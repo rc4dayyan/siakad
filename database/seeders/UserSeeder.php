@@ -24,7 +24,7 @@ class UserSeeder extends Seeder
             'code' => Str::random(6),
             'user' => 'admin',
             'gend' => 'L',
-            'email' => 'mjaya69703@gmail.com',
+            'email' => 'daeytea@gmail.com',
             'phone' => '080012345660',
             'password' => Hash::make('Admin123'),
             'status' => 1,

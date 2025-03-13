@@ -7,8 +7,6 @@
             <span class="text-danger">
                 <i class="bi bi-heart-fill icon-mid"></i>
             </span>
-            by
-            <a href="https://www.instagram.com/mjaya69703/">Muhamad Jaya Kusuma</a>
         </p>
     </div>
 </div>

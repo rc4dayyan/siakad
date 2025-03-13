@@ -217,7 +217,7 @@
     </tr>
    </table>
 
-   <p class="text-center mt-3">ESEC Academy - SiakadPT By Internal Developer</p>
+   <p class="text-center mt-3">ESEC Academy - Siakad By Internal Developer</p>
 </div>
 
 

@@ -50,9 +50,9 @@ services:
             - .docker/db/sql:/docker-entrypoint-initdb.d
         environment:
             MYSQL_ROOT_PASSWORD: root
-            MYSQL_DATABASE: siakadPT
-            MYSQL_USER: siakadPT
-            MYSQL_PASSWORD: siakadPT
+            MYSQL_DATABASE: Siakad
+            MYSQL_USER: Siakad
+            MYSQL_PASSWORD: Siakad
         restart: unless-stopped
 
 

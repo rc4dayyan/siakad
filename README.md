@@ -6,10 +6,10 @@
 <span>Latest Update: 4 Agustus 2024</span>
 </p>
 <p align="center">
-<a href="https://github.com/mjaya69703"><img src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white" alt="GitHub"></a>
-<a href="https://facebook.com/kyouma052"><img src="https://img.shields.io/badge/Facebook-%231877F2.svg?style=for-the-badge&logo=Facebook&logoColor=white" alt="Facebook"></a>
-<a href="https://instagram.com/mjaya69703"><img src="https://img.shields.io/badge/Instagram-%23E4405F.svg?style=for-the-badge&logo=Instagram&logoColor=white" alt="Instagram"></a>
-<a href="mailto:jaya.kusuma@internal-dev.id"><img src="https://img.shields.io/badge/Gmail-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Gmail"></a>
+<a href="#"><img src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white" alt="GitHub"></a>
+<a href="#"><img src="https://img.shields.io/badge/Facebook-%231877F2.svg?style=for-the-badge&logo=Facebook&logoColor=white" alt="Facebook"></a>
+<a href="#"><img src="https://img.shields.io/badge/Instagram-%23E4405F.svg?style=for-the-badge&logo=Instagram&logoColor=white" alt="Instagram"></a>
+<a href="mailto:koacime@gmail.com"><img src="https://img.shields.io/badge/Gmail-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Gmail"></a>
 </p>
 
 ## Preview Images
@@ -24,9 +24,9 @@ Proyek Sistem Informasi Akademik (SIAKAD) ini bertujuan untuk menyediakan platfo
 
 ## Feature List
 
-Pada proyek SiakadPT, terdapat 5 tingkat akses kontrol yang diperuntukkan bagi admin, 2 untuk dosen, dan 2 untuk mahasiswa. Namun, seiring dengan perkembangan proyek ini, diperkirakan jumlah akses kontrol akan terus bertambah seiring dengan peningkatan fitur dan kebutuhan pengguna. Hal ini menunjukkan fleksibilitas dan skalabilitas sistem yang dirancang untuk dapat menyesuaikan diri dengan tuntutan dan perubahan dalam lingkungan pendidikan tinggi secara efektif. 
+Pada proyek Siakad, terdapat 5 tingkat akses kontrol yang diperuntukkan bagi admin, 2 untuk dosen, dan 2 untuk mahasiswa. Namun, seiring dengan perkembangan proyek ini, diperkirakan jumlah akses kontrol akan terus bertambah seiring dengan peningkatan fitur dan kebutuhan pengguna. Hal ini menunjukkan fleksibilitas dan skalabilitas sistem yang dirancang untuk dapat menyesuaikan diri dengan tuntutan dan perubahan dalam lingkungan pendidikan tinggi secara efektif. 
 
-Berikut kami informasikan Fitur Utama SiakadPT yang kami bangun.
+Berikut kami informasikan Fitur Utama Siakad yang tersedia.
 
 <b>Fitur Untuk Staff / Karyawan ( Dibagi Sesuai Departemen )</b>
 1. Dashboard Admin

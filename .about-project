@@ -1,4 +1,4 @@
-## Planning Project SiakadPT By Internal Developer
+## Planning Project Siakad By Internal Developer
 
 A. Roles Authentikasi ( Tipe User )
 Saat ini untuk roles akan terbagi menjadi 3 Kelompok Authentikasi dengan melibatkan 3 Model Yaitu:
@@ -9,7 +9,7 @@ Pada model User ini akan menjadi default authentikasi untuk para admin dan staff
 Nah pada model User ini kita memiliki beberapa Hak Akses diantaranya
 
 - Hak Akses Web Administrator ( value type = 0 )
-    Hak akses Web Administrator merupakan roles tertinggi atau bisa juga dibilang sebagai Role Super Admin karena memiliki kemampuan untuk mengakses semua fitur yang berada pada roles Lainnya. 
+    Hak akses Web Administrator merupakan roles tertinggi atau bisa juga dibilang sebagai Role Super Admin karena memiliki kemampuan untuk mengakses semua fitur yang berada pada roles Lainnya.
 
 - Hak Akses Koordinator Fakultas ( value type = 1)
     Hak Akses Koordinator Fakultas merupakan roles yang difungsikan sebagai pengelola Program Studi, Mata Kuliah, Kurikulum, dan Kalender Akademik. Lalu sebagai langkah keamanan untuk meminimalisir terjadinya resiko terhadap perubahan atau penghapusan data secara tidak sengaja, Maka kita akan menambahkan Pop-Up "Security Code" setiap user yang ingin melakukan action Update data dan Delete Data.Berikut rencana fitur khusus yang akan dimiliki oleh Role Fakultas Koordinator :
@@ -30,10 +30,10 @@ Nah pada model User ini kita memiliki beberapa Hak Akses diantaranya
     Pada fitur ini koordinator akan membuat Semester berdasarkan berdasarkan Nama Semester, Tipe Semester,Kode Semester, Tahun Akademik
 
     5. Fitur Approval Kalender Akademik ( Approval Only )
-    Pada fitur ini Koordinator akan memberikan terkait persetujuan terhadap Kalender Akademik yang telah dibuat oleh Staff Administrasi. 
-   
+    Pada fitur ini Koordinator akan memberikan terkait persetujuan terhadap Kalender Akademik yang telah dibuat oleh Staff Administrasi.
+
     6. Fitur Approval Jadwal Perkuliahan ( Approval Only )
-    Pada fitur ini Koordinator akan memberikan terkait persetujuan terhadap jadwal Perkuliahan yang telah dibuat oleh Staff Administrasi. 
+    Pada fitur ini Koordinator akan memberikan terkait persetujuan terhadap jadwal Perkuliahan yang telah dibuat oleh Staff Administrasi.
 
     7. Fitur Kelola Program Perkuliahan ( CRUD )
     Pada fitur ini Koordinator akan membuat Jenis jenis program perkuliahan seperti Regular Pagi, Regular Sore, Kelas Beasiswa dan membagi jenis jenis estimasi waktu perkuliahannya semisal Regular Pagi pada Jam 08.00 - 16.00
@@ -56,4 +56,4 @@ Nah pada model User ini kita memiliki beberapa Hak Akses diantaranya
     4. Fitur Kelola Jadwal Perkuliahan ( CRUD )
     Seperti namanya pada fitur ini staff administrasi akan membuat Jadwal Perkuliahan mahasiswa berdasarkan ketersediaan ruangan, dosen, kelas dan matakuliah.
 
-    5. Fitur Penerbitan Surat Menyurat 
+    5. Fitur Penerbitan Surat Menyurat

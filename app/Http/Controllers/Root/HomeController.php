@@ -183,8 +183,8 @@ class HomeController extends Controller
         if($saran->save()){
             Mail::send('base.resource.mail-kotak-saran-admin', ['saran' => $saran], function($message) use ($saran) {
                 $message->to([
-                    'jaya.kusuma@internal-dev.id',
-                    'mjaya69703@gmail.com'
+                    'koacime@gmail.com',
+                    'daeytea@gmail.com'
                 ]);
                 $message->subject('[ SARAN ] - ESEC Academy - ' . $saran->subject);
                 $message->from('admin@internal-dev.id', 'SIAKAD PT by Internal-Dev');

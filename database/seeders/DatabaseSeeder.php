@@ -322,7 +322,7 @@ class DatabaseSeeder extends Seeder
             'school_head' => 'Dr. Mulawarman Frietz, M.Kom',
             'school_desc' => 'Salam sejahtera bagi seluruh mahasiswa dan dosen! Saya sebagai Rektor ESEC Academy dengan bangga menyambut Anda di portal Siakad kami. Platform ini adalah jembatan digital yang memudahkan akses dan meningkatkan efisiensi dalam proses akademik dan kemahasiswaan. Mari bersama-sama kita manfaatkan Siakad untuk menciptakan pengalaman belajar yang lebih baik dan membangun masa depan yang cerah bagi pendidikan kita.',
             'school_link' => 'https://instagram.com/mjaya69703',
-            'school_email' => 'jaya.kusuma@internal-dev.id',
+            'school_email' => 'koacime@gmail.com',
             'school_phone' => '+6287848799145',
             'social_ig' => 'https://instagram.com/mjaya69703',
             'social_fb' => 'https://facebook.com/kyouma052',

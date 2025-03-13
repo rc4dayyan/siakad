@@ -79,14 +79,8 @@
                                         <p class="user-dropdown-status text-sm text-muted">{{ Auth::user()->type }}</p>
                                     </div>
                                     @else
-                                    <div class="avatar avatar-md2">
-                                        <img src="{{ asset('storage/images/default/default-profile.jpg') }}"
-                                            alt="Avatar">
-                                    </div>
                                     <div class="text">
-
-                                        <h6 class="user-dropdown-name">John Ducky</h6>
-                                        <p class="user-dropdown-status text-sm text-muted">Member</p>
+                                        <h6 class="user-dropdown-name">Login</h6>
                                     </div>
                                     @endif
                                 </a>
@@ -168,7 +162,7 @@
                                                 <!-- 3 Level Submenu -->
                                                 <ul class="subsubmenu">
                                                     @foreach ($proku as $item)
-                                                        
+
                                                         <li class="subsubmenu-item ">
                                                             <a href="#" class="subsubmenu-link">{{ $item->name }}</a>
                                                         </li>
