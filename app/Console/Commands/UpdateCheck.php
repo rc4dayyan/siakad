@@ -31,10 +31,10 @@ class UpdateCheck extends Command
 
     public function handle()
     {
-        $branch = $this->option('branch') ?? 'stable';
+        $branch = $this->option('branch') ?? 'prod1';
         $client = new Client();
-        $owner = 'mjaya69703';
-        $repo = 'siakad-pt.internal-dev.id';
+        $owner = env('GITHUB_OWNER', 'rc4dayyan');
+        $repo = env('GITHUB_REPO', 'siakad');
         $url = "https://api.github.com/repos/$owner/$repo/branches/$branch";
 
         // Get the current local commit SHA

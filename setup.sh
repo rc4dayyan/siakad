@@ -9,7 +9,7 @@ read -p "Press enter to continue"
 
 echo "Setup Environment..."
 mkdir storage/framework/views
-cp .env.example .env
+# cp .env.example .env
 php artisan key:generate
 rm public/storage
 php artisan storage:link

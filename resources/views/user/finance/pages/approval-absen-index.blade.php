@@ -43,9 +43,9 @@
                 <div class="col-lg-3 col-6 mb-2">
                     <a href="{{ route($prefix . 'approval.absen-index') }}">
                         <div class="card btn btn-outline-success">
-                            <div class="card-body d-flex justify-content-around align-items-center">
-                                <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-person-circle-question" style="font-size: 42px"></i></span>
-                                <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ App\Models\uAttendance::where('absen_approve', 1)->count() }}<br> Approval Absen</span>
+                            <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-person-circle-question" style="font-size: 32px"></i></span>
+                                <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ App\Models\uAttendance::where('absen_approve', 1)->count() }}<br> Approval Absen</span>
                             </div>
                         </div>
                     </a>
@@ -53,9 +53,9 @@
                 <div class="col-lg-3 col-6 mb-2">
                     <a href="{{ route($prefix . 'approval.absen-index-approved') }}">
                         <div class="card btn btn-outline-success">
-                            <div class="card-body d-flex justify-content-around align-items-center">
-                                <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-person-circle-check" style="font-size: 42px"></i></span>
-                                <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ App\Models\uAttendance::where('absen_approve', 2)->count() }}<br> Approved Absen</span>
+                            <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-person-circle-check" style="font-size: 32px"></i></span>
+                                <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ App\Models\uAttendance::where('absen_approve', 2)->count() }}<br> Approved Absen</span>
                             </div>
                         </div>
                     </a>
@@ -63,9 +63,9 @@
                 <div class="col-lg-3 col-6 mb-2">
                     <a href="{{ route($prefix . 'approval.absen-index-rejected') }}">
                         <div class="card btn btn-outline-success">
-                            <div class="card-body d-flex justify-content-around align-items-center">
-                                <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-person-circle-xmark" style="font-size: 42px"></i></span>
-                                <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ App\Models\uAttendance::where('absen_approve', 3)->count() }}<br> Rejected Absen</span>
+                            <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-person-circle-xmark" style="font-size: 32px"></i></span>
+                                <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ App\Models\uAttendance::where('absen_approve', 3)->count() }}<br> Rejected Absen</span>
                             </div>
                         </div>
                     </a>

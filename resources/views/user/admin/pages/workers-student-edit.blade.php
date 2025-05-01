@@ -149,12 +149,12 @@
                                     <label for="mhs_reli">Agama</label>
                                     <select name="mhs_reli" id="mhs_reli" class="form-select" >
                                         <option value="" selected>Pilih Agama</option>
-                                        <option value="1" {{ $student->raw_mhs_reli === '1' ? 'selected' : ''}}>Agama Islam</option>
-                                        <option value="2" {{ $student->raw_mhs_reli === '2' ? 'selected' : ''}}>Agama Kristen Protestan</option>
-                                        <option value="3" {{ $student->raw_mhs_reli === '3' ? 'selected' : ''}}>Agama Kriten Katholik</option>
-                                        <option value="4" {{ $student->raw_mhs_reli === '4' ? 'selected' : ''}}>Agama Hindu</option>
-                                        <option value="5" {{ $student->raw_mhs_reli === '5' ? 'selected' : ''}}>Agama Buddha</option>
-                                        <option value="6" {{ $student->raw_mhs_reli === '6' ? 'selected' : ''}}>Agama Konghuchu</option>
+                                        <option value="1" {{ $student->raw_mhs_reli === '1' ? 'selected' : ''}}>1. Agama Islam</option>
+                                        <option value="2" {{ $student->raw_mhs_reli === '2' ? 'selected' : ''}}>2. Agama Kristen Protestan</option>
+                                        <option value="3" {{ $student->raw_mhs_reli === '3' ? 'selected' : ''}}>3. Agama Kriten Katholik</option>
+                                        <option value="4" {{ $student->raw_mhs_reli === '4' ? 'selected' : ''}}>4. Agama Hindu</option>
+                                        <option value="5" {{ $student->raw_mhs_reli === '5' ? 'selected' : ''}}>5. Agama Buddha</option>
+                                        <option value="6" {{ $student->raw_mhs_reli === '6' ? 'selected' : ''}}>6. Agama Konghuchu</option>
                                     </select>
                                     @error('mhs_reli')
                                         <small class="text-danger">{{ $message }}</small>
@@ -323,7 +323,7 @@
 
 
     </section>
-    
+
 </form>
 @endsection
 @section('custom-js')

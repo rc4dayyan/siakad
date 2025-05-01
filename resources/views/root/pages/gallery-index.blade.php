@@ -4,7 +4,7 @@
 @endsection
 @section('content')
 <section class="section">
-    <div class="breadcrumb-wrap-style-2" data-bg-image="https://srv-xsample.internal-dev.id/assets/webprofil/media/banner/banner22.jpg" style="border-radius: 20px; background-image: url(&quot;https://srv-xsample.internal-dev.id/assets/webprofil/media/banner/banner22.jpg&quot;);">
+    <div class="breadcrumb-wrap-style-2" data-bg-image="{{ env('APP_URL_SRV') }}/assets/webprofil/media/banner/banner22.jpg" style="border-radius: 20px; background-image: url(&quot;{{ env('APP_URL_SRV') }}/assets/webprofil/media/banner/banner22.jpg&quot;);">
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ route('root.home-index') }}">Home</a></li>
@@ -17,7 +17,7 @@
     </div>
     <div class="row mb-3 mt-3">
         <div class="col-lg-12">
-        
+
             <div class="d-flex justify-content-between align-items-center">
                 <div class="a d-flex justify-content-center">
                     <form action="{{ route('root.gallery-search') }}" method="GET">
@@ -27,8 +27,8 @@
                                     class="fa-solid fa-search"></i></button>
                         </div>
                     </form>
-        
-        
+
+
                 </div>
                 <div class="b">
                 </div>

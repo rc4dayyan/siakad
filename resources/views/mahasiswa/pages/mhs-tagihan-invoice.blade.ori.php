@@ -132,7 +132,7 @@
   <div class="container my-5 px-5 py-5">
    <div class="row">
       <div class="col-3 contact-details">
-         <h5>Esec Academy</h5>
+         <h5>Siakad</h5>
          <h6><em>Jakarta, Indonesia</h6>
          <p>Jl. Ciremai Raya No 240 Kota Jakarta Selatan</em></p>
       </div>

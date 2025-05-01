@@ -22,6 +22,12 @@
                 }
 
             }
+            .dataTable-wrapper {
+                font-size: 85%;
+            }
+            .sidebar-wrapper .menu .sidebar-title {
+                font-weight: 800;
+            }
         </style>
     </head>
 

@@ -44,9 +44,9 @@
                     <div class="col-lg-3 col-6 mb-2">
                         <a href="{{ route($prefix . 'presensi.absen-harian') }}">
                             <div class="card btn btn-outline-success">
-                                <div class="card-body d-flex justify-content-around align-items-center">
-                                    <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-clock" style="font-size: 42px"></i></span>
-                                    <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ $hadir->count() }} <br> Hadir</span>
+                                <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                    <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-clock" style="font-size: 32px"></i></span>
+                                    <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ $hadir->count() }} <br> Hadir</span>
                                 </div>
                             </div>
                         </a>
@@ -54,9 +54,9 @@
                     <div class="col-lg-3 col-6 mb-2">
                         <a href="{{ route($prefix . 'presensi.absen-harian') }}">
                             <div class="card btn btn-outline-success">
-                                <div class="card-body d-flex justify-content-around align-items-center">
-                                    <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-clock" style="font-size: 42px"></i></span>
-                                    <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ $izin->count() }} <br> Izin & Cuti</span>
+                                <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                    <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-clock" style="font-size: 32px"></i></span>
+                                    <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ $izin->count() }} <br> Izin & Cuti</span>
                                 </div>
                             </div>
                         </a>
@@ -64,9 +64,9 @@
                     <div class="col-lg-3 col-6 mb-2">
                         <a href="{{ route($prefix . 'presensi.absen-harian') }}">
                             <div class="card btn btn-outline-success">
-                                <div class="card-body d-flex justify-content-around align-items-center">
-                                    <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-clock" style="font-size: 42px"></i></span>
-                                    <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ $terlambat->count() }} <br> Terlambat</span>
+                                <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                    <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-clock" style="font-size: 32px"></i></span>
+                                    <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ $terlambat->count() }} <br> Terlambat</span>
                                 </div>
                             </div>
                         </a>
@@ -74,9 +74,9 @@
                     <div class="col-lg-3 col-6 mb-2">
                         <a href="#">
                             <div class="card btn btn-outline-success">
-                                <div class="card-body d-flex justify-content-around align-items-center">
-                                    <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-clock" style="font-size: 42px"></i></span>
-                                    <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ $hadir->count() + $izin->count() + $terlambat->count() }} <br> Total Absensi</span>
+                                <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                    <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-clock" style="font-size: 32px"></i></span>
+                                    <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ $hadir->count() + $izin->count() + $terlambat->count() }} <br> Total Absensi</span>
                                 </div>
                             </div>
                         </a>

@@ -1,6 +1,6 @@
 @extends('base.base-dash-index')
 @section('title')
-    SIAKAD PT - Internal Developer
+    {!! config('app.name') !!}
 @endsection
 @section('menu')
     Profile

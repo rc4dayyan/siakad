@@ -111,7 +111,7 @@ class AuthController extends Controller
             Mail::send('base.resource.mail-mhs-forgot-temp', ['user' => $user], function($message) use ($user) {
                 $message->to($user->mhs_mail);
                 $message->subject('Reset Password for ' . $user->mhs_name);
-                $message->from('admin@internal-dev.id', 'SIAKAD PT by Internal-Dev');
+                $message->from('admin@staipuimajalengka.ac.id', config('app.name'));
                 // $message->embedData(file_get_contents(public_path('/storage/images/default/logo.svg')), 'logo.svg', 'image/svg+xml');
             });
 

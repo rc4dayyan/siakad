@@ -124,7 +124,7 @@
     <table style="width: 100%;">
         <tr>
             <td style="width: 33%;">
-                <h5>Esec Academy</h5>
+                <h5>Siakad</h5>
                 <h6><em>Jakarta, Indonesia</em></h6>
                 <p>Jl. Ciremai Raya No 240 Kota Jakarta Selatan</p>
             </td>
@@ -217,7 +217,7 @@
     </tr>
    </table>
 
-   <p class="text-center mt-3">ESEC Academy - Siakad By Internal Developer</p>
+   <p class="text-center mt-3">Siakad - Siakad By Internal Developer</p>
 </div>
 
 

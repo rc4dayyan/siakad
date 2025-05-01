@@ -1,18 +1,18 @@
 @extends('base.base-dash-index')
 @section('title')
-    SIAKAD PT - Internal Developer
+    {!! config('app.name') !!}
 @endsection
 @section('menu')
     Contoh Menu
 @endsection
 @section('submenu')
-    Contoh SubMenu
+    Dashboard
 @endsection
 @section('urlmenu')
     #
 @endsection
 @section('subdesc')
-    Contoh Deskripsi Menu
+    Halaman Dashboard
 @endsection
 @section('custom-css')
     <style>
@@ -44,9 +44,9 @@
                 <div class="col-lg-3 col-6 mb-2">
                     <a href="{{ route('dosen.akademik.jadwal-index') }}">
                         <div class="card btn btn-outline-success">
-                            <div class="card-body d-flex justify-content-around align-items-center">
-                                <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-calendar" style="font-size: 42px"></i></span>
-                                <span class="text-white" style="margin-left: 25px; font-size: 16px;">Jadwal Mengajar <br>{{ \App\Models\JadwalKuliah::where('dosen_id', Auth::guard('dosen')->user()->id)->count() }}</span>
+                            <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-calendar" style="font-size: 32px"></i></span>
+                                <span class="" style="margin-left: 10px; font-size: 14px;">Jadwal Mengajar <br>{{ \App\Models\JadwalKuliah::where('dosen_id', Auth::guard('dosen')->user()->id)->count() }}</span>
                             </div>
                         </div>
                     </a>
@@ -54,9 +54,9 @@
                 <div class="col-lg-3 col-6 mb-2">
                     <a href="{{ route('dosen.akademik.jadwal-index') }}">
                         <div class="card btn btn-outline-success">
-                            <div class="card-body d-flex justify-content-around align-items-center">
-                                <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-star" style="font-size: 42px"></i></span>
-                                <span class="text-white" style="margin-left: 25px; font-size: 16px;">FeedBack <br>{{ $feedback->count() }}</span>
+                            <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-star" style="font-size: 32px"></i></span>
+                                <span class="" style="margin-left: 10px; font-size: 14px;">FeedBack <br>{{ $feedback->count() }}</span>
                             </div>
                         </div>
                     </a>

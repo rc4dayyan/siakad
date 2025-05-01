@@ -14,7 +14,7 @@ Public Document
 </style>
 @endsection
 @section('content')
-<div class="breadcrumb-wrap-style-2" data-bg-image="https://srv-xsample.internal-dev.id/assets/webprofil/media/banner/banner22.jpg" style="border-radius: 20px; background-image: url(&quot;https://srv-xsample.internal-dev.id/assets/webprofil/media/banner/banner22.jpg&quot;);">
+<div class="breadcrumb-wrap-style-2" data-bg-image="{{ env('APP_URL_SRV') }}/assets/webprofil/media/banner/banner22.jpg" style="border-radius: 20px; background-image: url(&quot;{{ env('APP_URL_SRV') }}/assets/webprofil/media/banner/banner22.jpg&quot;);">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{{ route('root.home-index') }}">Home</a></li>

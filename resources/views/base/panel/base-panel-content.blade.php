@@ -1,18 +1,18 @@
 @extends('base.base-dash-index')
 @section('title')
-    SIAKAD PT - Internal Developer
+    {!! config('app.name') !!}
 @endsection
 @section('menu')
     Contoh Menu
 @endsection
 @section('submenu')
-    Contoh SubMenu
+    Dashboard
 @endsection
 @section('urlmenu')
     #
 @endsection
 @section('subdesc')
-    Contoh Deskripsi Menu
+    Halaman Dashboard
 @endsection
 @section('content')
     <section class="section">

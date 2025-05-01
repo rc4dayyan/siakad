@@ -1,18 +1,18 @@
 @extends('base.base-dash-index')
 @section('title')
-    SIAKAD PT - Internal Developer
+    {!! config('app.name') !!}
 @endsection
 @section('menu')
     Contoh Menu
 @endsection
 @section('submenu')
-    Contoh SubMenu
+    Dashboard
 @endsection
 @section('urlmenu')
     #
 @endsection
 @section('subdesc')
-    Contoh Deskripsi Menu
+    Halaman Dashboard
 @endsection
 @section('custom-css')
     <style>
@@ -44,9 +44,9 @@
                 <div class="col-lg-3 col-6 mb-2">
                     <a href="{{ route('mahasiswa.home-tagihan-index') }}">
                         <div class="card btn btn-outline-success">
-                            <div class="card-body d-flex justify-content-around align-items-center">
-                                <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-file-invoice-dollar" style="font-size: 42px"></i></span>
-                                <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ number_format($sisatagihan, 0, ',', '.') }}<br>Tagihan <br> ( IDR )</span>
+                            <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-file-invoice-dollar" style="font-size: 32px"></i></span>
+                                <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ number_format($sisatagihan, 0, ',', '.') }}<br>Tagihan <br> ( IDR )</span>
                             </div>
                         </div>
                     </a>
@@ -54,9 +54,9 @@
                 <div class="col-lg-3 col-6 mb-2">
                     <a href="{{ route('mahasiswa.home-tagihan-index') }}">
                         <div class="card btn btn-outline-success">
-                            <div class="card-body d-flex justify-content-around align-items-center">
-                                <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-money-bill-transfer" style="font-size: 42px"></i></span>
-                                <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ number_format($history, 0, ',', '.') }}<br>Pembayaran <br> ( IDR )</span>
+                            <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-money-bill-transfer" style="font-size: 32px"></i></span>
+                                <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ number_format($history, 0, ',', '.') }}<br>Pembayaran <br> ( IDR )</span>
                             </div>
                         </div>
                     </a>
@@ -64,9 +64,9 @@
                 <div class="col-lg-3 col-6 mb-2">
                     <a href="{{ route('mahasiswa.home-jadkul-index') }}">
                         <div class="card btn btn-outline-success">
-                            <div class="card-body d-flex justify-content-around align-items-center">
-                                <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-user-check" style="font-size: 42px"></i></span>
-                                <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ $habsen }} <br>Absen <br> Kehadiran</span>
+                            <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-user-check" style="font-size: 32px"></i></span>
+                                <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ $habsen }} <br>Absen <br> Kehadiran</span>
                             </div>
                         </div>
                     </a>
@@ -74,9 +74,9 @@
                 <div class="col-lg-3 col-6 mb-2">
                     <a href="{{ route('mahasiswa.home-jadkul-index') }}">
                         <div class="card btn btn-outline-success">
-                            <div class="card-body d-flex justify-content-around align-items-center">
-                                <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-book-open-reader" style="font-size: 42px"></i></span>
-                                <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ $jadkul }} <br>Jadwal <br> Perkuliahan</span>
+                            <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-book-open-reader" style="font-size: 32px"></i></span>
+                                <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ $jadkul }} <br>Jadwal <br> Perkuliahan</span>
                             </div>
                         </div>
                     </a>

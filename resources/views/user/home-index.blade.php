@@ -47,9 +47,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route('web-admin.workers.student-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-user-graduate" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\Mahasiswa::all()->count() }} <br> Mahasiswa</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-user-graduate" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\Mahasiswa::all()->count() }} <br> Mahasiswa</span>
                                     </div>
                                 </div>
                             </a>
@@ -57,9 +57,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route('web-admin.workers.lecture-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-user-tie" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\Dosen::all()->count() }} <br> Dosen</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-user-tie" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\Dosen::all()->count() }} <br> Dosen</span>
                                     </div>
                                 </div>
                             </a>
@@ -67,9 +67,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route('web-admin.workers.staff-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-user-tag" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\User::where('type', ['1', '2', '3', '4'])->count() }}<br> Karyawan</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-user-tag" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\User::where('type', ['1', '2', '3', '4'])->count() }}<br> Karyawan</span>
                                     </div>
                                 </div>
                             </a>
@@ -77,9 +77,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route('web-admin.master.jadkul-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-book-open-reader" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\JadwalKuliah::all()->count() }}<br>Jadwal Kuliah</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-book-open-reader" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\JadwalKuliah::all()->count() }}<br>Jadwal Kuliah</span>
                                     </div>
                                 </div>
                             </a>
@@ -90,9 +90,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route('web-admin.master.fakultas-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-building-columns" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\Fakultas::all()->count() }} <br> Fakultas</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-building-columns" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\Fakultas::all()->count() }} <br> Fakultas</span>
                                     </div>
                                 </div>
                             </a>
@@ -100,9 +100,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route('web-admin.master.pstudi-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-graduation-cap" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\ProgramStudi::all()->count() }}<br>Prodi</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-graduation-cap" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\ProgramStudi::all()->count() }}<br>Prodi</span>
                                     </div>
                                 </div>
                             </a>
@@ -110,9 +110,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route('web-admin.master.kelas-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-building-user" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\Kelas::all()->count() }}<br> Kelas</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-building-user" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\Kelas::all()->count() }}<br> Kelas</span>
                                     </div>
                                 </div>
                             </a>
@@ -120,9 +120,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route('web-admin.master.matkul-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-book-open" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\MataKuliah::all()->count() }} <br> Mata Kuliah</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-book-open" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\MataKuliah::all()->count() }} <br> Mata Kuliah</span>
                                     </div>
                                 </div>
                             </a>
@@ -133,9 +133,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route('web-admin.master.taka-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-calendar" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\Kurikulum::all()->count() }}<br>Tahun Akademik</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-calendar" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\Kurikulum::all()->count() }}<br>Tahun Akademik</span>
                                     </div>
                                 </div>
                             </a>
@@ -143,9 +143,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route('web-admin.master.kurikulum-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-book" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\Kurikulum::all()->count() }}<br>Kurikulum</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-book" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\Kurikulum::all()->count() }}<br>Kurikulum</span>
                                     </div>
                                 </div>
                             </a>
@@ -153,9 +153,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route('web-admin.master.proku-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-list-ol" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\ProgramKuliah::all()->count() }}<br> Program Kuliah</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-list-ol" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\ProgramKuliah::all()->count() }}<br> Program Kuliah</span>
                                     </div>
                                 </div>
                             </a>
@@ -163,9 +163,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route('web-admin.inventory.ruang-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-house-flag" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\Ruang::all()->count() }}<br>Ruangan</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-house-flag" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\Ruang::all()->count() }}<br>Ruangan</span>
                                     </div>
                                 </div>
                             </a>
@@ -175,9 +175,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route($prefix . 'finance.keuangan-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-wallet" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ number_format($balSekarang, 0, ',', '.') }}<br> Sisa Saldo ( IDR )</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-wallet" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ number_format($balSekarang, 0, ',', '.') }}<br> Sisa Saldo ( IDR )</span>
                                     </div>
                                 </div>
                             </a>
@@ -185,9 +185,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route($prefix . 'finance.keuangan-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-file-invoice-dollar" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ number_format($balPending, 0, ',', '.') }}<br> Pending ( IDR )</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-file-invoice-dollar" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ number_format($balPending, 0, ',', '.') }}<br> Pending ( IDR )</span>
                                     </div>
                                 </div>
                             </a>
@@ -195,9 +195,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route($prefix . 'finance.keuangan-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-dollar" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ number_format($balIncome, 0, ',', '.') }}<br> Income ( IDR )</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-dollar" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ number_format($balIncome, 0, ',', '.') }}<br> Income ( IDR )</span>
                                     </div>
                                 </div>
                             </a>
@@ -205,9 +205,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route($prefix . 'finance.keuangan-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-dollar" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ number_format($balExpense, 0, ',', '.') }}<br> Expenses ( IDR )</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-dollar" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ number_format($balExpense, 0, ',', '.') }}<br> Expenses ( IDR )</span>
                                     </div>
                                 </div>
                             </a>
@@ -217,9 +217,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route($prefix . 'finance.tagihan-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-file-invoice" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\TagihanKuliah::all()->count() }}<br> Tagihan</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-file-invoice" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\TagihanKuliah::all()->count() }}<br> Tagihan</span>
                                     </div>
                                 </div>
                             </a>
@@ -227,9 +227,9 @@
                         <div class="col-lg-3 col-6 mb-2">
                             <a href="{{ route($prefix . 'finance.pembayaran-index') }}">
                                 <div class="card btn btn-outline-success">
-                                    <div class="card-body d-flex justify-content-around align-items-center">
-                                        <span class="icon" style="margin-right: 25px;"><i class="fa-solid fa-file-invoice-dollar" style="font-size: 42px"></i></span>
-                                        <span class="text-putih" style="margin-left: 25px; font-size: 16px;">{{ \App\Models\HistoryTagihan::where('stat', 1)->count() }}<br> Pembayaran</span>
+                                    <div class="card-body d-flex justify-content-around align-items-center p-1">
+                                        <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-file-invoice-dollar" style="font-size: 32px"></i></span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\HistoryTagihan::where('stat', 1)->count() }}<br> Pembayaran</span>
                                     </div>
                                 </div>
                             </a>

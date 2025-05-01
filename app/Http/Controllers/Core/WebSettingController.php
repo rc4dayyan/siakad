@@ -40,8 +40,8 @@ class WebSettingController extends Controller
 
         // Fetch branches from GitHub
         $client = new Client();
-        $owner = 'mjaya69703';
-        $repo = 'siakad-pt.internal-dev.id';
+        $owner = env('GITHUB_OWNER', 'rc4dayyan');
+        $repo = env('GITHUB_REPO', 'siakad');
         $url = "https://api.github.com/repos/$owner/$repo/branches";
 
         try {

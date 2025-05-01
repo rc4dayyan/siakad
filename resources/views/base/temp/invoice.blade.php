@@ -137,7 +137,7 @@ div.row div.to{
          <p>Contact details Spanning on multiple rows cuz bootstrap is awesome.</em></p>
       </div>
       <div class="col-1 offset-2 logo">
-         <img width="125px" height="125px" src="https://siakad-pt.internal-dev.id/storage/images/default/web/site-logo.png" />
+         <img width="125px" height="125px" src="{{ env('APP_URL') }}/storage/images/default/web/site-logo.png" />
       </div>
       <div class="invoice-details col-3 offset-3 text-right">
 

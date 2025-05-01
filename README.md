@@ -1,7 +1,7 @@
-<p align="center"><a href="https://siakad-pt.internal-dev.id" target="_blank"><img src="https://siakad-pt.internal-dev.id/storage/images/website/site-logo.png" width="400" alt="Laravel Logo"></a></p>
+<p align="center"><a href="https://{host}" target="_blank"><img src="https://{host}/storage/images/website/site-logo.png" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">
-<a href="changelog.md">ESEC Academy - Open Source Project | v0.032a - Changelogs</a>
+<a href="changelog.md">Siakad - Open Source Project | v0.032a - Changelogs</a>
 <br>
 <span>Latest Update: 4 Agustus 2024</span>
 </p>
@@ -76,10 +76,10 @@ Berikut kami informasikan Fitur Utama Siakad yang tersedia.
 Kamu boleh mencoba fitur apapun pada fitur ini, Apabila kamu memiliki kritik atau saran kamu bisa mengisi pada homepage dibagian menu Kritik dan Saran yang terhubung langsung dengan email pribadi saya.
 
 ```
-Link : https://siakad-pt.internal-dev.id
+Link : https://{host}
 
 Demo with User Account:
-Link : https://siakad-pt.internal-dev.id/admin/auth-signin
+Link : https://{host}/admin/auth-signin
 1. Departement Web Administrator ( Super Admin )
 User : admin
 Pass : Admin123
@@ -105,12 +105,12 @@ User : officer
 Pass : Admin123
 
 Demo with Dosen Account:
-Link : https://siakad-pt.internal-dev.id/dosen/auth-signin
+Link : https://{host}/dosen/auth-signin
 User : dosen.a@example.com // You can replace "a" with another alphabet to "d"
 Pass : Dosen123
 
 Demo with Mahasiswa Account:
-Link : https://siakad-pt.internal-dev.id/mahasiswa/auth-signin
+Link : https://{host}/mahasiswa/auth-signin
 User : mahasiswa.a@example.com // You can replace "a" with another alphabet to "d"
 Pass : Mahasiswa123
 ```
@@ -129,8 +129,8 @@ Notes:
 2. Clone Repository
 
 ```
-git clone https://github.com/mjaya69703/siakad-pt.internal-dev.id.git
-cd siakad-pt.internal-dev.id
+git clone https://github.com/mjaya69703/{host}.git
+cd {host}
 
 // Apabila Menggunakan Windows
 setup.bat

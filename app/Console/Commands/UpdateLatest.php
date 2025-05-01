@@ -31,10 +31,10 @@ class UpdateLatest extends Command
 
     public function handle()
     {
-        $branch = $this->option('branch') ?? 'stable'; // Default to 'dev-alpha' if no branch is provided
+        $branch = $this->option('branch') ?? 'prod1'; // Default to 'dev-alpha' if no branch is provided
         $client = new Client();
-        $owner = env('GITHUB_OWNER', 'mjaya69703');
-        $repo = env('GITHUB_REPO', 'siakad-pt.internal-dev.id');
+        $owner = env('GITHUB_OWNER', 'rc4dayyan');
+        $repo = env('GITHUB_REPO', 'siakad');
         $url = "https://api.github.com/repos/$owner/$repo/branches/$branch";
 
         // Get the current local commit SHA

@@ -22,44 +22,44 @@ class DatabaseSeeder extends Seeder
 
         // SEEDER KHUSUS DATA MASTER AKADEMIK
         \App\Models\Fakultas::create([
-            'name'       => 'Fakultas Ilmu Komputer',
-            'code'       => 'FIK',
+            'name'       => 'Fakultas Tarbiyah',
+            'code'       => 'FPAI',
             'head_id'    => '1',
         ]);
         \App\Models\ProgramStudi::create([
-            'name'       => 'Teknik Informatika',
-            'code'       => 'TI',
+            'name'       => 'Pendidikan Guru Pendidikan Agama Islam',
+            'code'       => 'PGPAI',
             'cnim'       => '4210',
-            'title'      => ', S.Kom',
+            'title'      => ', S.Pd',
             'level'      => 'S1',
-            'slug'       => Str::slug('Teknik Informatika'),
+            'slug'       => Str::slug('Pendidikan Guru Pendidikan Agama Islam'),
             'head_id'    => '1',
             'faku_id'    => '1',
         ]);
         \App\Models\ProgramStudi::create([
-            'name'       => 'Sistem Informasi',
-            'code'       => 'SI',
+            'name'       => 'Pendidikan Guru Bahasa Arab',
+            'code'       => 'PGBA',
             'cnim'       => '4211',
-            'title'      => ', S.Kom',
+            'title'      => ', S.Pd',
             'level'      => 'S1',
-            'slug'       => Str::slug('Sistem Informasi'),
+            'slug'       => Str::slug('Pendidikan Guru Bahasa Arab'),
             'head_id'    => '1',
             'faku_id'    => '1',
         ]);
         \App\Models\TahunAkademik::create([
-            'name'       => 'TA. 2023/2024',
+            'name'       => 'TA. 2025/2026',
             'code'       => '012023',
             'semester'   => '1',
-            'year_start' => '2023',
+            'year_start' => '2025',
         ]);
         \App\Models\TahunAkademik::create([
-            'name'       => 'TA. 2023/2024',
+            'name'       => 'TA. 2025/2026',
             'code'       => '022023',
             'semester'   => '2',
-            'year_start' => '2023',
+            'year_start' => '2025',
         ]);
         \App\Models\ProgramKuliah::create([
-            'name'       => 'Regular Pagi',
+            'name'       => 'Regular Sore',
             'code'       => 'G1RP-2023',
             'wave'       => 'Gelombang I',
             'taka_id'    => '1',
@@ -70,12 +70,12 @@ class DatabaseSeeder extends Seeder
             'code'       => 'K20',
             'desc'       => 'Kurikulum 2020 adalah kurikulum dirancang 25 Tahun',
             'year_start' => '2019',
-            'year_ended' => '2024',
+            'year_ended' => '2025',
         ]);
         \App\Models\MataKuliah::create([
-            'name'       => 'Jaringan Komputer Dasar',
-            'code'       => 'JKD',
-            'desc'       => 'Matakuliah yang membahas mengenai jaringan komputer dasar',
+            'name'       => 'Pendidikan Bahasa Arab 1',
+            'code'       => 'PBA1',
+            'desc'       => 'Matakuliah yang membahas mengenai pendidikan bahasa arab',
             'bsks'       => '20',
             'kuri_id'    => '1',
             'taka_id'    => '1',
@@ -84,27 +84,27 @@ class DatabaseSeeder extends Seeder
             'pstudi_id'  => '1',
         ]);
         \App\Models\MataKuliah::create([
-            'name'       => 'Jaringan Komputer Expert',
-            'code'       => 'JKE',
-            'desc'       => 'Matakuliah yang membahas mengenai jaringan komputer dasar',
+            'name'       => 'Sejarah Peradaban Islam',
+            'code'       => 'SPI',
+            'desc'       => 'Matakuliah yang membahas mengenai sejarah peradaban islam',
             'bsks'       => '20',
             'kuri_id'    => '1',
-            'taka_id'    => '2',
+            'taka_id'    => '1',
             'dosen_1'    => '2',
             'pstudi_id'  => '1',
         ]);
         \App\Models\Kelas::create([
-            'name'       => 'TI-2023-RP-1A',
-            'code'       => 'TI-2023-RP-1A',
+            'name'       => 'PBA-2025-1A',
+            'code'       => 'PBA-2025-1A',
             'capacity'   => '32',
             'dosen_id'   => '1',
             'proku_id'   => '1',
             'taka_id'    => '1',
-            'pstudi_id'  => '1',
+            'pstudi_id'  => '2',
         ]);
         \App\Models\Kelas::create([
-            'name'       => 'TI-2023-RP-1B',
-            'code'       => 'TI-2023-RP-1B',
+            'name'       => 'PAI-2025-1A',
+            'code'       => 'PAI-2025-1A',
             'capacity'   => '32',
             'dosen_id'   => '2',
             'proku_id'   => '1',
@@ -317,17 +317,17 @@ class DatabaseSeeder extends Seeder
         ]);
 
         \App\Models\Settings\webSettings::create([
-            'school_apps' => 'ESEC Apps v1.0 ',
-            'school_name' => 'ESEC Academy',
-            'school_head' => 'Dr. Mulawarman Frietz, M.Kom',
-            'school_desc' => 'Salam sejahtera bagi seluruh mahasiswa dan dosen! Saya sebagai Rektor ESEC Academy dengan bangga menyambut Anda di portal Siakad kami. Platform ini adalah jembatan digital yang memudahkan akses dan meningkatkan efisiensi dalam proses akademik dan kemahasiswaan. Mari bersama-sama kita manfaatkan Siakad untuk menciptakan pengalaman belajar yang lebih baik dan membangun masa depan yang cerah bagi pendidikan kita.',
-            'school_link' => 'https://instagram.com/mjaya69703',
+            'school_apps' => 'Siakad v1.0 ',
+            'school_name' => 'STAI PUI',
+            'school_head' => 'Dr. H. Agus Sutisna, M.Pd.',
+            'school_desc' => 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Tenetur, omnis quibusdam aliquam at nemo repellat nam ad adipisci itaque alias eveniet consequuntur molestiae cupiditate dolores, id magni autem vero quam, suscipit nulla facere molestias ipsum? Adipisci, animi natus. Modi, veniam doloribus assumenda in dolorem exercitationem quaerat tempora non temporibus magni earum voluptatibus autem quibusdam tempore voluptas aperiam, consequuntur alias fuga laudantium sed harum distinctio repudiandae facere omnis. Sint sunt dignissimos fugit velit voluptatibus adipisci esse minima explicabo. Nisi est architecto quasi suscipit amet quaerat nulla dolore illo quis inventore, error iusto nostrum eaque nemo, atque odio quas esse aut aperiam!',
+            'school_link' => '',
             'school_email' => 'koacime@gmail.com',
-            'school_phone' => '+6287848799145',
-            'social_ig' => 'https://instagram.com/mjaya69703',
-            'social_fb' => 'https://facebook.com/kyouma052',
-            'social_in' => 'https://id.linkedin.com/in/mjaya69703',
-            'social_tw' => 'https://x.com/mjaya69703',
+            'school_phone' => '+6212334567890',
+            'social_ig' => '#',
+            'social_fb' => '#',
+            'social_in' => '#',
+            'social_tw' => '#',
         ]);
 
         $this->call([

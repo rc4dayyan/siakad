@@ -55,9 +55,9 @@ class AuthController extends Controller
         $fieldType = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'mhs_mail' : 'mhs_nim';
 
         // Jika input 'login' adalah nomor dengan 10 digit, maka kita asumsikan itu adalah nomor telepon
-        if(preg_match('/^[0-9]{10,13}$/', $login)) {
-            $fieldType = 'mhs_phone';
-        }
+        // if(preg_match('/^[0-9]{10,13}$/', $login)) {
+        //     $fieldType = 'mhs_phone';
+        // }
 
         $user = Mahasiswa::where($fieldType, $request->login)->first();
 
@@ -102,10 +102,10 @@ class AuthController extends Controller
 
     public function AuthForgotVerify(Request $request){
         $request->validate([
-            'email' => 'required|email|exists:mahasiswas,mhs_mail', // validasi email dan cek apakah email ada di tabel users
+            'email' => 'required|exists:mahasiswas,mhs_nim',
         ]);
 
-        $user = Mahasiswa::where('mhs_mail', $request->email)->first();
+        $user = Mahasiswa::where('mhs_nim', $request->email)->first();
         $user->verify_token = Str::random(40);
         $user->token_created_at = now();
 
@@ -113,7 +113,7 @@ class AuthController extends Controller
             Mail::send('base.resource.mail-mhs-forgot-temp', ['user' => $user], function($message) use ($user) {
                 $message->to($user->mhs_mail);
                 $message->subject('Reset Password for ' . $user->mhs_name);
-                $message->from('admin@internal-dev.id', 'SIAKAD PT by Internal-Dev');
+                $message->from('admin@staipuimajalengka.ac.id', config('app.name'));
                 // $message->embedData(file_get_contents(public_path('/storage/images/default/logo.svg')), 'logo.svg', 'image/svg+xml');
             });
 

@@ -64,27 +64,45 @@ class ImportController extends Controller
             'import.max' => 'Ukuran file tidak boleh melebihi 2MB.',
         ]);
 
-        $path = $request->file('import')->store('public/excel-files');
-        $users = (new FastExcel)->import(storage_path('app/' . $path) , function ($line) {
-            return Mahasiswa::create([
-                'mhs_nim' => $line['NIM'],
-                'mhs_mail' => $line['Email'],
-                'mhs_phone' => $line['Phone'],
-                'mhs_name' => $line['FullName'],
-                'mhs_gend' => $line['Gender'] ,
-                'mhs_reli' => $line['Religion'] == null ? null : $line['Religion'],
-                'mhs_birthplace' => $line['BirthPlace'] == null ? null : $line['BirthPlace'],
-                'mhs_birthdate' => $line['BirthDate'] == null ? null : $line['BirthDate'],
-                'mhs_stat' => $line['TypeUser'],
-                'years_id' => $line['YearsID'],
-                'class_id' => $line['ClassID'],
-                'mhs_code' => Str::random(6),
-                'mhs_user' => Str::random(6),
-                'password' => Hash::make($line['Phone']),
-            ]);
-        });
 
-        Alert::success('Sukses', 'Data berhasil diimport !');
+        $path = $request->file('import')->store('public/excel-files');
+        $rows = (new FastExcel)->import(storage_path('app/' . $path));
+        $message = '';
+
+        foreach ($rows as $line) {
+            if (Mahasiswa::where('mhs_nim', $line['NIM'])->exists()) {
+                $message = "❌ Data dengan NIM {$line['NIM']} sudah ada. Import dihentikan.";
+                break; // ❗ Stop the loop immediately
+            }
+
+            Mahasiswa::create([
+                'mhs_nim'        => $line['NIM'],
+                'mhs_mail'       => $line['Email'],
+                'mhs_phone'      => $line['Phone'],
+                'mhs_name'       => $line['FullName'],
+                'mhs_gend'       => $line['Gender'],
+                'mhs_reli'       => $line['Religion'] == null ? null : $line['Religion'],
+                'mhs_birthplace' => $line['BirthPlace'] == null ? null : $line['BirthPlace'],
+                'mhs_birthdate'  => $line['BirthDate'] == null ? null : $line['BirthDate'],
+                'mhs_stat'       => $line['TypeUser'],
+                'years_id'       => $line['YearsID'],
+                'class_id'       => $line['ClassID'],
+                'mhs_code'       => Str::random(6),
+                'mhs_user'       => Str::random(6),
+                'password'       => Hash::make($line['Phone']),
+            ]);
+
+
+        }
+
+        if(empty($message)){
+            $message = "✅ Data berhasil diimport.";
+            Alert::success('Sukses', $message);
+        } else {
+            Alert::error('Gagal', $message);
+        }
+
+
         return back();
     }
 }
