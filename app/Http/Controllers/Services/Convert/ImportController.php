@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Services\Convert;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 // SECTION ADDONS SYSTEM
 use Illuminate\Support\Facades\File;
 use Auth;
@@ -69,31 +70,47 @@ class ImportController extends Controller
         $rows = (new FastExcel)->import(storage_path('app/' . $path));
         $message = '';
 
-        foreach ($rows as $line) {
-            if (Mahasiswa::where('mhs_nim', $line['NIM'])->exists()) {
-                $message = "❌ Data dengan NIM {$line['NIM']} sudah ada. Import dihentikan.";
-                break; // ❗ Stop the loop immediately
+        DB::beginTransaction();
+
+        try {
+            $continue = true;
+            foreach ($rows as $line) {
+                if (Mahasiswa::where('mhs_nim', $line['NIM'])->exists()) {
+                    $message = "❌ Data dengan NIM {$line['NIM']} sudah ada. Import dihentikan.";
+                    $continue = false;
+                    break; // ❗ Stop the loop immediately
+                }
+
+                Mahasiswa::create([
+                    'mhs_nim'        => $line['NIM'],
+                    'mhs_mail'       => $line['Email'],
+                    'mhs_phone'      => $line['Phone'],
+                    'mhs_name'       => $line['FullName'],
+                    'mhs_gend'       => $line['Gender'],
+                    'mhs_reli'       => $line['Religion'] == null ? null : $line['Religion'],
+                    'mhs_birthplace' => $line['BirthPlace'] == null ? null : $line['BirthPlace'],
+                    'mhs_birthdate'  => $line['BirthDate'] == null ? null : $line['BirthDate'],
+                    'mhs_stat'       => $line['TypeUser'],
+                    'years_id'       => $line['YearsID'],
+                    'class_id'       => $line['ClassID'],
+                    'mhs_code'       => Str::random(6),
+                    'mhs_user'       => Str::random(6),
+                    'password'       => Hash::make($line['Phone']),
+                ]);
             }
 
-            Mahasiswa::create([
-                'mhs_nim'        => $line['NIM'],
-                'mhs_mail'       => $line['Email'],
-                'mhs_phone'      => $line['Phone'],
-                'mhs_name'       => $line['FullName'],
-                'mhs_gend'       => $line['Gender'],
-                'mhs_reli'       => $line['Religion'] == null ? null : $line['Religion'],
-                'mhs_birthplace' => $line['BirthPlace'] == null ? null : $line['BirthPlace'],
-                'mhs_birthdate'  => $line['BirthDate'] == null ? null : $line['BirthDate'],
-                'mhs_stat'       => $line['TypeUser'],
-                'years_id'       => $line['YearsID'],
-                'class_id'       => $line['ClassID'],
-                'mhs_code'       => Str::random(6),
-                'mhs_user'       => Str::random(6),
-                'password'       => Hash::make($line['Phone']),
-            ]);
+            if($continue) {
+                // Commit transaction
+                DB::commit();
+            } else {
+                DB::rollBack();
+            }
+        } catch (\Exception $e) {
+            DB::rollBack();
 
-
+            $message = "Failed! " . $e->getMessage();
         }
+
 
         if(empty($message)){
             $message = "✅ Data berhasil diimport.";
