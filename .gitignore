@@ -20,4 +20,13 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+app/.DS_Store
+app/Http/.DS_Store
+app/Models/.DS_Store
+database/.DS_Store
 package-lock.json
+resources/.DS_Store
+resources/views/.DS_Store
+storage/*
+tests/.DS_Store
+public/*
