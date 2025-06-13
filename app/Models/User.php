@@ -37,6 +37,7 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'raw_type' => 'integer',
     ];
 
     public function getTypeAttribute($value)
