@@ -3,6 +3,20 @@
 /public/build
 /public/hot
 /public/storage
+/public/tools
+/public/vendor
+/public/auth
+
+# Ignore everything in public/
+public/dist/**
+
+# Unignore the path step by step
+!public/dist/assets/
+!public/dist/assets/compiled/
+!public/dist/assets/compiled/**
+!public/dist/assets/extensions/
+!public/dist/assets/extensions/**
+
 /storage/*.key
 /storage/framework/*
 /vendor
@@ -29,4 +43,3 @@ resources/.DS_Store
 resources/views/.DS_Store
 storage/*
 tests/.DS_Store
-public/*
