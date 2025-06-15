@@ -58,14 +58,14 @@
                 <span>Data Akademik</span>
             </a>
             <ul class="submenu">
-                <li class="submenu-item {{ Route::is('web-admin.master.taka-*') ? 'active' : '' }}">
-                    <a href="{{ route('web-admin.master.taka-index') }}" class="submenu-link">Data Tahun Akademik</a>
-                </li>
                 <li class="submenu-item {{ Route::is('web-admin.master.fakultas-*') ? 'active' : '' }}">
                     <a href="{{ route('web-admin.master.fakultas-index') }}" class="submenu-link">Data Fakultas</a>
                 </li>
                 <li class="submenu-item {{ Route::is('web-admin.master.pstudi-*') ? 'active' : '' }}">
                     <a href="{{ route('web-admin.master.pstudi-index') }}" class="submenu-link">Data Program Studi</a>
+                </li>
+                <li class="submenu-item {{ Route::is('web-admin.master.taka-*') ? 'active' : '' }}">
+                    <a href="{{ route('web-admin.master.taka-index') }}" class="submenu-link">Data Tahun Akademik</a>
                 </li>
             </ul>
         </li>

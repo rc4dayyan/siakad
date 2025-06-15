@@ -49,8 +49,8 @@
                         @enderror
                     </div>
                     <div class="form-group">
-                        <label for="code">Kode Program Studi ( 2 Angka )</label>
-                        <input type="text" class="form-control" name="code" id="code" placeholder="Inputkan kode program studi..." maxlength="2" uppercase onkeydown="return /[a-zA-Z0-9]/i.test(event.key)" >
+                        <label for="code">Kode Program Studi ( Max 10 Karakter )</label>
+                        <input type="text" class="form-control" name="code" id="code" placeholder="Inputkan kode program studi..." maxlength="10" uppercase onkeydown="return /[a-zA-Z0-9]/i.test(event.key)" >
                         @error('code')
                             <small class="text-danger">{{ $message }}</small>
                         @enderror
@@ -189,8 +189,8 @@
                                 @enderror
                             </div>
                             <div class="form-group">
-                                <label for="code">Kode Program Studi ( 2 Angka )</label>
-                                <input type="text" class="form-control" name="code" id="code" placeholder="Inputkan kode program studi..." value="{{ $item->code }}" maxlength="2" uppercase onkeydown="return /[a-zA-Z0-9]/i.test(event.key)" >
+                                <label for="code">Kode Program Studi ( 10 Angka )</label>
+                                <input type="text" class="form-control" name="code" id="code" placeholder="Inputkan kode program studi..." value="{{ $item->code }}" maxlength="10" uppercase onkeydown="return /[a-zA-Z0-9]/i.test(event.key)" >
                                 @error('code')
                                     <small class="text-danger">{{ $message }}</small>
                                 @enderror
@@ -217,9 +217,9 @@
                                 @enderror
                             </div>
                             <div class="form-group">
-                                <label for="head_id">Kepala Fakultas</label>
+                                <label for="head_id">Kepala Program Studi</label>
                                 <select name="head_id" id="head_id" class="form-select">
-                                    <option value="" selected>Pilih Kepala Fakultas</option>
+                                    <option value="" selected>Pilih Kepala Program Studi</option>
                                     @foreach ($dosen as $dsn)
                                         <option value="{{ $dsn->id }}" {{ $item->head_id == $dsn->id ? 'selected' : '' }}>{{ $dsn->dsn_name }}</option>
                                     @endforeach

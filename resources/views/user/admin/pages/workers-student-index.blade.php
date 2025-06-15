@@ -48,7 +48,7 @@
                         <td data-label="Number">{{ ++$key }}</td>
                         <td data-label="NIM Mahasiswa">{{ $item->mhs_nim }}</td>
                         <td data-label="Nama Mahasiswa">{{ $item->mhs_name }}</td>
-                        <td data-label="Kelas">{{ $item->kelas->name }}</td>
+                        <td data-label="Kelas">{{ $item->kelas->name ?? '' }}</td>
                         <td data-label="Gender">{{ $item->mhs_gend }}</td>
                         <td data-label="Join Date">{{ \Carbon\Carbon::parse($item->created_at)->format('l, d M Y') }}</td>
                         <td data-label="Status Mahasiswa">{{ $item->mhs_stat }}</td>

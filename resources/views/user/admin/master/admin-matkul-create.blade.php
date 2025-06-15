@@ -61,7 +61,7 @@
                         @enderror
                     </div>
                     <div class="form-group col-lg-3 col-12">
-                        <label for="bsks">Bebas SKS Mata Kuliah</label>
+                        <label for="bsks">Beban SKS Mata Kuliah</label>
                         <input type="number" min="10" max="40" name="bsks" id="bsks" class="form-control" placeholder="Inputkan beban sks matakuliah...">
                         @error('bsks')
                             <small class="text-danger">{{ $message }}</small>

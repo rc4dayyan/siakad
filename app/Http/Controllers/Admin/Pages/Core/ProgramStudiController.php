@@ -40,7 +40,7 @@ class ProgramStudiController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:3',
+            'code' => 'required|string|max:10',
             'cnim' => 'required|string|max:99999|numeric',
             'head_id' => 'required',
             'faku_id' => 'required',
@@ -67,7 +67,7 @@ class ProgramStudiController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:3',
+            'code' => 'required|string|max:10',
             'cnim' => 'required|string|max:99999|numeric',
             'head_id' => 'required',
             'faku_id' => 'required',
