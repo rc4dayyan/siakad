@@ -17,6 +17,7 @@ use Rap2hpoutre\FastExcel\FastExcel;
 use App\Models\User;
 use App\Models\Mahasiswa;
 use App\Models\Dosen;
+use App\Models\MataKuliah;
 
 class ImportController extends Controller
 {
@@ -113,6 +114,77 @@ class ImportController extends Controller
 
 
         if(empty($message)){
+            $message = "✅ Data berhasil diimport.";
+            Alert::success('Sukses', $message);
+        } else {
+            Alert::error('Gagal', $message);
+        }
+
+
+        return back();
+    }
+
+    public function importMataKuliah(Request $request)
+    {
+        $request->validate(
+            [
+                'import' => 'required|file|mimes:xls,xlsx,csv|max:2048', // max:2048 untuk batasan 2MB
+            ],
+            [
+                'import.required' => 'File harus diunggah.',
+                'import.mimes' => 'File harus dalam format xls, xlsx, atau csv.',
+                'import.max' => 'Ukuran file tidak boleh melebihi 2MB.',
+            ]
+        );
+
+        $taka_id   = $request->input('taka_id');
+        $pstudi_id = $request->input('pstudi_id');
+        $dosen_1 = $request->input('dosen_1');
+
+
+        $path = $request->file('import')->store('public/excel-files');
+        $rows = (new FastExcel)->import(storage_path('app/' . $path));
+        $message = '';
+
+        DB::beginTransaction();
+
+        try {
+            $continue = true;
+            foreach ($rows as $line) {
+                if (MataKuliah::where('code', $line['Kode'])->where('taka_id', $taka_id)->exists()) {
+                    $message = "❌ Data dengan matakuliah {$line['Kode']} sudah ada. Import dihentikan.";
+                    $continue = false;
+                    break; // ❗ Stop the loop immediately
+                }
+
+                MataKuliah::create([
+                    'kuri_id'   => 1,
+                    'taka_id'   => $taka_id,
+                    'pstudi_id' => $pstudi_id,
+                    'dosen_1'   => $dosen_1,
+                    'dosen_2'   => null,
+                    'dosen_3'   => null,
+                    'name'      => $line['Nama'],
+                    'code'      => $line['Kode'],
+                    'bsks'      => 20,
+                    'desc'      => '',
+                ]);
+            }
+
+            if ($continue) {
+                // Commit transaction
+                DB::commit();
+            } else {
+                DB::rollBack();
+            }
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            $message = "Failed! " . $e->getMessage();
+        }
+
+
+        if (empty($message)) {
             $message = "✅ Data berhasil diimport.";
             Alert::success('Sukses', $message);
         } else {

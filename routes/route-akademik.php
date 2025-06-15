@@ -56,6 +56,7 @@ Route::group(['prefix' => 'academic', 'middleware' => ['user-access:Departement 
         Route::get('/services/convert/export-users',[App\Http\Controllers\Services\Convert\ExportController::class, 'exportUsers'])->name('services.convert.export-users');
         Route::post('/services/convert/import-users',[App\Http\Controllers\Services\Convert\ImportController::class, 'importUsers'])->name('services.convert.import-users');
         Route::post('/services/convert/import-student',[App\Http\Controllers\Services\Convert\ImportController::class, 'importStudent'])->name('services.convert.import-student');
+        Route::post('/services/convert/import-matkul', [App\Http\Controllers\Services\Convert\ImportController::class, 'importMataKuliah'])->name('services.convert.import-matkul');
 
 
     });

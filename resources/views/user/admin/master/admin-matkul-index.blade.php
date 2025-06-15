@@ -1,18 +1,18 @@
 @extends('base.base-dash-index')
 @section('title')
-    Data Master Mata Kuliah - Siakad By Internal Developer
+Data Master Mata Kuliah - Siakad By Internal Developer
 @endsection
 @section('menu')
-    Data Master Mata Kuliah
+Data Master Mata Kuliah
 @endsection
 @section('submenu')
-    Data Master Mata Kuliah
+Data Master Mata Kuliah
 @endsection
 @section('urlmenu')
-    #
+#
 @endsection
 @section('subdesc')
-    Halaman untuk mengelola Mata Kuliah
+Halaman untuk mengelola Mata Kuliah
 @endsection
 @section('content')
 <section class="section">
@@ -22,6 +22,7 @@
                 @yield('submenu')
                 <div class="">
                     <a href="{{ route($prefix.'master.matkul-create') }}" class="btn btn-outline-primary"><i class="fa-solid fa-plus"></i></a>
+                    <a href="#" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importMataKuliah"><i class="fa-solid fa-file-import"></i></a>
                 </div>
             </h5>
         </div>
@@ -31,9 +32,9 @@
                     <tr>
                         <th class="text-center">#</th>
                         <th class="text-center">Program Studi</th>
-                        <th class="text-center">Nama Kurikulum</th>
                         <th class="text-center">Nama Mata Kuliah</th>
                         <th class="text-center">Kode Mata Kuliah</th>
+                        <th class="text-center">Semester</th>
                         <th class="text-center">Dosen Pengampu</th>
                         <th class="text-center">Syarat Mata Kuliah</th>
                         <th class="text-center">Button</th>
@@ -41,43 +42,124 @@
                 </thead>
                 <tbody>
                     @foreach ($matkul as $key => $item)
-                        
+
                     <tr>
                         <td data-label="Number">{{ ++$key }}</td>
-                        <td data-label="Program Studi">{{ $item->pstudi->fakultas->name . ' - ' . $item->pstudi->name }}</td>
-                        <td data-label="Kurikulum">{{ $item->kuri->name }}</td>
+                        <td data-label="Program Studi">{{ $item->pstudi->name }}</td>
                         <td data-label="Nama Mata Kuliah">{{ $item->name }}</td>
-                        <td data-label="Kode Mata Kuliah">{{ $item->kuri->code . ' - ' . $item->taka->code . ' - ' . $item->code }}</td>
+                        <td data-label="Kode Mata Kuliah">{{ $item->code }}</td>
+                        <td data-label="Kurikulum">{{ $item->taka->semester }}</td>
                         <td data-label="Team Dosen">
                             {{ $item->dosen1->dsn_name }}<br>{{ $item->dosen_2 == null ? '-' : $item->dosen2->dsn_name }}<br>{{ $item->dosen_3 == null ? '-' : $item->dosen3->dsn_name }}
                         </td>
                         <td data-label="Syarat Mata Kuliah">{{ $item->requ_id == null ? '-' : $item->requ->name }}</td>
-                        <td class="d-flex justify-content-center align-items-center">
-                            <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#updateMatkul{{ $item->code }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
-                            {{-- <a href="{{ route($prefix.'master.matkul-view', $item->code) }}"  style="margin-right: 10px" class="btn btn-outline-info"><i class="fa-solid fa-eye"></i></a> --}}
-                            <form id="delete-form-{{ $item->code }}"
-                                action="{{ route($prefix.'master.matkul-destroy', $item->code) }}" method="POST">
-                                @csrf
-                                @method('DELETE')
-                                <a type="button" class="bs-tooltip btn btn-rounded btn-outline-danger"
-                                    data-bs-toggle="tooltip" data-bs-placement="top" title="Delete"
-                                    data-original-title="Delete"
-                                    data-url="{{ route($prefix.'master.matkul-destroy', $item->code) }}"
-                                    data-name="{{ $item->name }}"
-                                    onclick="deleteData('{{ $item->code }}')">
-                                    <i class="fas fa-trash"></i>
-                                </a>
-                            </form>
+                        <td>
+                            <div class="d-flex justify-content-center align-items-center w-100" style="padding: 10px;">
+                                <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#updateMatkul{{ $item->code }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
+                                {{-- <a href="{{ route($prefix.'master.matkul-view', $item->code) }}" style="margin-right: 10px" class="btn btn-outline-info"><i class="fa-solid fa-eye"></i></a> --}}
+                                <form id="delete-form-{{ $item->code }}"
+                                    action="{{ route($prefix.'master.matkul-destroy', $item->code) }}" method="POST">
+                                    @csrf
+                                    @method('DELETE')
+                                    <a type="button" class="bs-tooltip btn btn-rounded btn-outline-danger"
+                                        data-bs-toggle="tooltip" data-bs-placement="top" title="Delete"
+                                        data-original-title="Delete"
+                                        data-url="{{ route($prefix.'master.matkul-destroy', $item->code) }}"
+                                        data-name="{{ $item->name }}"
+                                        onclick="deleteData('{{ $item->code }}')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </form>
+                            </div>
+
                         </td>
                     </tr>
                     @endforeach
- 
+
                 </tbody>
             </table>
         </div>
     </div>
 
 </section>
+
+<!-- Import Mata Kuliah -->
+<div class="me-1 mb-1 d-inline-block">
+
+    <!--Extra Large Modal -->
+    <form action="{{ route($prefix.'services.convert.import-matkul') }}" method="POST" enctype="multipart/form-data">
+        @csrf
+        <div class="modal fade text-left w-100" id="importMataKuliah" tabindex="-1" role="dialog"
+            aria-labelledby="myModalLabel16" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-l"
+                role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="modal-title" id="myModalLabel16">Import Mata Kuliah</h4>
+                        <div class="">
+
+                            <button type="submit" class="btn btn-outline-primary">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal"
+                                aria-label="Close">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="form-group col-12">
+                                <label for="taka_id">Tahun Akademik</label>
+                                <select name="taka_id" id="taka_id" class="form-select" name="taka_id" id="taka_id">
+                                    <option value="" selected>Pilih Tahun Akademik</option>
+                                    @foreach ($taka as $item_t)
+                                    <option value="{{ $item_t->id }}" {{ $item->taka_id == $item_t->id ? 'selected' : '' }}>{{ $item_t->name . ' - ' . $item_t->semester }}</option>
+                                    @endforeach
+                                </select>
+                                @error('taka_id')
+                                <small class="text-danger">{{ $message }}</small>
+                                @enderror
+                            </div>
+                            <div class="form-group col-12">
+                                <label for="pstudi_id">Program Studi</label>
+                                <select name="pstudi_id" id="pstudi_id" class="form-select" name="pstudi_id" id="pstudi_id">
+                                    <option value="" selected>Pilih Program Studi</option>
+                                    @foreach ($pstudi as $item_p)
+                                    <option value="{{ $item_p->id }}" {{ $item->pstudi_id == $item_p->id ? 'selected' : '' }}>{{ $item_p->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('pstudi_id')
+                                <small class="text-danger">{{ $message }}</small>
+                                @enderror
+                            </div>
+                            <div class="form-group col-12">
+                                <label for="dosen_1">Dosen Pengampu</label>
+                                <select name="dosen_1" id="dosen_1" class="form-select" name="dosen_1" id="dosen_1">
+                                    <option value="" selected>Pilih Dosen Pengampu</option>
+                                    @foreach ($dosen as $item_d1)
+                                    <option value="{{ $item_d1->id }}" {{ $item->dosen_1 == $item_d1->id ? 'selected' : '' }}>{{ $item_d1->dsn_name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('dosen_1')
+                                <small class="text-danger">{{ $message }}</small>
+                                @enderror
+                            </div>
+                            <div class="form-group col-12">
+                                <label for="import">Import Files ( xlsx, csv )</label>
+                                <input type="file" name="import" id="import" class="form-control" accept=".xls, .xlsx, .csv">
+                                @error('import')
+                                <small class="text-danger">{{ $message }}</small>
+                                @enderror
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
 <div class="me-1 mb-1 d-inline-block">
 
     <!--Extra Large Modal -->
@@ -93,8 +175,8 @@
                     <div class="modal-header">
                         <h4 class="modal-title" id="myModalLabel16">Edit Mata Kuliah - {{ $item->name }}</h4>
                         <div class="">
-    
-                            <button type="submit" class="btn btn-outline-primary" >
+
+                            <button type="submit" class="btn btn-outline-primary">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
                             <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal"
@@ -109,14 +191,14 @@
                                 <label for="name">Nama Mata Kuliah</label>
                                 <input type="text" name="name" id="name" class="form-control" value="{{ $item->name }}">
                                 @error('name')
-                                    <small class="text-danger">{{ $message }}</small>
+                                <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
                             <div class="form-group col-lg-6 col-12">
                                 <label for="code">Kode Mata Kuliah</label>
                                 <input type="text" name="code" id="code" class="form-control" value="{{ $item->code }}">
                                 @error('code')
-                                    <small class="text-danger">{{ $message }}</small>
+                                <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
                             <div class="form-group col-lg-6 col-12">
@@ -135,7 +217,7 @@
                                 <label for="bsks">Beban SKS Mata Kuliah</label>
                                 <input type="number" min="10" max="40" name="bsks" id="bsks" class="form-control" value="{{ $item->bsks }}">
                                 @error('bsks')
-                                    <small class="text-danger">{{ $message }}</small>
+                                <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
                             <div class="form-group col-lg-4 col-12">
@@ -184,7 +266,7 @@
                                 </select>
                                 @error('dosen_1')
                                 <small class="text-danger">{{ $message }}</small>
-                                @enderror 
+                                @enderror
                             </div>
                             <div class="form-group col-lg-4 col-12">
                                 <label for="dosen_2">Dosen Cadangan 1</label>
@@ -196,7 +278,7 @@
                                 </select>
                                 @error('dosen_2')
                                 <small class="text-danger">{{ $message }}</small>
-                                @enderror 
+                                @enderror
                             </div>
                             <div class="form-group col-lg-4 col-12">
                                 <label for="dosen_3">Dosen Cadangan 2</label>
@@ -208,14 +290,14 @@
                                 </select>
                                 @error('dosen_3')
                                 <small class="text-danger">{{ $message }}</small>
-                                @enderror                               
+                                @enderror
                             </div>
 
                             <div class="form-group col-lg-12 col-12">
                                 <label for="desc">Deskripsi Mata Kuliah</label>
                                 <textarea name="desc" id="dark" class="form-control" placeholder="isikan deskripsi matakuliah ...." cols="30" rows="10">{{ $item->desc == null ? '' : $item->desc }}</textarea>
                                 @error('desc')
-                                    <small class="text-danger">{{ $message }}</small>
+                                <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
                         </div>
