@@ -522,6 +522,7 @@ class WorkersController extends Controller
         $data['prefix'] = $this->setPrefix();
         $data['web'] = webSettings::where('id', 1)->first();
         $data['student'] = Mahasiswa::all();
+        $data['kelas'] = Kelas::all();
 
         return view('user.admin.pages.workers-student-index', $data);
 

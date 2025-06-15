@@ -1,18 +1,18 @@
 @extends('base.base-dash-index')
 @section('title')
-    Data Pengguna Mahasiswa - Siakad By Internal Developer
+Data Pengguna Mahasiswa - Siakad By Internal Developer
 @endsection
 @section('menu')
-    Data Pengguna Mahasiswa
+Data Pengguna Mahasiswa
 @endsection
 @section('submenu')
-    Lihat Data
+Lihat Data
 @endsection
 @section('urlmenu')
-    #
+#
 @endsection
 @section('subdesc')
-    Halaman untuk melihat data pengguna Mahasiswa
+Halaman untuk melihat data pengguna Mahasiswa
 @endsection
 @section('content')
 <section class="section">
@@ -32,46 +32,51 @@
                 <thead>
                     <tr>
                         <th class="text-center">#</th>
-                        <th class="text-center">NIM</th>          
+                        <th class="text-center">NIM</th>
+                        <th class="text-center">NIK</th>
                         <th class="text-center">Nama Mahasiswa</th>
                         <th class="text-center">Kelas</th>
                         <th class="text-center">Gender</th>
-                        <th class="text-center">Join Date</th>
-                        <th class="text-center">Status</th>
+                        <!-- <th class="text-center">Join Date</th> -->
+                        <!-- <th class="text-center">Status</th> -->
                         <th class="text-center">Button</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($student as $key => $item)
-                        
+
                     <tr>
                         <td data-label="Number">{{ ++$key }}</td>
                         <td data-label="NIM Mahasiswa">{{ $item->mhs_nim }}</td>
+                        <td data-label="NIK Mahasiswa">{{ $item->mhs_nik }}</td>
                         <td data-label="Nama Mahasiswa">{{ $item->mhs_name }}</td>
                         <td data-label="Kelas">{{ $item->kelas->name ?? '' }}</td>
                         <td data-label="Gender">{{ $item->mhs_gend }}</td>
-                        <td data-label="Join Date">{{ \Carbon\Carbon::parse($item->created_at)->format('l, d M Y') }}</td>
-                        <td data-label="Status Mahasiswa">{{ $item->mhs_stat }}</td>
-                        <td class="d-flex justify-content-center align-items-center">
-                            <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#viewContact{{ $item->mhs_code }}" class="btn btn-outline-info"><i class="fas fa-phone"></i></a>
-                            <a href="{{ route($prefix.'workers.student-edit', $item->mhs_code) }}" style="margin-right: 10px" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
-                            <form id="delete-form-{{ $item->mhs_code }}"
-                                action="{{ route($prefix.'workers.student-destroy', $item->mhs_code) }}" method="POST">
-                                @csrf
-                                @method('DELETE')
-                                <a type="button" class="bs-tooltip btn btn-rounded btn-outline-danger"
-                                    data-bs-toggle="tooltip" data-bs-placement="top" title="Delete"
-                                    data-original-title="Delete"
-                                    data-url="{{ route($prefix.'workers.student-destroy', $item->mhs_code) }}"
-                                    data-name="{{ $item->name }}"
-                                    onclick="deleteData('{{ $item->mhs_code }}')">
-                                    <i class="fas fa-trash"></i>
-                                </a>
-                            </form>
+                        <!-- <td data-label="Join Date">{{ \Carbon\Carbon::parse($item->mhs_register_date)->format('l, d M Y') }}</td> -->
+                        <!-- <td data-label="Status Mahasiswa">{{ $item->mhs_stat }}</td> -->
+                        <td>
+                            <div class="d-flex justify-content-center align-items-center w-100" style="padding: 10px;">
+
+                                <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#viewContact{{ $item->mhs_code }}" class="btn btn-outline-info"><i class="fas fa-phone"></i></a>
+                                <a href="{{ route($prefix.'workers.student-edit', $item->mhs_code) }}" style="margin-right: 10px" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
+                                <form id="delete-form-{{ $item->mhs_code }}"
+                                    action="{{ route($prefix.'workers.student-destroy', $item->mhs_code) }}" method="POST">
+                                    @csrf
+                                    @method('DELETE')
+                                    <a type="button" class="bs-tooltip btn btn-rounded btn-outline-danger"
+                                        data-bs-toggle="tooltip" data-bs-placement="top" title="Delete"
+                                        data-original-title="Delete"
+                                        data-url="{{ route($prefix.'workers.student-destroy', $item->mhs_code) }}"
+                                        data-name="{{ $item->name }}"
+                                        onclick="deleteData('{{ $item->mhs_code }}')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     @endforeach
- 
+
                 </tbody>
             </table>
         </div>
@@ -92,7 +97,7 @@
                         <h4 class="modal-title" id="myModalLabel16">Import Mahasiswa</h4>
                         <div class="">
 
-                            <button type="submit" class="btn btn-outline-primary" >
+                            <button type="submit" class="btn btn-outline-primary">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
                             <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal"
@@ -104,10 +109,22 @@
                     <div class="modal-body">
                         <div class="row">
                             <div class="form-group col-12">
+                                <label for="class_id">Kelas</label>
+                                <select name="class_id" id="class_id" class="form-select">
+                                    <option value="" selected>Pilih Kelas</option>
+                                    @foreach ($kelas as $item)
+                                    <option value="{{ $item->id }}">{{ $item->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('class_id')
+                                <small class="text-danger">{{ $message }}</small>
+                                @enderror
+                            </div>
+                            <div class="form-group col-12">
                                 <label for="import">Import Files ( xlsx, csv )</label>
                                 <input type="file" name="import" id="import" class="form-control" accept=".xls, .xlsx, .csv">
                                 @error('import')
-                                    <small class="text-danger">{{ $message }}</small>
+                                <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
                         </div>
@@ -120,7 +137,7 @@
 <div class="me-1 mb-1 d-inline-block">
 
     @foreach ($student as $item)
-        
+
     <div class="modal fade text-left w-100" id="viewContact{{ $item->mhs_code }}" tabindex="-1" role="dialog"
         aria-labelledby="myModalLabel16" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-l"

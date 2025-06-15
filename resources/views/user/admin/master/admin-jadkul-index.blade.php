@@ -1,18 +1,18 @@
 @extends('base.base-dash-index')
 @section('title')
-    Data Master Jadwal Kuliah - Siakad By Internal Developer
+Data Master Jadwal Kuliah - Siakad By Internal Developer
 @endsection
 @section('menu')
-    Data Master Jadwal Kuliah
+Data Master Jadwal Kuliah
 @endsection
 @section('submenu')
-    Data Master Jadwal Kuliah
+Data Master Jadwal Kuliah
 @endsection
 @section('urlmenu')
-    #
+#
 @endsection
 @section('subdesc')
-    Halaman untuk mengelola Jadwal Kuliah
+Halaman untuk mengelola Jadwal Kuliah
 @endsection
 @section('custom-css')
 
@@ -29,7 +29,7 @@
             </h5>
         </div>
         <div class="card-body">
-            <table class="table table-striped"  id="table1">
+            <table class="table table-striped" id="table1">
                 <thead>
                     <tr>
                         <th class="text-center">#</th>
@@ -45,36 +45,39 @@
                 </thead>
                 <tbody>
                     @foreach ($jadkul as $key => $item)
-                        
+
                     <tr>
                         <td data-label="Number">{{ ++$key }}</td>
-                        <td data-label="Program Studi">{{ $item->kelas->pstudi->fakultas->name }} <br> {{ $item->kelas->pstudi->name }}</td>
-                        <td data-label="Nama Kelas">{{ $item->kelas->code }}</td>
-                        <td data-label="Mata Kuliah">{{ $item->matkul->name }} <br> {{ $item->pert_id . ' - ' . $item->bsks . ' SKS' }}</td>
-                        <td data-label="Nama Dosen">{{ $item->dosen->dsn_name }}</td>
+                        <td data-label="Program Studi">{{ $item->kelas->pstudi->fakultas->name ?? '' }} <br> {{ $item->kelas->pstudi->name ?? '' }}</td>
+                        <td data-label="Nama Kelas">{{ $item->kelas->code ?? '' }}</td>
+                        <td data-label="Mata Kuliah">{{ $item->matkul->name ?? '' }} <br> {{ $item->pert_id . ' - ' . $item->bsks . ' SKS' }}</td>
+                        <td data-label="Nama Dosen">{{ $item->dosen->dsn_name ?? '' }}</td>
                         <td data-label="Metode">{{ $item->meth_id }}</td>
                         <td data-label="Tanggal Kuliah">{{ $item->days_id }} <br> - <br> {{ \Carbon\Carbon::parse($item->date)->format('d M Y') }}</td>
                         <td data-label="Waktu Perkuliahan">{{ $item->start }} <br> - <br> {{ $item->ended }}</td>
-                        <td class="d-flex justify-content-center align-items-center">
-                            <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#updateJadkul{{ $item->code }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
-                            <a href="{{ route($prefix.'master.jadkul-absen-view', $item->code) }}"  style="margin-right: 10px" class="btn btn-outline-info"><i class="fa-solid fa-user-check"></i></a>
-                            <form id="delete-form-{{ $item->code }}"
-                                action="{{ route($prefix.'master.jadkul-destroy', $item->code) }}" method="POST">
-                                @csrf
-                                @method('DELETE')
-                                <a type="button" class="bs-tooltip btn btn-rounded btn-outline-danger"
-                                    data-bs-toggle="tooltip" data-bs-placement="top" title="Delete"
-                                    data-original-title="Delete"
-                                    data-url="{{ route($prefix.'master.jadkul-destroy', $item->code) }}"
-                                    data-name="{{ $item->name }}"
-                                    onclick="deleteData('{{ $item->code }}')">
-                                    <i class="fas fa-trash"></i>
-                                </a>
-                            </form>
+                        <td>
+                            <div class="d-flex justify-content-center align-items-center w-100" style="padding: 10px;">
+                                <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#updateJadkul{{ $item->code }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
+                                <a href="{{ route($prefix.'master.jadkul-absen-view', $item->code) }}" style="margin-right: 10px" class="btn btn-outline-info"><i class="fa-solid fa-user-check"></i></a>
+                                <form id="delete-form-{{ $item->code }}"
+                                    action="{{ route($prefix.'master.jadkul-destroy', $item->code) }}" method="POST">
+                                    @csrf
+                                    @method('DELETE')
+                                    <a type="button" class="bs-tooltip btn btn-rounded btn-outline-danger"
+                                        data-bs-toggle="tooltip" data-bs-placement="top" title="Delete"
+                                        data-original-title="Delete"
+                                        data-url="{{ route($prefix.'master.jadkul-destroy', $item->code) }}"
+                                        data-name="{{ $item->name }}"
+                                        onclick="deleteData('{{ $item->code }}')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </form>
+                            </div>
+
                         </td>
                     </tr>
                     @endforeach
- 
+
                 </tbody>
             </table>
         </div>
@@ -94,10 +97,10 @@
                 role="document">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h4 class="modal-title" id="myModalLabel16">Edit Jadwal Perkuliahan - {{ $item->matkul->name . ' ' .$item->pert_id }}</h4>
+                        <h4 class="modal-title" id="myModalLabel16">Edit Jadwal Perkuliahan - {{ ($item->matkul->name ?? '') . ' ' .$item->pert_id }}</h4>
                         <div class="">
-    
-                            <button type="submit" class="mt-1 btn btn-outline-primary" >
+
+                            <button type="submit" class="mt-1 btn btn-outline-primary">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
                             <button type="button" class="mt-1 btn btn-outline-danger" data-bs-dismiss="modal"
@@ -115,9 +118,9 @@
                                     <option value="" selected>Pilih Mata Kuliah</option>
                                     @foreach ($matkul as $item_m)
                                     @php
-                                        $dosen1_name = $item_m->dosen1 ? $item_m->dosen1->dsn_name : null;
-                                        $dosen2_name = $item_m->dosen2 ? $item_m->dosen2->dsn_name : null;
-                                        $dosen3_name = $item_m->dosen3 ? $item_m->dosen3->dsn_name : null;
+                                    $dosen1_name = isset($item_m->dosen1) ? $item_m->dosen1->dsn_name : null;
+                                    $dosen2_name = isset($item_m->dosen2) ? $item_m->dosen2->dsn_name : null;
+                                    $dosen3_name = isset($item_m->dosen3) ? $item_m->dosen3->dsn_name : null;
                                     @endphp
                                     <option value="{{ $item_m->id }}" {{ $item->makul_id == $item_m->id ? 'selected' : '' }} data-dosen1="{{ $item_m->dosen_1 }}" data-dosen2="{{ $item_m->dosen_2 }}" data-dosen3="{{ $item_m->dosen_3 }}" data-dosen1-name="{{ $dosen1_name }}" data-dosen2-name="{{ $dosen2_name }}" data-dosen3-name="{{ $dosen3_name }}">{{ $item_m->name }}</option>
                                     @endforeach
@@ -153,7 +156,7 @@
                             </div>
                             <div class="form-group col-lg-3 col-12">
                                 <label for="meth_id">Metode Perkuliahan</label>
-                                <select name="meth_id" id="meth_id" class="form-select" >
+                                <select name="meth_id" id="meth_id" class="form-select">
                                     <option value="" selected>Pilih Metode Perkuliahan</option>
                                     <option value="0" {{ $item->raw_meth_id == 0 ? 'selected' : '' }}>Tatap Muka</option>
                                     <option value="1" {{ $item->raw_meth_id == 1 ? 'selected' : '' }}>Teleconference</option>
@@ -166,12 +169,12 @@
                                 <label for="bsks">Bebas SKS Hari Ini</label>
                                 <input type="number" min="1" max="8" name="bsks" id="bsks" class="form-control" value="{{ $item->bsks }}">
                                 @error('bsks')
-                                    <small class="text-danger">{{ $message }}</small>
+                                <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
                             <div class="form-group col-lg-3 col-12">
                                 <label for="days_id">Hari</label>
-                                <select name="days_id" id="days_id" class="form-select" >
+                                <select name="days_id" id="days_id" class="form-select">
                                     <option value="" selected>Pilih Hari</option>
                                     <option value="0" {{ $item->raw_days_id == 0 ? 'selected' : '' }}>Hari Minggu</option>
                                     <option value="1" {{ $item->raw_days_id == 1 ? 'selected' : '' }}>Hari Senin</option>
@@ -189,26 +192,26 @@
                                 <label for="date">Tanggal Perkuliahan</label>
                                 <input type="date" name="date" id="date" class="form-control" value="{{ $item->date }}">
                                 @error('date')
-                                    <small class="text-danger">{{ $message }}</small>
+                                <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
                             <div class="form-group col-lg-3 col-12">
                                 <label for="start">Waktu Mulai Perkuliahan</label>
                                 <input type="time" name="start" id="start" class="form-control" value="{{ $item->start }}">
                                 @error('start')
-                                    <small class="text-danger">{{ $message }}</small>
+                                <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
                             <div class="form-group col-lg-3 col-12">
                                 <label for="ended">Waktu Selesai Perkuliahan</label>
                                 <input type="time" name="ended" id="ended" class="form-control" value="{{ $item->ended }}">
                                 @error('ended')
-                                    <small class="text-danger">{{ $message }}</small>
+                                <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
                             <div class="form-group col-lg-4 col-12">
                                 <label for="ruang_id">Ruangan</label>
-                                <select name="ruang_id" id="ruang_id" class="form-select" >
+                                <select name="ruang_id" id="ruang_id" class="form-select">
                                     <option value="" selected>Pilih Ruangan</option>
                                     @foreach ($ruang as $item_r)
                                     <option value="{{ $item_r->id }}" {{ $item->ruang_id == $item_r->id ? 'selected' : '' }}>{{ $item_r->name }}</option>
@@ -220,7 +223,7 @@
                             </div>
                             <div class="form-group col-lg-4 col-12">
                                 <label for="kelas_id">Kelas</label>
-                                <select name="kelas_id" id="kelas_id" class="form-select" >
+                                <select name="kelas_id" id="kelas_id" class="form-select">
                                     <option value="" selected>Pilih Kelas</option>
                                     @foreach ($kelas as $item_k)
                                     <option value="{{ $item_k->id }}" {{ $item->kelas_id == $item_k->id ? 'selected' : '' }}>{{ $item_k->name }}</option>
@@ -235,9 +238,9 @@
                                 <label for="dosen_id">Dosen</label>
                                 <select name="dosen_id" id="dosen_id" class="form-select">
                                     <option value="" selected>Pilih Dosen</option>
-                                    <option value="{{ $item->matkul->dosen_1 == null ? '' : $item->matkul->dosen_1 }}" {{ $item->matkul->dosen_1 == $item->dosen_id ? 'selected' : ''  }} {{ $item->matkul->dosen_1 == null ? 'disabled' : '' }}>{{ $item->matkul->dosen_1 == null ? 'Tidak Tersedia' : $item->matkul->dosen1->dsn_name }}</option>
-                                    <option value="{{ $item->matkul->dosen_2 == null ? '' : $item->matkul->dosen_2 }}" {{ $item->matkul->dosen_2 == $item->dosen_id ? 'selected' : ''  }} {{ $item->matkul->dosen_2 == null ? 'disabled' : '' }}>{{ $item->matkul->dosen_2 == null ? 'Tidak Tersedia' : $item->matkul->dosen2->dsn_name }}</option>
-                                    <option value="{{ $item->matkul->dosen_3 == null ? '' : $item->matkul->dosen_3 }}" {{ $item->matkul->dosen_3 == $item->dosen_id ? 'selected' : ''  }} {{ $item->matkul->dosen_3 == null ? 'disabled' : '' }}>{{ $item->matkul->dosen_3 == null ? 'Tidak Tersedia' : $item->matkul->dosen3->dsn_name }}</option>
+                                    <option value="{{ !isset($item->matkul->dosen_1) ? '' : $item->matkul->dosen_1 }}" {{ isset($item->matkul->dosen_1) && $item->matkul->dosen_1 == $item->dosen_id ? 'selected' : ''  }} {{ !isset($item->matkul->dosen_1) ? 'disabled' : '' }}>{{ !isset($item->matkul->dosen_1) ? 'Tidak Tersedia' : $item->matkul->dosen1->dsn_name }}</option>
+                                    <option value="{{ !isset($item->matkul->dosen_2) ? '' : $item->matkul->dosen_2 }}" {{ isset($item->matkul->dosen_2) && $item->matkul->dosen_2 == $item->dosen_id ? 'selected' : ''  }} {{ !isset($item->matkul->dosen_2) ? 'disabled' : '' }}>{{ !isset($item->matkul->dosen_2) ? 'Tidak Tersedia' : $item->matkul->dosen2->dsn_name }}</option>
+                                    <option value="{{ !isset($item->matkul->dosen_3) ? '' : $item->matkul->dosen_3 }}" {{ isset($item->matkul->dosen_3) && $item->matkul->dosen_3 == $item->dosen_id ? 'selected' : ''  }} {{ !isset($item->matkul->dosen_3) ? 'disabled' : '' }}>{{ !isset($item->matkul->dosen_3) ? 'Tidak Tersedia' : $item->matkul->dosen3->dsn_name }}</option>
                                 </select>
                                 @error('dosen_id')
                                 <small class="text-danger">{{ $message }}</small>

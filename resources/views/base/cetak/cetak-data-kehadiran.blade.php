@@ -1,67 +1,83 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Daftar Hadir Perkuliahan</title>
     <style>
         body {
             font-family: Arial, sans-serif;
         }
+
         .container {
             width: 700px;
             margin: 0 auto;
             padding: 1px;
             /* border: 1px solid #ddd; */
         }
+
         .header {
             text-align: center;
             margin-bottom: 20px;
         }
+
         .logo {
             width: 125px;
             height: auto;
         }
+
         .title {
             font-size: 24px;
             margin-top: 10px;
         }
+
         .content {
             margin-top: 20px;
         }
+
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
         }
-        th, td {
+
+        th,
+        td {
             border: 1px solid #ddd;
             padding: 5px;
-           
+
         }
+
         .empty {
             text-align: center;
         }
+
         .signature {
             margin-top: 10px;
             /* margin-bottom: 10px; */
             text-align: right;
         }
+
         .signature p {
             font-size: 16px;
             /* margin-top: 80px; */
         }
+
         .info {
             margin-bottom: 20px;
         }
+
         .info-row {
             display: flex;
             justify-content: space-between;
             margin-bottom: 10px;
         }
+
         .info-col {
             flex: 0 0 70%;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header" style="text-align: center; margin-bottom: 20px;">
@@ -74,10 +90,11 @@
                     <!-- Kop surat -->
                     <td style="width: 70%; text-align: center; border: none;">
                         <div>
-                            <h2 class="title" style="margin: 0;">Universitas Contoh</h2>
-                            <p style="margin: 5px 0; font-size: 16px;">Jl. Contoh No. 123, Kota Contoh</p>
-                            <p style="margin: 5px 0; font-size: 16px;">Telp: (0123) 456789 | Fax: (0123) 456789</p>
-                            <p style="margin: 5px 0; font-size: 16px;">Website: www.contoh.ac.id | Email: info@contoh.ac.id</p>
+                            <h2 class="title" style="margin: 0;"> {{ $web->school_name }}</h2>
+                            <p style="margin: 5px 0; font-size: 16px;">{{ $web->address }}</p>
+                            <p style="margin: 5px 0; font-size: 16px;">Telp/Fax: {{ $web->school_phone }}</p>
+                            <p style="margin: 5px 0; font-size: 16px;">Whatsapp: {{ $web->whatsapp }}</p>
+                            <p style="margin: 5px 0; font-size: 16px;">Website: https://staipuimajalengka.ac.id | Email: info@staipuimajalengka.ac.id</p>
                         </div>
                     </td>
                 </tr>
@@ -92,9 +109,9 @@
                 </h2>
             </div>
         </div>
-        
-        
-        
+
+
+
 
         <table style="border-collapse: collapse;">
             <tbody>
@@ -112,9 +129,9 @@
                 </tr>
             </tbody>
         </table>
-        
-        
-        
+
+
+
 
         <div class="content">
             <table>
@@ -136,17 +153,17 @@
                         <td style="text-align: center" data-label="Nomor NIM">{{ $item->mhs_nim }}</td>
                         <td style="text-align: center" data-label="Nama Mahasiswa">{{ $item->mhs_name }}</td>
                         <td style="text-align: center" data-label="Jenis Kelamin">{{ $item->mhs_gend == null ? '-' : $item->mhs_gend }}</td>
-                        @php  
-                            $dateNow  = \Carbon\Carbon::now()->format('m-d-Y');
-                            $timeNow  = \Carbon\Carbon::now()->format('H:i:s');
+                        @php
+                        $dateNow = \Carbon\Carbon::now()->format('m-d-Y');
+                        $timeNow = \Carbon\Carbon::now()->format('H:i:s');
 
-                            $jadkul = \App\Models\JadwalKuliah::where('kelas_id', $kelas->id)->get();
-                            $absen = \App\Models\AbsensiMahasiswa::where('author_id', $item->id)->get();
-                            // dd($absen->count());
-                            
+                        $jadkul = \App\Models\JadwalKuliah::where('kelas_id', $kelas->id)->get();
+                        $absen = \App\Models\AbsensiMahasiswa::where('author_id', $item->id)->get();
+                        // dd($absen->count());
+                        $totalJadkul = $jadkul->count() > 0 ? $jadkul->count() : 1;
                         @endphp
-                        <td style="text-align: center" data-label="Data Kehadiran">{{ $absen->count() }} / {{ $jadkul->count() }} Perkuliahan</td>
-                        <td style="text-align: center" data-label="Presentase Kehadiran">{{ $absen->count() / $jadkul->count() * 100 }} %  </td>
+                        <td style="text-align: center" data-label="Data Kehadiran">{{ $absen->count() }} / {{ $totalJadkul }} Perkuliahan</td>
+                        <td style="text-align: center" data-label="Presentase Kehadiran">{{ $absen->count() / $totalJadkul * 100 }} % </td>
                     </tr>
                     @empty
                     <tr>
@@ -181,4 +198,5 @@
         </div>
     </div>
 </body>
+
 </html>

@@ -8,4 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class webSettings extends Model
 {
     use HasFactory;
+    protected $fillable = [
+        'address',
+    ];
 }

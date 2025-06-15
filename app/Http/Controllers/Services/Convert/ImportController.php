@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Models\Mahasiswa;
 use App\Models\Dosen;
 use App\Models\MataKuliah;
+use DateTime;
 
 class ImportController extends Controller
 {
@@ -71,32 +72,53 @@ class ImportController extends Controller
         $rows = (new FastExcel)->import(storage_path('app/' . $path));
         $message = '';
 
+        $class_id = $request->input('class_id');
+
         DB::beginTransaction();
 
         try {
             $continue = true;
             foreach ($rows as $line) {
+                
                 if (Mahasiswa::where('mhs_nim', $line['NIM'])->exists()) {
                     $message = "❌ Data dengan NIM {$line['NIM']} sudah ada. Import dihentikan.";
                     $continue = false;
                     break; // ❗ Stop the loop immediately
                 }
+                $ttl          = explode(',', $line['Tempat,Tanggal Lahir']);
+                $tempatLahir  = $ttl[0] ?? '';
+                if(isset($ttl[1])){
+                    $date = new DateTime($ttl[1]);
+                    $tanggalLahir = $date->format('Y-m-d');
+                } else {
+                    $tanggalLahir = '';
+                }
+
+                $regDateTmp = new DateTime($line['Tanggal Masuk']);
+                $registerDate = $regDateTmp->format('Y-m-d');
+                
 
                 Mahasiswa::create([
-                    'mhs_nim'        => $line['NIM'],
-                    'mhs_mail'       => $line['Email'],
-                    'mhs_phone'      => $line['Phone'],
-                    'mhs_name'       => $line['FullName'],
-                    'mhs_gend'       => $line['Gender'],
-                    'mhs_reli'       => $line['Religion'] == null ? null : $line['Religion'],
-                    'mhs_birthplace' => $line['BirthPlace'] == null ? null : $line['BirthPlace'],
-                    'mhs_birthdate'  => $line['BirthDate'] == null ? null : $line['BirthDate'],
-                    'mhs_stat'       => $line['TypeUser'],
-                    'years_id'       => $line['YearsID'],
-                    'class_id'       => $line['ClassID'],
-                    'mhs_code'       => Str::random(6),
-                    'mhs_user'       => Str::random(6),
-                    'password'       => Hash::make($line['Phone']),
+                    'mhs_nim'             => $line['NIM'],
+                    'mhs_nik'             => $line['NIK'],
+                    'mhs_mail'            => $line['Email'],
+                    'mhs_phone'           => $line['Telepon'],
+                    'mhs_name'            => $line['Nama'],
+                    'mhs_gend'            => $line['Jenis Kelamin'],
+                    'mhs_reli'            => $line['Agama'] ?? '',
+                    'mhs_birthplace'      => $tempatLahir,
+                    'mhs_birthdate'       => $tanggalLahir,
+                    'mhs_stat'            => 1,
+                    'years_id'            => 0,
+                    'class_id'            => $class_id,
+                    'mhs_code'            => Str::random(6),
+                    'mhs_user'            => Str::random(6),
+                    'password'            => Hash::make($line['NIK']),
+                    'mhs_register_date'   => $registerDate,
+                    'mhs_status'          => $line['Status Mahasiswa'],
+                    'mhs_register_type'   => $line['Jenis Pendaftaran'],
+                    'mhs_register_amount' => $line['Biaya Masuk'],
+                    'mhs_sync_status'     => $line['Status Sync'],
                 ]);
             }
 
@@ -117,6 +139,7 @@ class ImportController extends Controller
             $message = "✅ Data berhasil diimport.";
             Alert::success('Sukses', $message);
         } else {
+            var_dump($message);exit;
             Alert::error('Gagal', $message);
         }
 
