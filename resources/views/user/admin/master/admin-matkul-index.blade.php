@@ -95,7 +95,11 @@ Halaman untuk mengelola Mata Kuliah
                 role="document">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h4 class="modal-title" id="myModalLabel16">Import Mata Kuliah</h4>
+                        <h4 class="modal-title" id="myModalLabel16">
+                            Import Mata Kuliah
+                            <br />
+                            <small><a href="{{ route('root.download-matakuliah-example') }}">Download contoh file</a></small>
+                        </h4>
                         <div class="">
 
                             <button type="submit" class="btn btn-outline-primary">

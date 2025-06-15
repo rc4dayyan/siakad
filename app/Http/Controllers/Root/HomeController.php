@@ -198,4 +198,26 @@ class HomeController extends Controller
         }
 
     }
+
+    public function downloadMahasiswaExample()
+    {
+        $path = public_path('files/file_import/siakad-import-mahasiswa-contoh.xlsx');
+        
+        if (!file_exists($path)) {
+            abort(404);
+        }
+
+        return response()->download($path);
+    }
+
+    public function downloadMatakuliahExample()
+    {
+        $path = public_path('files/file_import/siakad-import-matakuliah-contoh.xlsx');
+
+        if (!file_exists($path)) {
+            abort(404);
+        }
+
+        return response()->download($path);
+    }
 }

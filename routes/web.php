@@ -24,6 +24,8 @@ Route::get('/album-foto/show/{slug}', [App\Http\Controllers\Root\HomeController:
 Route::get('/admission/{slug}', [App\Http\Controllers\Root\HomeController::class, 'prodiIndex'])->name('root.home-prodi');
 Route::get('/program-kuliah/{code}', [App\Http\Controllers\Root\HomeController::class, 'prokuIndex'])->name('root.home-proku');
 Route::post('/advice/store', [App\Http\Controllers\Root\HomeController::class, 'adviceStore'])->name('root.home-advice-store');
+Route::get('/download-mahasiswa-example', [App\Http\Controllers\Root\HomeController::class, 'downloadMahasiswaExample'])->name('root.download-mahasiswa-example');
+Route::get('/download-matakuliah-example', [App\Http\Controllers\Root\HomeController::class, 'downloadMatakuliahExample'])->name('root.download-matakuliah-example');
 
 // ERROR PAGE
 Route::get('/error/verify', [App\Http\Controllers\Root\ErrorController::class, 'ErrorVerify'])->name('error.verify');
