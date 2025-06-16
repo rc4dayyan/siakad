@@ -78,12 +78,13 @@ class ImportController extends Controller
 
         try {
             $continue = true;
+            $totalSavedData = 0;
             foreach ($rows as $line) {
-                
                 if (Mahasiswa::where('mhs_nim', $line['NIM'])->exists()) {
-                    $message = "❌ Data dengan NIM {$line['NIM']} sudah ada. Import dihentikan.";
-                    $continue = false;
-                    break; // ❗ Stop the loop immediately
+                    continue;
+                    // $message = "❌ Data dengan NIM {$line['NIM']} sudah ada. Import dihentikan.";
+                    // $continue = false;
+                    // break; // ❗ Stop the loop immediately
                 }
                 $ttl          = explode(',', $line['Tempat,Tanggal Lahir']);
                 $tempatLahir  = $ttl[0] ?? '';
@@ -120,6 +121,8 @@ class ImportController extends Controller
                     'mhs_register_amount' => $line['Biaya Masuk'],
                     'mhs_sync_status'     => $line['Status Sync'],
                 ]);
+
+                $totalSavedData++;
             }
 
             if($continue) {
@@ -136,7 +139,7 @@ class ImportController extends Controller
 
 
         if(empty($message)){
-            $message = "✅ Data berhasil diimport.";
+            $message = "✅ Data berhasil diimport dengan total data baru masuk berjumlah $totalSavedData.";
             Alert::success('Sukses', $message);
         } else {
             var_dump($message);exit;
@@ -173,11 +176,14 @@ class ImportController extends Controller
 
         try {
             $continue = true;
+            $totalSavedData = 0;
             foreach ($rows as $line) {
+                
                 if (MataKuliah::where('code', $line['Kode'])->where('taka_id', $taka_id)->exists()) {
-                    $message = "❌ Data dengan matakuliah {$line['Kode']} sudah ada. Import dihentikan.";
-                    $continue = false;
-                    break; // ❗ Stop the loop immediately
+                    continue;
+                    // $message = "❌ Data dengan matakuliah {$line['Kode']} sudah ada. Import dihentikan.";
+                    // $continue = false;
+                    // break; // ❗ Stop the loop immediately
                 }
 
                 MataKuliah::create([
@@ -192,6 +198,7 @@ class ImportController extends Controller
                     'bsks'      => 20,
                     'desc'      => '',
                 ]);
+                $totalSavedData++;
             }
 
             if ($continue) {
@@ -208,7 +215,7 @@ class ImportController extends Controller
 
 
         if (empty($message)) {
-            $message = "✅ Data berhasil diimport.";
+            $message = "✅ Data berhasil diimport dengan data baru masuk berjumlah $totalSavedData";
             Alert::success('Sukses', $message);
         } else {
             Alert::error('Gagal', $message);
