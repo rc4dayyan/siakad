@@ -43,8 +43,8 @@
                                 @foreach ($stask as $key => $item)
                                     <tr>
                                         <td data-label="Number">{{ ++$key }}</td>
-                                        <td data-label="Nama Mata Kuliah">{{ $item->jadkul->matkul->name }} <br> {{ $item->jadkul->pert_id }}</td>
-                                        <td data-label="Nama Kelas">{{ $item->jadkul->kelas->name }}</td>
+                                        <td data-label="Nama Mata Kuliah">{{ $item->jadkul->matkul->name ?? '' }} <br> {{ $item->jadkul->pert_id ?? '' }}</td>
+                                        <td data-label="Nama Kelas">{{ $item->jadkul->kelas->name ?? '' }}</td>
                                         <td data-label="Judul Tugas">{{ $item->title }}</td>
                                         <td data-label="Masa Berlaku">{{ \Carbon\Carbon::parse($item->exp_date)->format('d M Y') . ' - ' .\Carbon\Carbon::parse($item->exp_time)->format('H:i') }}</td>
                                         <td class="d-flex justify-content-center align-items-center">

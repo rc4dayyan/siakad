@@ -1,19 +1,6 @@
         <!-- Bagian menu untuk pengguna yang telah login -->
         {{-- HAK AKSES WEB ADMINISTRATOR --}}
-        <li class="sidebar-item {{ Route::is($prefix . 'home-index', request()->path()) ? 'active' : '' }}">
-            <a href="{{ route($prefix . 'home-index') }}" class='sidebar-link'>
-                <i class="fa-solid fa-home"></i>
-                <span>Home</span>
-            </a>
-        </li>
-        <li class="sidebar-item {{ Route::is($prefix . 'home-profile', request()->path()) ? 'active' : '' }}">
-            <a href="{{ route($prefix . 'home-profile') }}" class='sidebar-link'>
-                <i class="fa-solid fa-user-edit"></i>
-                <span>Profile User</span>
-            </a>
-        </li>
-
-        <li class="sidebar-title">Menu Rutinitas</li>
+        <!-- <li class="sidebar-title">Menu Rutinitas</li>
         <li class="sidebar-item  {{ Route::is($prefix . 'presensi.absen-harian', request()->path()) ? 'active' : '' }}">
             <a href="{{ route($prefix . 'presensi.absen-harian') }}" class='sidebar-link'>
                 <i class="fa-solid fa-calendar-check"></i>
@@ -31,7 +18,7 @@
                 <i class="fa-solid fa-ticket"></i>
                 <span>Support Ticket</span>
             </a>
-        </li>
+        </li> -->
 
         <li class="sidebar-title">Menu Publikasi</li>
         <li class="sidebar-item  {{ Route::is($prefix . 'system.notify-index', request()->path()) ? 'active' : '' }}">

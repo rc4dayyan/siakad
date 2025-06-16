@@ -2,7 +2,7 @@
     @guest
         <!-- Bagian menu ini akan disembunyikan ketika pengguna adalah "guest" -->
     @else
-        @include('user.sidebar-index')
+    @include('user.sidebar-index-main')
         @if ((int)Auth::user()->raw_type === 0)
             {{-- MENU KHUSUS UNTUK WEB ADMINISTRATOR --}}
             @include('user.admin.admin-sidebar-index')
@@ -24,6 +24,7 @@
             @include('user.support.home-sidebar')
             {{-- END -- MENU KHUSUS UNTUK DEPARTEMENT OFFICER --}}
         @endif
+        @include('user.sidebar-index')
     @endguest
 
     <!-- Menu untuk mahasiswa -->
