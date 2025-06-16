@@ -130,7 +130,7 @@ Halaman untuk mengelola Mata Kuliah
                                 <select name="pstudi_id" id="pstudi_id" class="form-select" name="pstudi_id" id="pstudi_id">
                                     <option value="" selected>Pilih Program Studi</option>
                                     @foreach ($pstudi as $item_p)
-                                    <option value="{{ $item_p->id }}" {{ $item->pstudi_id == $item_p->id ? 'selected' : '' }}>{{ $item_p->name }}</option>
+                                    <option value="{{ $item_p->id }}" {{ isset($item) && $item->pstudi_id == $item_p->id ? 'selected' : '' }}>{{ $item_p->name }}</option>
                                     @endforeach
                                 </select>
                                 @error('pstudi_id')
@@ -142,7 +142,7 @@ Halaman untuk mengelola Mata Kuliah
                                 <select name="dosen_1" id="dosen_1" class="form-select" name="dosen_1" id="dosen_1">
                                     <option value="" selected>Pilih Dosen Pengampu</option>
                                     @foreach ($dosen as $item_d1)
-                                    <option value="{{ $item_d1->id }}" {{ $item->dosen_1 == $item_d1->id ? 'selected' : '' }}>{{ $item_d1->dsn_name }}</option>
+                                    <option value="{{ $item_d1->id }}" {{ isset($item) && $item->dosen_1 == $item_d1->id ? 'selected' : '' }}>{{ $item_d1->dsn_name }}</option>
                                     @endforeach
                                 </select>
                                 @error('dosen_1')
