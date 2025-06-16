@@ -18,6 +18,7 @@ public/dist/**
 !public/dist/assets/extensions/**
 !public/dist/assets/file_import/
 !public/dist/assets/file_import/**
+!public/dist/custom/
 
 /storage/*.key
 /storage/framework/*
