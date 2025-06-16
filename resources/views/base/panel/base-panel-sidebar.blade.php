@@ -41,7 +41,7 @@
 
     @else
 
-        @if (Auth::user()->raw_type === 0)
+        @if ((int)Auth::user()->raw_type === 0)
             <li class="sidebar-title">Special Menu</li>
 
             <li class="sidebar-item  {{ Route::is($prefix . 'system.setting-index', request()->path()) ? 'active' : '' }}">
