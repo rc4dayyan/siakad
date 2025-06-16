@@ -118,7 +118,7 @@ Halaman untuk mengelola Mata Kuliah
                                 <select name="taka_id" id="taka_id" class="form-select" name="taka_id" id="taka_id">
                                     <option value="" selected>Pilih Tahun Akademik</option>
                                     @foreach ($taka as $item_t)
-                                    <option value="{{ $item_t->id }}" {{ $item->taka_id == $item_t->id ? 'selected' : '' }}>{{ $item_t->name . ' - ' . $item_t->semester }}</option>
+                                    <option value="{{ $item_t->id }}" {{ isset($item) && $item->taka_id == $item_t->id ? 'selected' : '' }}>{{ $item_t->name . ' - ' . $item_t->semester }}</option>
                                     @endforeach
                                 </select>
                                 @error('taka_id')
