@@ -6,7 +6,7 @@
     Data Tugas Kuliah
 @endsection
 @section('submenu')
-    Tugas {{ $stask->jadkul->matkul->name }} - {{ $stask->jadkul->pert_id }}
+    Tugas {{ $stask->jadkul->matkul->name ?? '' }} - {{ $stask->jadkul->pert_id ?? '' }}
 @endsection
 @section('urlmenu')
 {{ route('mahasiswa.akademik.tugas-index') }}
@@ -32,7 +32,7 @@
             <div class="card-body row">
                 <div class="form-group col-lg-4 col-12">
                     <label for="exp_date">Mata Kuliah</label>
-                    <input type="text" readonly id="exp_date" name="exp_date" value="{{ $stask->jadkul->matkul->name }} - {{ $stask->jadkul->pert_id }}" class="form-control">
+                    <input type="text" readonly id="exp_date" name="exp_date" value="{{ $stask->jadkul->matkul->name ?? '' }} - {{ $stask->jadkul->pert_id ?? '' }}" class="form-control">
                     @error('exp_date')
                         <small class="text-danger">{{ $message }}</small>
                     @enderror
