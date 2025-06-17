@@ -42,7 +42,7 @@
                                 <td data-label="Number">{{ ++$key }}</td>
                                 <td data-label="Judul Tugas">{{ $item->title }}</td>
                                 <td data-label="Nama Dosen">{{ $item->dosen->dsn_name }}</td>
-                                <td data-label="Mata Kuliah">{{ $item->jadkul->matkul->name }} <br> {{ $item->jadkul->pert_id }}</td>
+                                <td data-label="Mata Kuliah">{{ $item->jadkul->matkul->name ?? '' }} <br> {{ $item->jadkul->pert_id ?? '' }}</td>
                                 <td data-label="Nama Dosen">{{ \Carbon\Carbon::parse($item->exp_date)->isoFormat('dddd, D MMMM Y') }} <br> {{ \Carbon\Carbon::parse($item->exp_time)->format('H:i') }} WIB </td>
                                 <td class="d-flex justify-content-center align-items-center">
                                     <a href="{{ route('mahasiswa.akademik.tugas-view', $item->code) }}" class="btn btn-primary"><i class="fa-solid fa-eye"></i></a>
