@@ -164,7 +164,7 @@ Halaman untuk melihat Jadwal Kuliah
                 role="document">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h4 class="modal-title" id="myModalLabel16">FeedBack - {{ $item->matkul->name .' P-'.$item->raw_pert_id }} </h4>
+                        <h4 class="modal-title" id="myModalLabel16">FeedBack - {{ ($item->matkul->name ?? '') .' P-'.$item->raw_pert_id }} </h4>
                         <div class="d-flex justify-content-between align-items-center">
 
                             <button type="submit" class="btn btn-outline-primary" style="margin-right: 4px">
