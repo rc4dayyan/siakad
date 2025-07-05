@@ -12,9 +12,9 @@
                 <li class="submenu-item {{ Route::is('web-admin.finance.pembayaran-*', request()->path()) ? 'active' : '' }}">
                     <a href="{{ route('web-admin.finance.pembayaran-index') }}" class="submenu-link">Data Pembayaran</a>
                 </li>
-                <li class="submenu-item {{ Route::is('web-admin.finance.keuangan-*', request()->path()) ? 'active' : '' }}">
+                <!-- <li class="submenu-item {{ Route::is('web-admin.finance.keuangan-*', request()->path()) ? 'active' : '' }}">
                     <a href="{{ route('web-admin.finance.keuangan-index') }}" class="submenu-link">Data Keuangan</a>
-                </li>
+                </li> -->
             </ul>
         </li>
         <!-- <li class="sidebar-item has-sub {{ Route::is('web-admin.approval.*', request()->path()) ? 'active' : '' }}">
