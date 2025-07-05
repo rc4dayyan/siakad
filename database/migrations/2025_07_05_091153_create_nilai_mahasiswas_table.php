@@ -30,11 +30,7 @@ return new class extends Migration
             $table->unique(['mahasiswa_id', 'mata_kuliah_id', 'kelas_id']); // 1 mahasiswa hanya punya 1 nilai per mata kuliah
         });
 
-        // Schema::table('mata_kuliahs', function (Blueprint $table) {
-        //     $table->unsignedBigInteger('kelas_id')->nullable()->after('pstudi_id');
-
-        //     $table->foreign('kelas_id')->references('id')->on('kelas')->onDelete('set null');
-        // });
+        
     }
 
     /**
