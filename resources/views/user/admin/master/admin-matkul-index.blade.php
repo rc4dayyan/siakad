@@ -35,8 +35,10 @@ Halaman untuk mengelola Mata Kuliah
                         <th class="text-center">Nama Mata Kuliah</th>
                         <th class="text-center">Kode Mata Kuliah</th>
                         <th class="text-center">Semester</th>
-                        <th class="text-center">Dosen Pengampu</th>
-                        <th class="text-center">Syarat Mata Kuliah</th>
+                        <th class="text-center">Kelas</th>
+                        <!-- <th class="text-center">Dosen Pengampu</th> -->
+                        <!-- <th class="text-center">Syarat Mata Kuliah</th> -->
+                        <th class="text-center"></th>
                         <th class="text-center">Button</th>
                     </tr>
                 </thead>
@@ -49,12 +51,21 @@ Halaman untuk mengelola Mata Kuliah
                         <td data-label="Nama Mata Kuliah">{{ $item->name }}</td>
                         <td data-label="Kode Mata Kuliah">{{ $item->code }}</td>
                         <td data-label="Kurikulum">{{ $item->taka->semester }}</td>
-                        <td data-label="Team Dosen">
+                        <td data-label="Kurikulum">{{ $item->kelas->name ?? '' }}</td>
+                        <!-- <td data-label="Team Dosen">
                             {{ $item->dosen1->dsn_name }}<br>{{ $item->dosen_2 == null ? '-' : $item->dosen2->dsn_name }}<br>{{ $item->dosen_3 == null ? '-' : $item->dosen3->dsn_name }}
+                        </td> -->
+                        <!-- <td data-label="Syarat Mata Kuliah">{{ $item->requ_id == null ? '-' : $item->requ->name }}</td> -->
+                        <td data-label="Syarat Mata Kuliah">
+                            <a href="{{ route($prefix.'master.matkul-nilai', $item->id) }}" class="btn btn-outline-info" style="margin-right: 10px">
+                                Nilai
+                            </a>
                         </td>
-                        <td data-label="Syarat Mata Kuliah">{{ $item->requ_id == null ? '-' : $item->requ->name }}</td>
                         <td>
                             <div class="d-flex justify-content-center align-items-center w-100" style="padding: 10px;">
+                                <!-- <a href="{{ route($prefix.'master.matkul-nilai', $item->id) }}" class="btn btn-outline-info" style="margin-right: 10px">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                </a> -->
                                 <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#updateMatkul{{ $item->code }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
                                 {{-- <a href="{{ route($prefix.'master.matkul-view', $item->code) }}" style="margin-right: 10px" class="btn btn-outline-info"><i class="fa-solid fa-eye"></i></a> --}}
                                 <form id="delete-form-{{ $item->code }}"

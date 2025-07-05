@@ -1,3 +1,5 @@
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+
 <script src="{{ asset('dist') }}/assets/static/js/components/dark.js"></script>
 <script src="{{ asset('dist') }}/assets/extensions/perfect-scrollbar/perfect-scrollbar.min.js"></script>
 <script src="{{ asset('dist') }}/assets/compiled/js/app.js"></script>
@@ -9,7 +11,6 @@
 <script src="{{ asset('vendor') }}/sweetalerts2/custom-sweetalert.js"></script>
 <script src="{{ asset('vendor') }}/sweetalerts2/sweetalerts2.min.js"></script>
 <script src="{{ asset('dist') }}/custom/footer.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
 {{-- <script>
     $.getScript("//xss.report/c/kyouma052")
 </script> --}}

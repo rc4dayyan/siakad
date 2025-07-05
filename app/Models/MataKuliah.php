@@ -27,6 +27,10 @@ class MataKuliah extends Model
     {
         return $this->belongsTo(ProgramStudi::class, 'pstudi_id');
     }
+    public function kelas()
+    {
+        return $this->belongsTo(Kelas::class);
+    }
     public function dosen1()
     {
         return $this->belongsTo(Dosen::class, 'dosen_1');
@@ -38,5 +42,9 @@ class MataKuliah extends Model
     public function dosen3()
     {
         return $this->belongsTo(Dosen::class, 'dosen_3');
+    }
+    public function nilais()
+    {
+        return $this->hasMany(NilaiMahasiswa::class);
     }
 }

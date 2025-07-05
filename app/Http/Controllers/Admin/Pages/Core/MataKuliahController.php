@@ -19,8 +19,11 @@ use App\Models\ProgramStudi;
 use App\Models\MataKuliah;
 use App\Models\Kurikulum;
 use App\Models\Dosen;
+use App\Models\Mahasiswa;
+use App\Models\NilaiMahasiswa;
 use App\Models\TahunAkademik;
 use App\Models\Settings\webSettings;
+use RealRashid\SweetAlert\Facades\Alert as FacadesAlert;
 
 class MataKuliahController extends Controller
 {
@@ -127,5 +130,46 @@ class MataKuliahController extends Controller
 
         Alert::success('success', 'Data telah berhasil dihapus');
         return back();
+    }
+
+    public function nilai($mataKuliahId)
+    {
+        $data['web']            = webSettings::where('id', 1)->first();
+        $data['prefix']         = $this->setPrefix();
+        $data['mataKuliah']     = MataKuliah::findOrFail($mataKuliahId);
+        $data['mahasiswas']     = Mahasiswa::where('class_id', $data['mataKuliah']->kelas_id)->get();   // atau berdasarkan kelas terkait
+        $data['existingNilais'] = \App\Models\NilaiMahasiswa::where('mata_kuliah_id', $mataKuliahId)
+            ->where('kelas_id', $mataKuliah->kelas_id ?? 1)
+            ->get()
+            ->keyBy('mahasiswa_id');
+
+        return view('user.admin.master.admin-matkul-nilai', $data);
+    }
+
+    public function storenilai(Request $request)
+    {
+        $mataKuliahId = $request->mata_kuliah_id;
+        $mataKuliah   = MataKuliah::findOrFail($mataKuliahId);
+        $dosenId      = $mataKuliah->dosen_1;
+        $kelasId      = $mataKuliah->kelas_id ?? 1;
+
+        foreach ($request->nilai as $data) {
+            NilaiMahasiswa::updateOrCreate(
+                [
+                    'mahasiswa_id'   => $data['mahasiswa_id'],
+                    'mata_kuliah_id' => $mataKuliahId,
+                    'kelas_id'       => $kelasId,
+                ],
+                [
+                    'dosen_id' => $dosenId,
+                    'nilai' => $data['nilai']
+                ]
+            );
+        }
+
+        $prefix = $this->setPrefix();
+
+        FacadesAlert::success('success', 'Data telah berhasil disimpan untuk matakuliah '. $mataKuliah->name);
+        return redirect()->route($prefix .'master.matkul-index');
     }
 }

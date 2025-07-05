@@ -17,7 +17,7 @@
                 </li>
             </ul>
         </li>
-        <li class="sidebar-item has-sub {{ Route::is('web-admin.approval.*', request()->path()) ? 'active' : '' }}">
+        <!-- <li class="sidebar-item has-sub {{ Route::is('web-admin.approval.*', request()->path()) ? 'active' : '' }}">
             <a href="#" class='sidebar-link'>
                 <i class="fa-solid fa-file-signature"></i>
                 <span>Data Approval</span>
@@ -27,7 +27,7 @@
                     <a href="{{ route($prefix . 'approval.absen-index') }}" class="submenu-link">Approval Absensi</a>
                 </li>
             </ul>
-        </li>
+        </li> -->
 
 
         {{-- MENU KHUSUS UNTUK WEB ADMINISTRATOR --}}
@@ -69,7 +69,7 @@
                 </li>
             </ul>
         </li>
-        <li class="sidebar-item has-sub {{ Route::is('web-admin.master.proku-*') ? 'active' : '' }}">
+        <!-- <li class="sidebar-item has-sub {{ Route::is('web-admin.master.proku-*') ? 'active' : '' }}">
             <a href="#" class='sidebar-link'>
                 <i class="fa-solid fa-school"></i>
                 <span>Data PMB</span>
@@ -79,7 +79,7 @@
                     <a href="{{ route('web-admin.master.proku-index') }}" class="submenu-link">Data Program Kuliah</a>
                 </li>
             </ul>
-        </li>
+        </li> -->
         <li class="sidebar-item has-sub {{ Route::is('web-admin.master.kurikulum-*', 'web-admin.master.kelas-*', 'web-admin.master.matkul-*', 'web-admin.master.jadkul-*') ? 'active' : '' }}">
             <a href="#" class='sidebar-link'>
                 <i class="fa-solid fa-school"></i>

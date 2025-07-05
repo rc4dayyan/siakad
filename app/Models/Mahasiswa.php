@@ -76,4 +76,13 @@ class Mahasiswa extends Authenticatable
     {
         return $this->belongsTo(TahunAkademik::class, 'taka_id');
     }
+    public function nilais()
+    {
+        return $this->hasMany(NilaiMahasiswa::class);
+    }
+    public function nilaiMahasiswa()
+    {
+        return $this->hasOne(NilaiMahasiswa::class, 'mahasiswa_id')
+            ->where('mata_kuliah_id', $this->mata_kuliah_id ?? request('mata_kuliah_id'));
+    }
 }

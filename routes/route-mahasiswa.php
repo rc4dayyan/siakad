@@ -40,6 +40,11 @@ Route::group(['prefix' => 'mahasiswa', 'middleware' => ['mhs-access:Mahasiswa Ak
     Route::get('/tugas-kuliah/{code}/view',[App\Http\Controllers\Mahasiswa\Pages\StudentTaskController::class, 'view'])->name('akademik.tugas-view');
     Route::post('/tugas-kuliah/{code}/store',[App\Http\Controllers\Mahasiswa\Pages\StudentTaskController::class, 'store'])->name('akademik.tugas-store');
 
+    // PRIVATE FUNCTION => NILAI KULIAH
+    Route::get('/nilai-kuliah', [App\Http\Controllers\Mahasiswa\Pages\StudentNilaiController::class, 'index'])->name('akademik.nilai-index');
+    Route::get('/nilai-kuliah/{code}/view', [App\Http\Controllers\Mahasiswa\Pages\StudentNilaiController::class, 'view'])->name('akademik.nilai-view');
+    Route::post('/nilai-kuliah/{code}/store', [App\Http\Controllers\Mahasiswa\Pages\StudentNilaiController::class, 'store'])->name('akademik.nilai-store');
+
 
     // AJAX ASYNC
     Route::get('/ajax/getTicketLastReply/{code}',[App\Http\Controllers\Mahasiswa\Pages\SupportController::class, 'AjaxLastReply'])->name('ajax.support.ticket-last-reply');

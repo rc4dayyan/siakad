@@ -24,6 +24,12 @@
         <span>Data Tugas Kuliah</span>
     </a>
 </li>
+<li class="sidebar-item  {{ Route::is('mahasiswa.akademik.nilai-*', request()->path()) ? 'active' : '' }}">
+    <a href="{{ route('mahasiswa.akademik.nilai-index') }}" class='sidebar-link'>
+        <i class="fa-solid fa-list-check"></i>
+        <span>Data Nilai</span>
+    </a>
+</li>
 
 <li class="sidebar-title">Menu Finansial</li>
 <li class="sidebar-item  {{ Route::is('mahasiswa.home-tagihan-*', request()->path()) ? 'active' : '' }}">

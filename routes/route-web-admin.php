@@ -81,6 +81,8 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::get('/master/data-matkul/create',[App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'create'])->name('master.matkul-create');
         Route::post('/master/data-matkul/store',[App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'store'])->name('master.matkul-store');
         Route::patch('/master/data-matkul/{code}/update',[App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'update'])->name('master.matkul-update');
+        Route::get('/master/data-matkul/{code}/nilai', [App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'nilai'])->name('master.matkul-nilai');
+        Route::post('/master/data-matkul/storenilai', [App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'storenilai'])->name('master.matkul-storenilai');
         Route::delete('/master/data-matkul/{code}/destroy',[App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'destroy'])->name('master.matkul-destroy');
         // MENU KHUSUS DATA MASTER => DATA JADWAL KULIAH
         Route::get('/master/data-jadkul',[App\Http\Controllers\Admin\Pages\Core\JadwalKuliahController::class, 'index'])->name('master.jadkul-index');

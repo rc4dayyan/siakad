@@ -71,5 +71,7 @@ function rejectData(id) {
     });
 }
 $(document).ready(function () {
-    $("#myTable").DataTable();
+    if ($('#myTable').length) {
+        $('#myTable').DataTable();
+    }
 });
