@@ -47,10 +47,10 @@ Halaman untuk melihat data pengguna Karyawan
                         <td data-label="Role Karyawan">{{ $item->type }}</td>
                         <td data-label="Gender">{{ $item->gend }}</td>
                         <td data-label="Join Date">{{ \Carbon\Carbon::parse($item->created_at)->format('l, d M Y') }}</td>
-                        @if($item->status === 1)
+                        @if($item->status === '1')
                         <td data-label="Status"><span class="text-success">Active</span></td>
 
-                        @elseif($item->status === 0)
+                        @elseif($item->status === '0')
                         <td data-label="Status"><span class="text-danger">Non-Active</span></td>
                         @else
                         <td data-label="Status"><span class="text-danger">-</span></td>
