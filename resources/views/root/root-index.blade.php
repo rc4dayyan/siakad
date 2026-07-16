@@ -2,10 +2,6 @@
 
 @section('body-class', 'modern-home')
 
-@section('custom-css')
-    <link rel="stylesheet" href="{{ asset('dist') }}/custom/home.css">
-@endsection
-
 @section('content')
     @php
         $featuredAlbum = $album->first();
@@ -165,7 +161,7 @@
             </div>
         </section>
 
-        <section class="home-section home-section--muted">
+        <section class="home-section home-section--muted" id="berita">
             <div class="container">
                 <div class="row g-5 align-items-start">
                     <div class="col-lg-8">

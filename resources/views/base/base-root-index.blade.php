@@ -22,13 +22,14 @@
     <link rel="stylesheet" href="{{ asset('dist') }}/assets/compiled/css/iconly.css">
     <link rel="stylesheet" href="{{ asset('dist') }}/assets/custom/css/news-section.css">
     <link rel="stylesheet" href="{{ asset('dist') }}/custom/banner.css">
+    <link rel="stylesheet" href="{{ asset('dist') }}/custom/home.css">
     {{-- PLUGIN FONT AWESOME --}}
     <link rel="stylesheet" href="{{ asset('vendor') }}/fontawesome/css/all.min.css" rel="stylesheet">
     @yield('custom-css')
 
 </head>
 
-<body class="@yield('body-class')">
+<body class="public-site @yield('body-class')">
     <script src="{{ asset('dist') }}/assets/static/js/initTheme.js"></script>
     <div id="app">
         <div id="main" class="layout-horizontal">

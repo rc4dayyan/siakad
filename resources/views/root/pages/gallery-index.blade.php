@@ -1,54 +1,68 @@
 @extends('base.base-root-index')
-@section('submenu')
-    Daftar Album Foto
-@endsection
+
+@section('body-class', 'public-inner-page')
+
 @section('content')
-<section class="section">
-    <div class="breadcrumb-wrap-style-2" data-bg-image="{{ env('APP_URL_SRV') }}/assets/webprofil/media/banner/banner22.jpg" style="border-radius: 20px; background-image: url(&quot;{{ env('APP_URL_SRV') }}/assets/webprofil/media/banner/banner22.jpg&quot;);">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ route('root.home-index') }}">Home</a></li>
-                <li class="breadcrumb-item active" aria-current="page"><a href="{{ route('root.gallery-index') }}">Album Foto</a></li>
-            </ol>
-        </nav>
-        <div class="inner-banner-title">
-            <h1 class="title">@yield('submenu')</h1>
-        </div>
-    </div>
-    <div class="row mb-3 mt-3">
-        <div class="col-lg-12">
-
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="a d-flex justify-content-center">
-                    <form action="{{ route('root.gallery-search') }}" method="GET">
-                        <div class="a d-flex justify-content-center">
-                            <input type="search" class="form-control" placeholder="Search here..." name="search" id="search">
-                            <button type="submit" class="btn btn-info" style="margin-left: 5px"><i
-                                    class="fa-solid fa-search"></i></button>
-                        </div>
+    <main class="public-page">
+        <section class="public-hero public-hero--compact">
+            <div class="container">
+                <nav class="public-breadcrumb" aria-label="Breadcrumb">
+                    <a href="{{ route('root.home-index') }}">Beranda</a>
+                    <i class="fa-solid fa-chevron-right"></i>
+                    <span>Galeri</span>
+                </nav>
+                <div class="public-hero__split">
+                    <div class="public-hero__content">
+                        <span class="home-kicker">Momen dan cerita</span>
+                        <h1>Galeri kegiatan kampus</h1>
+                        <p>Rekam jejak aktivitas akademik, kolaborasi, dan kebersamaan sivitas kampus.</p>
+                    </div>
+                    <form class="public-search" action="{{ route('root.gallery-search') }}" method="GET" role="search">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <label class="visually-hidden" for="gallery-search">Cari album</label>
+                        <input type="search" name="search" id="gallery-search" value="{{ request('search') }}" placeholder="Cari album...">
+                        <button type="submit">Cari</button>
                     </form>
-
-
-                </div>
-                <div class="b">
                 </div>
             </div>
-        </div>
-        <div class="col-lg-12 row mt-2">
-            @foreach ($albums as $item)
-            <div class="col-6 col-sm-6 col-lg-3 mt-3 mb-3 mt-md-0 mb-md-0 text-center">
-                <div class="position-relative">
-                    <a href="{{ route('root.gallery-show', $item->slug) }}" class="overlay-container mb-2 mt-2">
-                        <img class="w-100 active" style="border-radius: 20px" src="{{ asset('storage/'.$item->cover) }}"
-                            data-bs-target="#Gallerycarousel" data-bs-slide-to="0">
-                        <span class="overlay-text">{{ $item->name }}</span>
-                    </a>
-                </div>
-            </div>
-            @endforeach
-            {{ $albums->links('root.vendor.paginator') }}
-        </div>
-    </div>
+        </section>
 
-</section>
+        <section class="public-section">
+            <div class="container">
+                <div class="public-section-heading">
+                    <div>
+                        <span class="home-kicker">Koleksi terbaru</span>
+                        <h2>{{ request('search') ? 'Hasil pencarian “' . request('search') . '”' : 'Jelajahi album foto' }}</h2>
+                    </div>
+                    <span class="public-result-count">{{ $albums->total() }} album</span>
+                </div>
+
+                @if ($albums->count())
+                    <div class="public-album-grid">
+                        @foreach ($albums as $item)
+                            <article class="public-album-card">
+                                <a href="{{ route('root.gallery-show', $item->slug) }}" class="public-album-card__image">
+                                    <img src="{{ asset('storage/' . $item->cover) }}" alt="{{ $item->name }}" loading="lazy">
+                                    <span><i class="fa-regular fa-images"></i> Lihat album</span>
+                                </a>
+                                <div class="public-album-card__body">
+                                    <small>{{ $item->created_at?->translatedFormat('d F Y') ?? 'Galeri kampus' }}</small>
+                                    <h3><a href="{{ route('root.gallery-show', $item->slug) }}">{{ $item->name }}</a></h3>
+                                    <p>{{ Str::limit(strip_tags($item->desc), 90) }}</p>
+                                </div>
+                            </article>
+                        @endforeach
+                    </div>
+                    <div class="public-pagination">{{ $albums->withQueryString()->links('root.vendor.paginator') }}</div>
+                @else
+                    <div class="public-empty-state">
+                        <span class="home-icon home-icon--green"><i class="fa-regular fa-images"></i></span>
+                        <h2>Album tidak ditemukan</h2>
+                        <p>Coba gunakan kata kunci lain atau kembali melihat seluruh koleksi galeri.</p>
+                        <a href="{{ route('root.gallery-index') }}" class="home-btn home-btn--primary">Lihat semua album</a>
+                    </div>
+                @endif
+            </div>
+        </section>
+    </main>
 @endsection
