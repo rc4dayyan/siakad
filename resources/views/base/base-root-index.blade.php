@@ -28,7 +28,7 @@
 
 </head>
 
-<body>
+<body class="@yield('body-class')">
     <script src="{{ asset('dist') }}/assets/static/js/initTheme.js"></script>
     <div id="app">
         <div id="main" class="layout-horizontal">

@@ -1,148 +1,320 @@
 @extends('base.base-root-index')
+
+@section('body-class', 'modern-home')
+
+@section('custom-css')
+    <link rel="stylesheet" href="{{ asset('dist') }}/custom/home.css">
+@endsection
+
 @section('content')
-<div class="page-content row">
+    @php
+        $featuredAlbum = $album->first();
+        $featuredPost = $posts->first();
+        $heroImage = $featuredAlbum
+            ? asset('storage/' . $featuredAlbum->cover)
+            : asset('auth/assets/img/curved-images/curved11.jpg');
+    @endphp
 
-    <div class="col-lg-8 col-12">
-        <h4 class="card-title">Gallery Terbaru</h4>
-        <hr>
-        <div class="card mb-3">
-            <div class="card-body">
-                <div id="carouselExampleCaptions" class="carousel slide" data-bs-ride="carousel">
-                    <div class="carousel-inner">
-                        @foreach ($album as $item)
-
-                        <div class="carousel-item active">
-                            <a href="{{ route('root.gallery-show', $item->slug) }}">
-
-                                <img src="{{ asset('storage/'.$item->cover) }}" style="height: 375px; width: 100%; object-fit: cover;" class="d-block w-100" alt="...">
-                                <div class="carousel-caption d-none d-md-block">
-                                    <h5>{{ $item->name }}</h5>
-                                    <p>Nulla vitae elit libero, a pharetra augue mollis interdum.</p>
-                                </div>
+    <main class="home-page">
+        <section class="home-hero" aria-labelledby="hero-title">
+            <div class="home-hero__glow home-hero__glow--one"></div>
+            <div class="home-hero__glow home-hero__glow--two"></div>
+            <div class="container home-hero__container">
+                <div class="row align-items-center g-5">
+                    <div class="col-lg-6">
+                        <div class="home-eyebrow">
+                            <span class="home-eyebrow__dot"></span>
+                            Sistem Informasi Akademik Terpadu
+                        </div>
+                        <h1 id="hero-title">Langkah cerdas menuju masa depan yang <span>lebih bermakna.</span></h1>
+                        <p class="home-hero__lead">
+                            Temukan pengalaman akademik yang terhubung, transparan, dan mudah diakses di
+                            {{ strip_tags($web->school_name) }}.
+                        </p>
+                        <div class="home-hero__actions">
+                            <a href="#program-studi" class="home-btn home-btn--primary">
+                                Jelajahi Program
+                                <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                            </a>
+                            <a href="{{ route('mahasiswa.auth-signin-page') }}" class="home-btn home-btn--ghost">
+                                <i class="fa-regular fa-user" aria-hidden="true"></i>
+                                Portal Mahasiswa
                             </a>
                         </div>
-                        @endforeach
-                    </div>
-                    <a class="carousel-control-prev" href="#carouselExampleCaptions" role="button" data-bs-slide="prev">
-                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Previous</span>
-                    </a>
-                    <a class="carousel-control-next" href="#carouselExampleCaptions" role="button" data-bs-slide="next">
-                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Next</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-        <h4 class="card-title">Berita Terbaru</h4>
-        <hr>
-        <div class="card mb-3">
-            <div class="card-body">
-                @if ($posts->count() == 0)
-                    <p>Nothing Post In Here</p>
-
-                @else
-                    @foreach ($posts as $key => $item)
-
-                        <div class="berita row">
-                            <div class="col-lg-2 text-center">
-                                <img src="{{ asset('storage/images/'. $item->image) }}" style="" class="rounded" alt="">
+                        <div class="home-hero__metrics" aria-label="Ringkasan kampus">
+                            <div>
+                                <strong>{{ $fakultas->count() }}</strong>
+                                <span>Fakultas</span>
                             </div>
-                            <div class="col-lg-10">
-                                <a href="{{ route('root.post-view', $item->slug) }}" style="font-size: 20px; font-weight: 800;">{{ $item->name }}</a>
-                                <p class="mb-2">{{ Str::limit( strip_tags( $item->content ), 180 ) }}</p>
-                                <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ $proku->count() }}</strong>
+                                <span>Program Kuliah</span>
+                            </div>
+                            <div>
+                                <strong>{{ $posts->total() }}</strong>
+                                <span>Informasi Terkini</span>
+                            </div>
+                        </div>
+                    </div>
 
-                                    <small>{{ $item->created_at->translatedFormat('l, d F Y - H.i') }} WIB <br> Author By <a href="#">{{ $item->author->name }}</a> - Kategori <a href="">{{ $item->category->name }}</a></small>
-                                    <a href="{{ route('root.post-view', $item->slug) }}" class="btn btn-xs btn-info"><i class="fa-solid fa-info"></i></a>
+                    <div class="col-lg-6">
+                        <div class="home-hero__visual">
+                            <div class="home-hero__image-wrap">
+                                <img src="{{ $heroImage }}" alt="Kegiatan akademik {{ strip_tags($web->school_name) }}">
+                                <div class="home-hero__image-shade"></div>
+                                @if ($featuredAlbum)
+                                    <a href="{{ route('root.gallery-show', $featuredAlbum->slug) }}" class="home-hero__caption">
+                                        <span class="home-hero__caption-icon"><i class="fa-regular fa-images"></i></span>
+                                        <span>
+                                            <small>Galeri pilihan</small>
+                                            <strong>{{ $featuredAlbum->name }}</strong>
+                                        </span>
+                                        <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                                    </a>
+                                @endif
+                            </div>
+                            <div class="home-hero__badge">
+                                <span><i class="fa-solid fa-graduation-cap"></i></span>
+                                <div>
+                                    <strong>Kampus berdampak</strong>
+                                    <small>Belajar, bertumbuh, mengabdi</small>
                                 </div>
                             </div>
                         </div>
-                        <hr>
-                    @endforeach
-                @endif
-            </div>
-        </div>
-        {{ $posts->links('root.vendor.paginator') }}
-
-    </div>
-    <div class="col-lg-4 col-12">
-        <div class="card mb-3">
-            <div class="card-body">
-                <h4 class="card-title text-center">Sambutan Rektor</h4>
-                <img src="{{ asset('storage/images/default/default-profile.jpg') }}" class="card-img-top mb-2" alt="">
-                <p class="text-center">{{ $web->school_head }} <br>Rektor Utama {!! $web->school_name !!}</p>
-                <hr>
-                <p style="text-align: justify">{!! $web->school_desc !!}</p>
-            </div>
-        </div>
-        <div class="card mb-3">
-            <div class="card-body">
-                <div class="list-group list-group-horizontal-sm mb-1 text-center" role="tablist">
-                    <a class="list-group-item list-group-item-action active" id="list-terbaru-list" data-bs-toggle="list" href="#list-terbaru" role="tab">Daftar Pengumuman</a>
-                    <a class="list-group-item list-group-item-action" id="list-terpopular-list" data-bs-toggle="list" href="#list-terpopular" role="tab">Berita Terpopuler</a>
-                </div>
-                <div class="tab-content text-justify" style="text-align: justify">
-                    <div class="tab-pane fade show active" id="list-terbaru" role="tabpanel" aria-labelledby="list-terbaru-list">
-                        <h6 class="text-center mt-2 mb-2">Pengumuman - {{ \Carbon\Carbon::now()->format('d M Y') }}</h6>
-
-                        @forelse ($notify as $item)
-                            <span>{{ \Carbon\Carbon::parse($item->created_at)->format('d-m-Y'.' - '.'H'.'.'.'i') }} - <a href="#" data-bs-toggle="modal" data-bs-target="#updateFakultas{{ $item->code }}">{{ $item->name }}</a></span><br>
-                        @empty
-                            <span class="">Tidak Ada Pengumuman Hari Ini</span>
-                        @endforelse
-                    </div>
-                    <div class="tab-pane fade" id="list-terpopular" role="tabpanel" aria-labelledby="list-terpopular-list">Cupidatat
-                        quis ad sint excepteur laborum in esse qui. Et excepteur consectetur ex nisi eu do
-                        cillum ad laborum.
-                        Mollit et eu officia dolore sunt Lorem culpa qui commodo velit ex amet id ex.
-                        Officia
-                        anim incididunt
-                        laboris deserunt anim aute dolor incididunt veniam aute dolore do exercitation.
-                        Dolor
-                        nisi culpa ex ad
-                        irure in elit eu dolore. Ad laboris ipsum reprehenderit irure non commodo enim culpa
-                        commodo veniam
-                        incididunt veniam ad. Lorem ipsum dolor sit amet consectetur, adipisicing elit.
-                        Exercitationem, porro!
-                        Amet soluta tempora eveniet blanditiis alias eos, dolor qui consectetur!
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
-<div class="me-1 mb-1 d-inline-block">
+        </section>
 
-    <!--Extra Large Modal -->
-    @foreach ($notify as $item)
-        <div class="modal fade text-left w-100" id="updateFakultas{{$item->code}}" tabindex="-1" role="dialog"
-            aria-labelledby="myModalLabel16" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-l"
-                role="document">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h4 class="modal-title" id="myModalLabel16">Notifikasi - {{ $item->name }}</h4>
-                        <div class="">
+        <section class="home-quick" aria-label="Akses cepat">
+            <div class="container">
+                <div class="home-quick__grid">
+                    <a href="{{ route('mahasiswa.auth-signin-page') }}" class="home-quick__item">
+                        <span class="home-icon home-icon--green"><i class="fa-solid fa-user-graduate"></i></span>
+                        <span><strong>Portal Mahasiswa</strong><small>Akses jadwal, tugas, nilai, dan tagihan</small></span>
+                        <i class="fa-solid fa-chevron-right home-quick__arrow"></i>
+                    </a>
+                    <a href="{{ route('dosen.auth-signin-page') }}" class="home-quick__item">
+                        <span class="home-icon home-icon--blue"><i class="fa-solid fa-chalkboard-user"></i></span>
+                        <span><strong>Portal Dosen</strong><small>Kelola perkuliahan dan aktivitas akademik</small></span>
+                        <i class="fa-solid fa-chevron-right home-quick__arrow"></i>
+                    </a>
+                    <a href="{{ route('root.home-download') }}" class="home-quick__item">
+                        <span class="home-icon home-icon--gold"><i class="fa-regular fa-folder-open"></i></span>
+                        <span><strong>Pusat Dokumen</strong><small>Unduh informasi dan dokumen kampus</small></span>
+                        <i class="fa-solid fa-chevron-right home-quick__arrow"></i>
+                    </a>
+                </div>
+            </div>
+        </section>
 
-                            <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal"
-                                aria-label="Close">
-                                <i class="fas fa-times"></i>
-                            </button>
+        <section class="home-section" id="program-studi">
+            <div class="container">
+                <div class="home-section__heading home-section__heading--center">
+                    <span class="home-kicker">Pendidikan untuk masa depan</span>
+                    <h2>Temukan jalur akademik yang tepat untuk Anda</h2>
+                    <p>Program pendidikan dirancang untuk membentuk lulusan yang kompeten, adaptif, dan berintegritas.</p>
+                </div>
+
+                <div class="row g-4 justify-content-center">
+                    @forelse ($fakultas as $index => $faku)
+                        <div class="col-md-6 col-lg-4">
+                            <article class="home-program-card">
+                                <div class="home-program-card__number">0{{ $index + 1 }}</div>
+                                <span class="home-icon home-icon--soft"><i class="fa-solid fa-book-open-reader"></i></span>
+                                <h3>{{ $faku->name }}</h3>
+                                @php
+                                    $programs = \App\Models\ProgramStudi::where('faku_id', $faku->id)->get();
+                                @endphp
+                                <p>{{ $programs->count() }} program studi tersedia untuk mendukung tujuan akademik dan karier Anda.</p>
+                                <div class="home-program-card__links">
+                                    @foreach ($programs->take(3) as $program)
+                                        <a href="{{ route('root.home-prodi', $program->slug) }}">
+                                            <span>{{ $program->level }} · {{ $program->name }}</span>
+                                            <i class="fa-solid fa-arrow-right"></i>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </article>
                         </div>
+                    @empty
+                        <div class="col-12">
+                            <div class="home-empty">Informasi fakultas sedang dipersiapkan.</div>
+                        </div>
+                    @endforelse
+
+                    <div class="col-md-6 col-lg-4">
+                        <article class="home-program-card home-program-card--accent">
+                            <div class="home-program-card__number"><i class="fa-solid fa-compass"></i></div>
+                            <span class="home-icon home-icon--accent"><i class="fa-solid fa-calendar-check"></i></span>
+                            <h3>Program Kuliah</h3>
+                            <p>Pilih skema perkuliahan yang paling sesuai dengan ritme dan kebutuhan belajar Anda.</p>
+                            <div class="home-program-card__links">
+                                @forelse ($proku->take(3) as $program)
+                                    <a href="{{ route('root.home-proku', $program->code) }}">
+                                        <span>{{ $program->name }}</span>
+                                        <i class="fa-solid fa-arrow-right"></i>
+                                    </a>
+                                @empty
+                                    <span class="home-program-card__muted">Informasi segera tersedia.</span>
+                                @endforelse
+                            </div>
+                        </article>
                     </div>
-                    <div class="modal-body">
-                        <div class="row">
-                            <div class="form-group">
-                                <p class="text-center"><b>{{ $item->name }}</b></p>
-                                <p>{!! $item->desc !!}</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="home-section home-section--muted">
+            <div class="container">
+                <div class="row g-5 align-items-start">
+                    <div class="col-lg-8">
+                        <div class="home-section__heading home-section__heading--row">
+                            <div>
+                                <span class="home-kicker">Warta kampus</span>
+                                <h2>Berita dan cerita terbaru</h2>
                             </div>
                         </div>
+
+                        @if ($featuredPost)
+                            <div class="home-news-grid">
+                                <article class="home-news-featured">
+                                    <a href="{{ route('root.post-view', $featuredPost->slug) }}" class="home-news-featured__image">
+                                        <img src="{{ asset('storage/images/' . $featuredPost->image) }}" alt="{{ $featuredPost->name }}">
+                                        <span>{{ $featuredPost->category?->name ?? 'Berita Kampus' }}</span>
+                                    </a>
+                                    <div class="home-news-featured__body">
+                                        <time datetime="{{ $featuredPost->created_at->toDateString() }}">
+                                            {{ $featuredPost->created_at->translatedFormat('d F Y') }}
+                                        </time>
+                                        <h3><a href="{{ route('root.post-view', $featuredPost->slug) }}">{{ $featuredPost->name }}</a></h3>
+                                        <p>{{ Str::limit(strip_tags($featuredPost->content), 150) }}</p>
+                                        <a href="{{ route('root.post-view', $featuredPost->slug) }}" class="home-text-link">
+                                            Baca selengkapnya <i class="fa-solid fa-arrow-right"></i>
+                                        </a>
+                                    </div>
+                                </article>
+
+                                <div class="home-news-list">
+                                    @foreach ($posts->skip(1)->take(3) as $item)
+                                        <article class="home-news-item">
+                                            <a href="{{ route('root.post-view', $item->slug) }}" class="home-news-item__image">
+                                                <img src="{{ asset('storage/images/' . $item->image) }}" alt="{{ $item->name }}">
+                                            </a>
+                                            <div>
+                                                <time datetime="{{ $item->created_at->toDateString() }}">{{ $item->created_at->translatedFormat('d M Y') }}</time>
+                                                <h3><a href="{{ route('root.post-view', $item->slug) }}">{{ $item->name }}</a></h3>
+                                                <span>{{ $item->category?->name ?? 'Berita Kampus' }}</span>
+                                            </div>
+                                        </article>
+                                    @endforeach
+                                </div>
+                            </div>
+                            <div class="home-pagination">{{ $posts->links('root.vendor.paginator') }}</div>
+                        @else
+                            <div class="home-empty">Belum ada berita yang dipublikasikan.</div>
+                        @endif
                     </div>
+
+                    <div class="col-lg-4">
+                        <aside class="home-announcements">
+                            <div class="home-announcements__header">
+                                <span class="home-icon home-icon--gold"><i class="fa-solid fa-bullhorn"></i></span>
+                                <div><small>Informasi penting</small><h2>Pengumuman</h2></div>
+                            </div>
+                            <div class="home-announcements__list">
+                                @forelse ($notify->take(5) as $item)
+                                    <button type="button" data-bs-toggle="modal" data-bs-target="#announcement{{ $item->code }}">
+                                        <time>{{ \Carbon\Carbon::parse($item->created_at)->translatedFormat('d M Y') }}</time>
+                                        <strong>{{ $item->name }}</strong>
+                                        <span>Lihat detail <i class="fa-solid fa-arrow-right"></i></span>
+                                    </button>
+                                @empty
+                                    <div class="home-announcements__empty">
+                                        <i class="fa-regular fa-circle-check"></i>
+                                        <p>Belum ada pengumuman baru hari ini.</p>
+                                    </div>
+                                @endforelse
+                            </div>
+                        </aside>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="home-section home-leader">
+            <div class="container">
+                <div class="home-leader__card">
+                    <div class="home-leader__portrait">
+                        <img src="{{ asset('storage/images/default/default-profile.jpg') }}" alt="{{ $web->school_head }}">
+                        <div class="home-leader__portrait-mark"><i class="fa-solid fa-quote-left"></i></div>
+                    </div>
+                    <div class="home-leader__content">
+                        <span class="home-kicker">Sambutan pimpinan</span>
+                        <h2>Menumbuhkan ilmu, karakter, dan kontribusi nyata.</h2>
+                        <div class="home-leader__quote">{!! Str::limit(strip_tags($web->school_desc), 420) !!}</div>
+                        <div class="home-leader__identity">
+                            <strong>{{ $web->school_head }}</strong>
+                            <span>Rektor · {!! $web->school_name !!}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        @if ($album->count())
+            <section class="home-section home-gallery">
+                <div class="container">
+                    <div class="home-section__heading home-section__heading--row">
+                        <div>
+                            <span class="home-kicker">Momen kampus</span>
+                            <h2>Kehidupan di kampus</h2>
+                        </div>
+                        <a href="{{ route('root.gallery-index') }}" class="home-text-link">Lihat semua galeri <i class="fa-solid fa-arrow-right"></i></a>
+                    </div>
+                    <div class="home-gallery__grid">
+                        @foreach ($album as $index => $item)
+                            <a href="{{ route('root.gallery-show', $item->slug) }}" class="home-gallery__item home-gallery__item--{{ $index + 1 }}">
+                                <img src="{{ asset('storage/' . $item->cover) }}" alt="{{ $item->name }}">
+                                <span><small>Galeri</small><strong>{{ $item->name }}</strong></span>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            </section>
+        @endif
+
+        <section class="home-cta">
+            <div class="container">
+                <div class="home-cta__inner">
+                    <div>
+                        <span class="home-kicker">Mulai perjalanan Anda</span>
+                        <h2>Siap menjadi bagian dari {{ strip_tags($web->school_name) }}?</h2>
+                        <p>Akses layanan akademik dan temukan informasi yang Anda butuhkan dalam satu tempat.</p>
+                    </div>
+                    <div class="home-cta__actions">
+                        <a href="{{ route('mahasiswa.auth-signin-page') }}" class="home-btn home-btn--light">Masuk ke SIAKAD</a>
+                        <a href="{{ route('root.home-advice') }}" class="home-btn home-btn--outline-light">Hubungi Kami</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    @foreach ($notify as $item)
+        <div class="modal fade home-modal" id="announcement{{ $item->code }}" tabindex="-1" aria-labelledby="announcementTitle{{ $item->code }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div>
+                            <small>Pengumuman kampus</small>
+                            <h4 class="modal-title" id="announcementTitle{{ $item->code }}">{{ $item->name }}</h4>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                    </div>
+                    <div class="modal-body">{!! $item->desc !!}</div>
                 </div>
             </div>
         </div>
     @endforeach
-</div>
-
 @endsection
