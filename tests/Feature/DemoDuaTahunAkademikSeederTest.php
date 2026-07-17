@@ -39,6 +39,14 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
         foreach ($this->migrationFiles() as $migration) {
             (require database_path('migrations/'.$migration))->up();
         }
+
+        DB::table('fakultas')->insert([
+            'code' => 'FTK-EXISTING',
+            'name' => 'Fakultas Tarbiyah Existing',
+            'head_id' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     public function test_seeder_creates_complete_two_year_flow_and_is_idempotent(): void
@@ -60,6 +68,11 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
         $this->assertSame(1, TahunAkademik::query()->where('is_active', true)->count());
 
         $this->assertSame(2, DB::table('dosens')->where('dsn_code', 'like', 'DEMO-%')->count());
+        $this->assertSame(1, DB::table('fakultas')->count());
+        $this->assertSame(
+            DB::table('fakultas')->where('code', 'FTK-EXISTING')->value('id'),
+            DB::table('program_studis')->where('code', 'DEMO-PAI')->value('faku_id')
+        );
         $this->assertSame(2, Mahasiswa::query()->where('mhs_code', 'like', 'DEMO-%')->count());
         $this->assertSame(4, DB::table('kelas')->where('code', 'like', 'DEMO-%')->count());
         $this->assertSame(8, DB::table('mata_kuliahs')->where('code', 'like', 'DEMO-%')->count());
@@ -126,6 +139,16 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
         $this->assertSame(2, DB::table('users')->where('code', 'like', 'DEMO-STAFF-%')->count());
         $this->assertSame(8, DB::table('master_mata_kuliahs')->where('program_studi', 'DEMO-PAI')->count());
         $this->assertSame(0, Mahasiswa::where('mhs_code', 'like', 'DEMO-%')->where(fn ($query) => $query->where('taka_id', '!=', 0)->orWhere('class_id', '!=', 0))->count());
+    }
+
+    public function test_seeder_requires_an_existing_faculty(): void
+    {
+        DB::table('fakultas')->delete();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('minimal satu data fakultas');
+
+        $this->seed(DemoDuaTahunAkademikSeeder::class);
     }
 
     private function migrationFiles(): array

@@ -38,6 +38,7 @@ use App\Services\Academic\PeriodReadinessService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 
 class DemoDuaTahunAkademikSeeder extends Seeder
 {
@@ -203,10 +204,14 @@ class DemoDuaTahunAkademikSeeder extends Seeder
 
     private function seedStudyProgram(Dosen $head): ProgramStudi
     {
-        $faculty = Fakultas::updateOrCreate(['code' => 'DEMO-FTK'], [
-            'name' => 'Fakultas Tarbiyah Demo',
-            'head_id' => $head->id,
-        ]);
+        $faculty = Fakultas::query()
+            ->where('code', 'not like', 'DEMO-%')
+            ->orderBy('id')
+            ->first() ?? Fakultas::query()->orderBy('id')->first();
+
+        if (! $faculty) {
+            throw new RuntimeException('Seeder demo membutuhkan minimal satu data fakultas yang sudah tersedia.');
+        }
 
         return ProgramStudi::updateOrCreate(['code' => 'DEMO-PAI'], [
             'faku_id' => $faculty->id,
