@@ -78,6 +78,30 @@ class KrsWorkflowTest extends TestCase
         PenawaranMataKuliah::create([...$attributes, 'code' => 'OF-DUPLICATE']);
     }
 
+    public function test_participants_view_receives_web_admin_route_prefix(): void
+    {
+        $data = $this->academicData();
+        $offering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $webAdmin = User::create([
+            'type' => 0,
+            'code' => 'WEBADMIN',
+            'name' => 'Web Administrator',
+            'user' => 'webadmin',
+            'phone' => '0812000000',
+            'email' => 'webadmin@example.test',
+            'password' => 'secret',
+            'status' => 1,
+        ]);
+
+        $this->actingAs($webAdmin);
+
+        $view = app(\App\Http\Controllers\Admin\PenawaranMataKuliahController::class)
+            ->participants($offering);
+
+        $this->assertSame('web-admin.', $view->getData()['prefix']);
+        $this->assertTrue($offering->is($view->getData()['penawaran']));
+    }
+
     public function test_student_submits_and_advisor_approves_locked_krs_with_notification(): void
     {
         $data = $this->academicData();

@@ -198,6 +198,7 @@ class PenawaranMataKuliahController extends Controller
     public function participants(PenawaranMataKuliah $penawaran): View
     {
         return view('user.admin.master.penawaran-matkul-participants', [
+            'prefix' => $this->setPrefix(),
             'penawaran' => $penawaran->load(['masterMataKuliah', 'taka', 'kelas', 'dosenUtama']),
             'students' => $penawaran->pesertaDisetujui()->orderBy('mhs_name')->get(),
         ]);
