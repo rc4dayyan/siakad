@@ -124,7 +124,7 @@
                                 @endphp
                                 <p>{{ $programs->count() }} program studi tersedia untuk mendukung tujuan akademik dan karier Anda.</p>
                                 <div class="home-program-card__links">
-                                    @foreach ($programs->take(3) as $program)
+                                    @foreach ($programs->take(4) as $program)
                                         <a href="{{ route('root.home-prodi', $program->slug) }}">
                                             <span>{{ $program->level }} · {{ $program->name }}</span>
                                             <i class="fa-solid fa-arrow-right"></i>
