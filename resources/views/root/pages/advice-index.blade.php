@@ -9,7 +9,7 @@
                 <nav class="public-breadcrumb" aria-label="Breadcrumb">
                     <a href="{{ route('root.home-index') }}">Beranda</a>
                     <i class="fa-solid fa-chevron-right"></i>
-                    <span>Saran dan Masukan</span>
+                    <span>Kontak kami atau Saran dan Masukan</span>
                 </nav>
                 <div class="public-hero__content">
                     <span class="home-kicker">Kami siap mendengarkan</span>

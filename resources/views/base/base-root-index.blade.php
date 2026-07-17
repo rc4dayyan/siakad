@@ -226,13 +226,7 @@
 
                             <li class="menu-item">
                                 <a href="{{ route('root.home-advice') }}" class='menu-link'>
-                                    <span><i class="fa-solid fa-envelope-open-text"></i> Saran dan Masukan</span>
-                                </a>
-                            </li>
-
-                            <li class="menu-item">
-                                <a href="#" class='menu-link'>
-                                    <span><i class="fa-solid fa-phone"></i> Kontak Kami</span>
+                                    <span><i class="fa-solid fa-envelope-open-text"></i> Kontak Kami</span>
                                 </a>
                             </li>
 
