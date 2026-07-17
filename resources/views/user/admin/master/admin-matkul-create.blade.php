@@ -17,6 +17,9 @@
 @section('subdesc')
     Halaman untuk mengelola Data Mata Kuliah
 @endsection
+@section('custom-css')
+    <link rel="stylesheet" href="{{ asset('dist') }}/assets/extensions/choices.js/public/assets/styles/choices.css">
+@endsection
 @section('content')
 <section class="section row">
 
@@ -35,9 +38,16 @@
                 </div>
                 <div class="card-body row">
                     <div class="form-group col-lg-3 col-12">
-                        <label for="name">Nama Mata Kuliah</label>
-                        <input type="text" name="name" id="name" class="form-control" placeholder="Inputkan nama matakuliah...">
-                        @error('name')
+                        <label for="mid">Nama Mata Kuliah</label>
+                        <select name="mid" id="mid" class="choices form-select">
+                            <option value="">Pilih Mata Kuliah</option>
+                            @foreach ($masterMatkul as $master)
+                                <option value="{{ $master->id }}" @selected(old('mid') == $master->id)>
+                                    {{ $master->name }} — {{ $master->program_studi }}, Semester {{ $master->semester }} ({{ $master->sks }} SKS)
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('mid')
                             <small class="text-danger">{{ $message }}</small>
                         @enderror
                     </div>
@@ -156,6 +166,8 @@
 </section>
 @endsection
 @section('custom-js')
+<script src="{{ asset('dist') }}/assets/extensions/choices.js/public/assets/scripts/choices.js"></script>
+<script src="{{ asset('dist') }}/assets/static/js/pages/form-element-select.js"></script>
 <script src="{{ asset('dist') }}/assets/extensions/tinymce/tinymce.min.js"></script>
 <script src="{{ asset('dist') }}/assets/static/js/pages/tinymce.js"></script>
 @endsection

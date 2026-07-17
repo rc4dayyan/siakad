@@ -2,27 +2,22 @@
 
 namespace App\Http\Controllers\Admin\Pages\Core;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-// SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\File;
-use Auth;
-use Hash;
-use Str;
-// SECTION ADDONS EXTERNAL
 use Alert;
 use App\Helper\roleTrait;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-// SECTION MODELS
-use App\Models\ProgramStudi;
-use App\Models\MataKuliah;
-use App\Models\Kurikulum;
+// SECTION ADDONS SYSTEM
+// SECTION ADDONS EXTERNAL
+use App\Http\Controllers\Controller;
 use App\Models\Dosen;
+// SECTION MODELS
+use App\Models\Kurikulum;
 use App\Models\Mahasiswa;
+use App\Models\MasterMataKuliah;
+use App\Models\MataKuliah;
 use App\Models\NilaiMahasiswa;
-use App\Models\TahunAkademik;
+use App\Models\ProgramStudi;
 use App\Models\Settings\webSettings;
+use App\Models\TahunAkademik;
+use Illuminate\Http\Request;
 use RealRashid\SweetAlert\Facades\Alert as FacadesAlert;
 
 class MataKuliahController extends Controller
@@ -38,9 +33,11 @@ class MataKuliahController extends Controller
         $data['pstudi'] = ProgramStudi::all();
         $data['dosen'] = Dosen::all();
         $data['matkul'] = MataKuliah::all();
+        $data['masterMatkul'] = $this->masterMataKuliahs();
 
         return view('user.admin.master.admin-matkul-index', $data);
     }
+
     public function create()
     {
         $data['web'] = webSettings::where('id', 1)->first();
@@ -50,6 +47,7 @@ class MataKuliahController extends Controller
         $data['pstudi'] = ProgramStudi::all();
         $data['matkul'] = MataKuliah::all();
         $data['dosen'] = Dosen::all();
+        $data['masterMatkul'] = $this->masterMataKuliahs();
 
         return view('user.admin.master.admin-matkul-create', $data);
     }
@@ -57,7 +55,7 @@ class MataKuliahController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
+            'mid' => 'required|integer|exists:master_mata_kuliahs,id',
             'code' => 'required|string|max:255',
             'bsks' => 'required|string|max:255',
             'desc' => 'required|string',
@@ -70,8 +68,10 @@ class MataKuliahController extends Controller
             'requ_id' => 'nullable',
         ]);
 
+        $masterMatkul = MasterMataKuliah::findOrFail($request->mid);
         $matkul = new MataKuliah;
-        $matkul->name = $request->name;
+        $matkul->mid = $masterMatkul->id;
+        $matkul->name = $masterMatkul->name;
         $matkul->code = $request->code;
         $matkul->bsks = $request->bsks;
         $matkul->desc = $request->desc;
@@ -85,13 +85,14 @@ class MataKuliahController extends Controller
         $matkul->save();
 
         Alert::success('success', 'Data telah berhasil disimpan');
+
         return back();
     }
 
     public function update(Request $request, $code)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
+            'mid' => 'required|integer|exists:master_mata_kuliahs,id',
             'code' => 'required|string|max:255',
             'bsks' => 'required|string|max:255',
             'desc' => 'required|string',
@@ -104,8 +105,10 @@ class MataKuliahController extends Controller
             'requ_id' => 'nullable',
         ]);
 
-        $matkul = MataKuliah::where('code', $code)->first();
-        $matkul->name = $request->name;
+        $masterMatkul = MasterMataKuliah::findOrFail($request->mid);
+        $matkul = MataKuliah::where('code', $code)->firstOrFail();
+        $matkul->mid = $masterMatkul->id;
+        $matkul->name = $masterMatkul->name;
         $matkul->code = $request->code;
         $matkul->bsks = $request->bsks;
         $matkul->desc = $request->desc;
@@ -119,7 +122,17 @@ class MataKuliahController extends Controller
         $matkul->save();
 
         Alert::success('success', 'Data telah berhasil diupdate');
+
         return back();
+    }
+
+    private function masterMataKuliahs()
+    {
+        return MasterMataKuliah::query()
+            ->orderBy('program_studi')
+            ->orderBy('semester')
+            ->orderBy('name')
+            ->get();
     }
 
     public function destroy(Request $request, $code)
@@ -129,15 +142,16 @@ class MataKuliahController extends Controller
         $matkul->delete();
 
         Alert::success('success', 'Data telah berhasil dihapus');
+
         return back();
     }
 
     public function nilai($mataKuliahId)
     {
-        $data['web']            = webSettings::where('id', 1)->first();
-        $data['prefix']         = $this->setPrefix();
-        $data['mataKuliah']     = MataKuliah::findOrFail($mataKuliahId);
-        $data['mahasiswas']     = Mahasiswa::where('class_id', $data['mataKuliah']->kelas_id)->get();   // atau berdasarkan kelas terkait
+        $data['web'] = webSettings::where('id', 1)->first();
+        $data['prefix'] = $this->setPrefix();
+        $data['mataKuliah'] = MataKuliah::findOrFail($mataKuliahId);
+        $data['mahasiswas'] = Mahasiswa::where('class_id', $data['mataKuliah']->kelas_id)->get();   // atau berdasarkan kelas terkait
         $data['existingNilais'] = \App\Models\NilaiMahasiswa::where('mata_kuliah_id', $mataKuliahId)
             ->where('kelas_id', $mataKuliah->kelas_id ?? 1)
             ->get()
@@ -149,27 +163,28 @@ class MataKuliahController extends Controller
     public function storenilai(Request $request)
     {
         $mataKuliahId = $request->mata_kuliah_id;
-        $mataKuliah   = MataKuliah::findOrFail($mataKuliahId);
-        $dosenId      = $mataKuliah->dosen_1;
-        $kelasId      = $mataKuliah->kelas_id ?? 1;
+        $mataKuliah = MataKuliah::findOrFail($mataKuliahId);
+        $dosenId = $mataKuliah->dosen_1;
+        $kelasId = $mataKuliah->kelas_id ?? 1;
 
         foreach ($request->nilai as $data) {
             NilaiMahasiswa::updateOrCreate(
                 [
-                    'mahasiswa_id'   => $data['mahasiswa_id'],
+                    'mahasiswa_id' => $data['mahasiswa_id'],
                     'mata_kuliah_id' => $mataKuliahId,
-                    'kelas_id'       => $kelasId,
+                    'kelas_id' => $kelasId,
                 ],
                 [
                     'dosen_id' => $dosenId,
-                    'nilai' => $data['nilai']
+                    'nilai' => $data['nilai'],
                 ]
             );
         }
 
         $prefix = $this->setPrefix();
 
-        FacadesAlert::success('success', 'Data telah berhasil disimpan untuk matakuliah '. $mataKuliah->name);
-        return redirect()->route($prefix .'master.matkul-index');
+        FacadesAlert::success('success', 'Data telah berhasil disimpan untuk matakuliah '.$mataKuliah->name);
+
+        return redirect()->route($prefix.'master.matkul-index');
     }
 }

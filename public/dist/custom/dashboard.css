@@ -440,7 +440,7 @@
 }
 
 .authenticated-app .card {
-    overflow: hidden;
+    /* overflow: hidden; */
     color: var(--dash-ink);
     border: 1px solid var(--dash-line);
     border-radius: 16px;
@@ -1073,4 +1073,11 @@
         scroll-behavior: auto !important;
         transition-duration: 0.01ms !important;
     }
+}
+
+/* Keep every Choices.js search dropdown above surrounding dashboard content. */
+.authenticated-app .choices.is-open,
+.authenticated-app .choices__list--dropdown,
+.authenticated-app .choices__list[aria-expanded] {
+    z-index: 9999;
 }

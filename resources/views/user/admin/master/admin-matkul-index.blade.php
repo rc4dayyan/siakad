@@ -204,9 +204,16 @@ Halaman untuk mengelola Mata Kuliah
                     <div class="modal-body">
                         <div class="row">
                             <div class="form-group col-lg-6 col-12">
-                                <label for="name">Nama Mata Kuliah</label>
-                                <input type="text" name="name" id="name" class="form-control" value="{{ $item->name }}">
-                                @error('name')
+                                <label for="mid-{{ $item->id }}">Nama Mata Kuliah</label>
+                                <select name="mid" id="mid-{{ $item->id }}" class="form-select">
+                                    <option value="">Pilih Mata Kuliah</option>
+                                    @foreach ($masterMatkul as $master)
+                                        <option value="{{ $master->id }}" @selected(old('mid', $item->mid) == $master->id)>
+                                            {{ $master->name }} — {{ $master->program_studi }}, Semester {{ $master->semester }} ({{ $master->sks }} SKS)
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('mid')
                                 <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>

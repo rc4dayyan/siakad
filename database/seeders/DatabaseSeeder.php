@@ -20,6 +20,8 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
 
+        $this->call(MasterMataKuliahSeeder::class);
+
         // SEEDER KHUSUS DATA MASTER AKADEMIK
         \App\Models\Fakultas::create([
             'name'       => 'Fakultas Tarbiyah',
