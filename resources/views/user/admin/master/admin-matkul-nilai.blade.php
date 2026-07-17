@@ -27,7 +27,7 @@ Halaman untuk mengelola Data Nilai Mata Kuliah
                     @yield('submenu')
                     <div class="">
                         <a href="{{ route($prefix.'master.matkul-index') }}" class="btn btn-outline-warning"><i class="fa-solid fa-backward"></i></a>
-                        <button type="submit" class="btn btn-outline-primary"><i class="fa-solid fa-paper-plane"></i></button>
+                        <button type="submit" class="btn btn-outline-primary" @disabled(! $canManageNilai)><i class="fa-solid fa-paper-plane"></i></button>
                     </div>
                 </h5>
             </div>
@@ -38,7 +38,13 @@ Halaman untuk mengelola Data Nilai Mata Kuliah
                 <div class="mb-4">
                     <h5>Mata Kuliah: <strong>{{ $mataKuliah->name }}</strong></h5>
                     <h5>Kelas: <strong>{{ $mataKuliah->kelas->name ?? '' }}</strong></h5>
+                    <h5>Periode: <strong>{{ $period->name }}</strong></h5>
                 </div>
+
+                @if (! $canManageNilai)
+                    <div class="alert alert-warning">Nilai tidak dapat diubah karena periode hanya-baca atau mata kuliah belum terhubung dengan kelas periode ini.</div>
+                @endif
+                @error('kelas_id') <div class="alert alert-danger">{{ $message }}</div> @enderror
 
                 <div class="row">
                     <div class="col-12">

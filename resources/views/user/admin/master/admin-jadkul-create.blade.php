@@ -28,10 +28,16 @@
                     <h5 class="card-title">@yield('submenu')</h5>
                     <div class="">
                         <a href="{{ route($prefix.'master.jadkul-index') }}" class="mt-1 btn btn-outline-warning"><i class="fa-solid fa-backward"></i></a>
-                        <button type="submit" class="mt-1 btn btn-outline-primary"><i class="fa-solid fa-paper-plane"></i></button>
+                        <button type="submit" class="mt-1 btn btn-outline-primary" @disabled(! $canManageJadwal)><i class="fa-solid fa-paper-plane"></i></button>
                     </div>
                 </div>
                 <div class="card-body row">
+                    @if (! $canManageJadwal)
+                        <div class="col-12"><div class="alert alert-warning">Periode belum dipilih atau sudah hanya-baca.</div></div>
+                    @endif
+                    @error('academic_period')
+                        <div class="col-12"><div class="alert alert-danger">{{ $message }}</div></div>
+                    @enderror
                     <div class="form-group col-lg-3 col-12">
                         <label for="makul_id">Mata Kuliah</label>
                         <select name="makul_id" id="makul_id" class="form-select">

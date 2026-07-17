@@ -2,173 +2,186 @@
 
 namespace App\Http\Controllers\Dosen\Akademik;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-// SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\File;
-use Auth;
-use Hash;
-use Str;
-// SECTION ADDONS EXTERNAL
 use Alert;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-// SECTION MODELS
-use App\Models\JadwalKuliah;
-use App\Models\Mahasiswa;
+use App\Http\Controllers\Controller;
 use App\Models\HasilStudi;
+use App\Models\JadwalKuliah;
+use App\Models\Settings\webSettings;
 use App\Models\studentScore;
 use App\Models\studentTask;
-use App\Models\Settings\webSettings;
+use App\Services\Academic\AcademicPeriodContext;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
+use Str;
 
 class StudentTaskController extends Controller
 {
-    public function index()
+    public function index(AcademicPeriodContext $context): View
     {
-        $data['web'] = webSettings::where('id', 1)->first();
-        $data['jadkul'] = JadwalKuliah::all();
-        $data['stask'] = studentTask::all();
-
-        return view('dosen.pages.student-task-index', $data);
+        return view('dosen.pages.student-task-index', $this->pageData($context));
     }
 
-    public function create()
+    public function create(AcademicPeriodContext $context): View
     {
-        $data['web'] = webSettings::where('id', 1)->first();
-        $data['jadkul'] = JadwalKuliah::all();
-        $data['stask'] = studentTask::latest()->paginate(5);
+        $data = $this->pageData($context);
+        $data['stask'] = $this->taskQuery($context)->latest()->paginate(5);
 
         return view('dosen.pages.student-task-create', $data);
     }
-    public function view($code)
+
+    public function view(string $code, AcademicPeriodContext $context): View
     {
-        $data['web'] = webSettings::where('id', 1)->first();
-        $data['jadkul'] = JadwalKuliah::all();
-        $data['stask'] = studentTask::latest()->paginate(5);
-        $data['task'] = studentTask::where('code', $code)->first();
-        $data['score'] = studentScore::where('stask_id', $data['task']->id)->get();
+        $task = $this->ownedActiveTask($code, $context);
 
-        // dd($data['score']);
-
-        return view('dosen.pages.student-task-view', $data);
-    }
-    public function viewDetail($code)
-    {
-        $data['web'] = webSettings::where('id', 1)->first();
-        $data['stask'] = studentTask::latest()->paginate(5);
-        $data['score'] = studentScore::where('code', $code)->first();
-
-        // dd($data['score']);
-
-        return view('dosen.pages.student-task-view-score', $data);
-    }
-    public function edit($code)
-    {
-        $data['web'] = webSettings::where('id', 1)->first();
-        $data['jadkul'] = JadwalKuliah::all();
-        $data['stask'] = studentTask::latest()->paginate(5);
-        $data['task'] = studentTask::where('code', $code)->first();
-
-        return view('dosen.pages.student-task-edit', $data);
+        return view('dosen.pages.student-task-view', [
+            ...$this->pageData($context),
+            'task' => $task,
+            'score' => studentScore::where('stask_id', $task->id)->with('student')->get(),
+        ]);
     }
 
-    public function store(Request $request)
+    public function viewDetail(string $code, AcademicPeriodContext $context): View
     {
-        $request->validate([
-            'jadkul_id' => 'required',
-            'exp_date'  => 'required',
-            'exp_time'  => 'required',
-            'title' => 'required|string',
-            'detail_task' => 'required'
-        ],
-        [
-            'jadkul_id.required' => 'Jadwal kuliah wajib dipilih.',
-            'exp_date' => 'Batas Akhir Tanggal wajib diisi.',
-            'exp_time' => 'Batas Akhir Waktu wajib diisi.',
-            'title' => 'Judul tugas kuliah wajib diisi.',
-            'detail_task' => 'Detail tugas kuliah wajib diisi.',
-        ]
-    );
-        $stask = new studentTask;
-        $stask->dosen_id = Auth::guard('dosen')->user()->id;
-        $stask->code = Str::random(6);
-        $stask->jadkul_id = $request->jadkul_id;
-        $stask->exp_date = $request->exp_date;
-        $stask->exp_time = $request->exp_time;
-        $stask->title = $request->title;
-        $stask->detail_task = $request->detail_task;
-        $stask->save();
+        return view('dosen.pages.student-task-view-score', [
+            'web' => webSettings::where('id', 1)->first(),
+            'stask' => $this->taskQuery($context)->latest()->paginate(5),
+            'score' => $this->ownedActiveScore($code, $context),
+        ]);
+    }
 
-        Alert::success('Data berhasil ditambahkan');
+    public function edit(string $code, AcademicPeriodContext $context): View
+    {
+        return view('dosen.pages.student-task-edit', [
+            ...$this->pageData($context),
+            'task' => $this->ownedActiveTask($code, $context),
+        ]);
+    }
+
+    public function store(Request $request, AcademicPeriodContext $context): RedirectResponse
+    {
+        $period = $context->published();
+        abort_unless($period?->isWritable(), 404);
+        $validated = $this->validateTask($request, $context);
+
+        studentTask::create([
+            ...$validated,
+            'dosen_id' => auth('dosen')->id(),
+            'code' => Str::random(6),
+        ]);
+
+        Alert::success('Berhasil', 'Tugas berhasil ditambahkan.');
+
         return back();
     }
 
-    public function update(Request $request, $code)
+    public function update(Request $request, string $code, AcademicPeriodContext $context): RedirectResponse
     {
-        $request->validate([
-            'jadkul_id' => 'required',
-            'exp_date'  => 'required',
-            'exp_time'  => 'required',
-            'title' => 'required|string',
-            'detail_task' => 'required'
-        ],
-        [
-            'jadkul_id.required' => 'Jadwal kuliah wajib dipilih.',
-            'exp_date' => 'Batas Akhir Tanggal wajib diisi.',
-            'exp_time' => 'Batas Akhir Waktu wajib diisi.',
-            'title' => 'Judul tugas kuliah wajib diisi.',
-            'detail_task' => 'Detail tugas kuliah wajib diisi.',
-        ]
-    );
-        $stask = studentTask::where('code', $code)->first();
-        $stask->dosen_id = Auth::guard('dosen')->user()->id;
-        $stask->jadkul_id = $request->jadkul_id;
-        $stask->exp_date = $request->exp_date;
-        $stask->exp_time = $request->exp_time;
-        $stask->title = $request->title;
-        $stask->detail_task = $request->detail_task;
-        $stask->save();
+        $period = $context->published();
+        abort_unless($period?->isWritable(), 404);
+        $this->ownedActiveTask($code, $context)->update($this->validateTask($request, $context));
 
-        Alert::success('Data berhasil diupdate');
+        Alert::success('Berhasil', 'Tugas berhasil diperbarui.');
+
         return back();
     }
 
-    public function updateScore($code, Request $request)
+    public function updateScore(string $code, Request $request, AcademicPeriodContext $context): RedirectResponse
     {
-        $score = studentScore::where('code', $code)->first();
-        $score->score = $request->score;
-        $score->save();
+        $period = $context->published();
+        abort_unless($period?->isWritable(), 404);
+        $validated = $request->validate(['score' => ['required', 'integer', 'between:0,10']]);
 
-        $user = Mahasiswa::where('id', $request->student_id)->first();
-        $khs = HasilStudi::where('student_id', $user->id)->where('smt_id', $user->taka->raw_semester)->first();
-        // dd($khs->count())
+        DB::transaction(function () use ($code, $context, $period, $validated): void {
+            $score = $this->ownedActiveScore($code, $context, true);
 
-        if ($khs === null) {
-            $ckhs = new HasilStudi;
-            $ckhs->student_id = $user->id;
-            $ckhs->taka_id = $user->taka->id;
-            $ckhs->smt_id = $user->taka->raw_semester;
-            $ckhs->score_tugas = $request->score;
-            $ckhs->max_tugas = 1;
-            $ckhs->code = Str::random(6);
-            $ckhs->save();
-        } elseif ($khs !== null) {
-            $ukhs = HasilStudi::where('student_id', $user->id)->where('smt_id', $user->taka->raw_semester)->first();
-            $ukhs->score_tugas += $request->score;
-            $ukhs->max_tugas += 1;
-            $ukhs->save();
-        }
+            if ($score->score !== null) {
+                throw ValidationException::withMessages([
+                    'score' => 'Nilai tugas yang sudah disimpan memerlukan prosedur koreksi khusus.',
+                ]);
+            }
 
-        Alert::success('success', 'Score berhasil diupdate');
+            $score->update(['score' => $validated['score']]);
+            $hasilStudi = HasilStudi::firstOrCreate([
+                'student_id' => $score->student_id,
+                'taka_id' => $period->id,
+            ], [
+                'smt_id' => $period->raw_semester,
+                'code' => Str::random(6),
+            ]);
+            $hasilStudi->increment('score_tugas', $validated['score']);
+            $hasilStudi->increment('max_tugas');
+        });
+
+        Alert::success('Berhasil', 'Nilai tugas berhasil disimpan.');
+
         return back();
     }
 
-    public function destroy($code)
+    public function destroy(string $code, AcademicPeriodContext $context): RedirectResponse
     {
-        $stask = studentTask::where('code', $code)->first();
-        $stask->delete();
+        $period = $context->published();
+        abort_unless($period?->isWritable(), 404);
+        $this->ownedActiveTask($code, $context)->delete();
 
-        Alert::success('success', 'Data berhasil dihapus');
+        Alert::success('Berhasil', 'Tugas berhasil dihapus.');
+
         return back();
+    }
+
+    private function pageData(AcademicPeriodContext $context): array
+    {
+        return [
+            'web' => webSettings::where('id', 1)->first(),
+            'jadkul' => JadwalKuliah::query()
+                ->forAcademicPeriod($context->published())
+                ->forLecturer(auth('dosen')->id())
+                ->get(),
+            'stask' => $this->taskQuery($context)->get(),
+        ];
+    }
+
+    private function taskQuery(AcademicPeriodContext $context)
+    {
+        return studentTask::query()
+            ->forAcademicPeriod($context->published())
+            ->forLecturer(auth('dosen')->id());
+    }
+
+    private function ownedActiveTask(string $code, AcademicPeriodContext $context): studentTask
+    {
+        return $this->taskQuery($context)->where('code', $code)->firstOrFail();
+    }
+
+    private function ownedActiveScore(string $code, AcademicPeriodContext $context, bool $lock = false): studentScore
+    {
+        return studentScore::query()
+            ->forAcademicPeriod($context->published())
+            ->forLecturer(auth('dosen')->id())
+            ->when($lock, fn ($query) => $query->lockForUpdate())
+            ->where('code', $code)
+            ->with(['student', 'task.jadkul'])
+            ->firstOrFail();
+    }
+
+    private function validateTask(Request $request, AcademicPeriodContext $context): array
+    {
+        $allowedScheduleIds = JadwalKuliah::query()
+            ->forAcademicPeriod($context->published())
+            ->forLecturer(auth('dosen')->id())
+            ->pluck('id');
+
+        return $request->validate([
+            'jadkul_id' => ['required', 'integer', Rule::in($allowedScheduleIds)],
+            'exp_date' => ['required', 'date'],
+            'exp_time' => ['required', 'date_format:H:i'],
+            'title' => ['required', 'string', 'max:255'],
+            'detail_task' => ['required', 'string'],
+        ], [
+            'jadkul_id.in' => 'Jadwal harus berasal dari periode aktif dan diampu oleh dosen yang sedang masuk.',
+        ]);
     }
 }

@@ -21,6 +21,7 @@ Halaman untuk melihat data pengguna Mahasiswa
             <h5 class="card-title d-flex justify-content-between align-items-center">
                 @yield('menu')
                 <div class="">
+                    <a href="{{ route($prefix.'workers.student-promotion-index') }}" class="btn btn-outline-warning" title="Kenaikan semester massal"><i class="fa-solid fa-users-gear"></i></a>
                     <a href="{{ route($prefix.'workers.student-create') }}" class="btn btn-outline-primary"><i class="fa-solid fa-plus"></i></a>
                     <a href="{{ route($prefix.'services.convert.export-student') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
                     <a href="#" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importStudent"><i class="fa-solid fa-file-import"></i></a>
@@ -50,7 +51,7 @@ Halaman untuk melihat data pengguna Mahasiswa
                         <td data-label="NIM Mahasiswa">{{ $item->mhs_nim }}</td>
                         <td data-label="NIK Mahasiswa">{{ $item->mhs_nik }}</td>
                         <td data-label="Nama Mahasiswa">{{ $item->mhs_name }}</td>
-                        <td data-label="Kelas">{{ $item->kelas->name ?? '' }}</td>
+                        <td data-label="Kelas">{{ $item->registrasiAkademik->first()?->kelas?->name ?? $item->kelas?->name ?? '' }}</td>
                         <td data-label="Gender">{{ $item->mhs_gend }}</td>
                         <!-- <td data-label="Join Date">{{ \Carbon\Carbon::parse($item->mhs_register_date)->format('l, d M Y') }}</td> -->
                         <!-- <td data-label="Status Mahasiswa">{{ $item->mhs_stat }}</td> -->

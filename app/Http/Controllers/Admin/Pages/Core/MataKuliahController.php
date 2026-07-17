@@ -4,11 +4,9 @@ namespace App\Http\Controllers\Admin\Pages\Core;
 
 use Alert;
 use App\Helper\roleTrait;
-// SECTION ADDONS SYSTEM
-// SECTION ADDONS EXTERNAL
 use App\Http\Controllers\Controller;
 use App\Models\Dosen;
-// SECTION MODELS
+use App\Models\Kelas;
 use App\Models\Kurikulum;
 use App\Models\Mahasiswa;
 use App\Models\MasterMataKuliah;
@@ -16,175 +14,235 @@ use App\Models\MataKuliah;
 use App\Models\NilaiMahasiswa;
 use App\Models\ProgramStudi;
 use App\Models\Settings\webSettings;
-use App\Models\TahunAkademik;
+use App\Services\Academic\AcademicPeriodContext;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 use RealRashid\SweetAlert\Facades\Alert as FacadesAlert;
 
 class MataKuliahController extends Controller
 {
     use roleTrait;
 
-    public function index()
+    public function index(AcademicPeriodContext $context): View
     {
-        $data['web'] = webSettings::where('id', 1)->first();
-        $data['prefix'] = $this->setPrefix();
-        $data['kuri'] = Kurikulum::all();
-        $data['taka'] = TahunAkademik::all();
-        $data['pstudi'] = ProgramStudi::all();
-        $data['dosen'] = Dosen::all();
-        $data['matkul'] = MataKuliah::all();
-        $data['masterMatkul'] = $this->masterMataKuliahs();
-
-        return view('user.admin.master.admin-matkul-index', $data);
+        return view('user.admin.master.admin-matkul-index', $this->formData($context));
     }
 
-    public function create()
+    public function create(AcademicPeriodContext $context): View
     {
-        $data['web'] = webSettings::where('id', 1)->first();
-        $data['prefix'] = $this->setPrefix();
-        $data['kuri'] = Kurikulum::all();
-        $data['taka'] = TahunAkademik::all();
-        $data['pstudi'] = ProgramStudi::all();
-        $data['matkul'] = MataKuliah::all();
-        $data['dosen'] = Dosen::all();
-        $data['masterMatkul'] = $this->masterMataKuliahs();
-
-        return view('user.admin.master.admin-matkul-create', $data);
+        return view('user.admin.master.admin-matkul-create', $this->formData($context));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, AcademicPeriodContext $context): RedirectResponse
     {
-        $request->validate([
-            'mid' => 'required|integer|exists:master_mata_kuliahs,id',
-            'code' => 'required|string|max:255',
-            'bsks' => 'required|string|max:255',
-            'desc' => 'required|string',
-            'pstudi_id' => 'required',
-            'kuri_id' => 'required',
-            'taka_id' => 'required',
-            'dosen_1' => 'required',
-            'dosen_2' => 'nullable',
-            'dosen_3' => 'nullable',
-            'requ_id' => 'nullable',
+        $period = $context->requireWritableCurrent($request->user());
+        $validated = $this->validateMataKuliah($request, $period->id);
+        $master = MasterMataKuliah::findOrFail($validated['mid']);
+
+        MataKuliah::create([
+            ...$validated,
+            'name' => $master->name,
+            'taka_id' => $period->id,
         ]);
 
-        $masterMatkul = MasterMataKuliah::findOrFail($request->mid);
-        $matkul = new MataKuliah;
-        $matkul->mid = $masterMatkul->id;
-        $matkul->name = $masterMatkul->name;
-        $matkul->code = $request->code;
-        $matkul->bsks = $request->bsks;
-        $matkul->desc = $request->desc;
-        $matkul->pstudi_id = $request->pstudi_id;
-        $matkul->kuri_id = $request->kuri_id;
-        $matkul->taka_id = $request->taka_id;
-        $matkul->requ_id = $request->requ_id;
-        $matkul->dosen_1 = $request->dosen_1;
-        $matkul->dosen_2 = $request->dosen_2;
-        $matkul->dosen_3 = $request->dosen_3;
-        $matkul->save();
-
-        Alert::success('success', 'Data telah berhasil disimpan');
+        Alert::success('Berhasil', 'Mata kuliah berhasil ditambahkan.');
 
         return back();
     }
 
-    public function update(Request $request, $code)
+    public function update(Request $request, string $code, AcademicPeriodContext $context): RedirectResponse
     {
-        $request->validate([
-            'mid' => 'required|integer|exists:master_mata_kuliahs,id',
-            'code' => 'required|string|max:255',
-            'bsks' => 'required|string|max:255',
-            'desc' => 'required|string',
-            'pstudi_id' => 'required',
-            'kuri_id' => 'required',
-            'taka_id' => 'required',
-            'dosen_1' => 'required',
-            'dosen_2' => 'nullable',
-            'dosen_3' => 'nullable',
-            'requ_id' => 'nullable',
+        $period = $context->requireWritableCurrent($request->user());
+        $mataKuliah = MataKuliah::query()
+            ->forAcademicPeriod($period)
+            ->where('code', $code)
+            ->firstOrFail();
+        $validated = $this->validateMataKuliah($request, $period->id, $mataKuliah);
+        $master = MasterMataKuliah::findOrFail($validated['mid']);
+
+        $mataKuliah->update([
+            ...$validated,
+            'name' => $master->name,
         ]);
 
-        $masterMatkul = MasterMataKuliah::findOrFail($request->mid);
-        $matkul = MataKuliah::where('code', $code)->firstOrFail();
-        $matkul->mid = $masterMatkul->id;
-        $matkul->name = $masterMatkul->name;
-        $matkul->code = $request->code;
-        $matkul->bsks = $request->bsks;
-        $matkul->desc = $request->desc;
-        $matkul->pstudi_id = $request->pstudi_id;
-        $matkul->kuri_id = $request->kuri_id;
-        $matkul->taka_id = $request->taka_id;
-        $matkul->requ_id = $request->requ_id;
-        $matkul->dosen_1 = $request->dosen_1;
-        $matkul->dosen_2 = $request->dosen_2;
-        $matkul->dosen_3 = $request->dosen_3;
-        $matkul->save();
-
-        Alert::success('success', 'Data telah berhasil diupdate');
+        Alert::success('Berhasil', 'Mata kuliah berhasil diperbarui.');
 
         return back();
     }
 
-    private function masterMataKuliahs()
+    public function destroy(string $code, AcademicPeriodContext $context): RedirectResponse
     {
-        return MasterMataKuliah::query()
-            ->orderBy('program_studi')
-            ->orderBy('semester')
-            ->orderBy('name')
-            ->get();
-    }
+        $period = $context->requireWritableCurrent(auth()->user());
+        $mataKuliah = MataKuliah::query()
+            ->forAcademicPeriod($period)
+            ->where('code', $code)
+            ->firstOrFail();
 
-    public function destroy(Request $request, $code)
-    {
+        $mataKuliah->delete();
 
-        $matkul = MataKuliah::where('code', $code)->first();
-        $matkul->delete();
-
-        Alert::success('success', 'Data telah berhasil dihapus');
+        Alert::success('Berhasil', 'Mata kuliah berhasil dihapus.');
 
         return back();
     }
 
-    public function nilai($mataKuliahId)
+    public function nilai(int $mataKuliahId, AcademicPeriodContext $context): View
     {
-        $data['web'] = webSettings::where('id', 1)->first();
-        $data['prefix'] = $this->setPrefix();
-        $data['mataKuliah'] = MataKuliah::findOrFail($mataKuliahId);
-        $data['mahasiswas'] = Mahasiswa::where('class_id', $data['mataKuliah']->kelas_id)->get();   // atau berdasarkan kelas terkait
-        $data['existingNilais'] = \App\Models\NilaiMahasiswa::where('mata_kuliah_id', $mataKuliahId)
-            ->where('kelas_id', $mataKuliah->kelas_id ?? 1)
-            ->get()
-            ->keyBy('mahasiswa_id');
+        $period = $context->requireCurrent(auth()->user());
+        $mataKuliah = MataKuliah::query()
+            ->forAcademicPeriod($period)
+            ->with('kelas')
+            ->findOrFail($mataKuliahId);
+        $kelas = $mataKuliah->kelas_id
+            ? Kelas::query()->forAcademicPeriod($period)->find($mataKuliah->kelas_id)
+            : null;
 
-        return view('user.admin.master.admin-matkul-nilai', $data);
+        return view('user.admin.master.admin-matkul-nilai', [
+            'web' => webSettings::where('id', 1)->first(),
+            'prefix' => $this->setPrefix(),
+            'mataKuliah' => $mataKuliah,
+            'period' => $period,
+            'canManageNilai' => $period->isWritable() && $kelas !== null,
+            'mahasiswas' => $kelas ? $this->participantQuery($mataKuliah, $period->id, $kelas->id)->get() : collect(),
+            'existingNilais' => NilaiMahasiswa::query()
+                ->forAcademicPeriod($period)
+                ->where('mata_kuliah_id', $mataKuliahId)
+                ->when($kelas, fn ($query) => $query->where('kelas_id', $kelas->id))
+                ->get()
+                ->keyBy('mahasiswa_id'),
+        ]);
     }
 
-    public function storenilai(Request $request)
+    public function storenilai(Request $request, AcademicPeriodContext $context): RedirectResponse
     {
-        $mataKuliahId = $request->mata_kuliah_id;
-        $mataKuliah = MataKuliah::findOrFail($mataKuliahId);
-        $dosenId = $mataKuliah->dosen_1;
-        $kelasId = $mataKuliah->kelas_id ?? 1;
+        $period = $context->requireWritableCurrent($request->user());
+        $mataKuliah = MataKuliah::query()
+            ->forAcademicPeriod($period)
+            ->findOrFail($request->integer('mata_kuliah_id'));
+        $kelas = $mataKuliah->kelas_id
+            ? Kelas::query()->forAcademicPeriod($period)->find($mataKuliah->kelas_id)
+            : null;
 
-        foreach ($request->nilai as $data) {
-            NilaiMahasiswa::updateOrCreate(
-                [
-                    'mahasiswa_id' => $data['mahasiswa_id'],
-                    'mata_kuliah_id' => $mataKuliahId,
-                    'kelas_id' => $kelasId,
-                ],
-                [
-                    'dosen_id' => $dosenId,
-                    'nilai' => $data['nilai'],
-                ]
-            );
+        if (! $kelas) {
+            throw ValidationException::withMessages([
+                'kelas_id' => 'Mata kuliah harus terhubung dengan kelas pada periode yang sedang dipilih.',
+            ]);
         }
 
-        $prefix = $this->setPrefix();
+        $allowedStudentIds = $this->participantQuery($mataKuliah, $period->id, $kelas->id)
+            ->pluck('id')
+            ->all();
 
-        FacadesAlert::success('success', 'Data telah berhasil disimpan untuk matakuliah '.$mataKuliah->name);
+        $validated = $request->validate([
+            'nilai' => ['required', 'array'],
+            'nilai.*.mahasiswa_id' => [
+                'required',
+                'integer',
+                Rule::in($allowedStudentIds),
+            ],
+            'nilai.*.nilai' => ['nullable', 'in:A,B,C,D,E'],
+        ], [
+            'nilai.*.mahasiswa_id.exists' => 'Mahasiswa harus terdaftar pada kelas mata kuliah di periode ini.',
+        ]);
 
-        return redirect()->route($prefix.'master.matkul-index');
+        DB::transaction(function () use ($validated, $period, $mataKuliah, $kelas): void {
+            foreach ($validated['nilai'] as $data) {
+                NilaiMahasiswa::updateOrCreate(
+                    [
+                        'mahasiswa_id' => $data['mahasiswa_id'],
+                        'mata_kuliah_id' => $mataKuliah->id,
+                        'kelas_id' => $kelas->id,
+                    ],
+                    [
+                        'taka_id' => $period->id,
+                        ...(Schema::hasColumn('nilai_mahasiswas', 'penawaran_mata_kuliah_id')
+                            ? ['penawaran_mata_kuliah_id' => $mataKuliah->penawaran?->id]
+                            : []),
+                        'dosen_id' => $mataKuliah->dosen_1,
+                        'nilai' => $data['nilai'] ?? null,
+                    ]
+                );
+            }
+        });
+
+        FacadesAlert::success('Berhasil', 'Nilai berhasil disimpan untuk mata kuliah '.$mataKuliah->name.'.');
+
+        return redirect()->route($this->setPrefix().'master.matkul-index');
+    }
+
+    private function formData(AcademicPeriodContext $context): array
+    {
+        $period = $context->current(auth()->user());
+
+        return [
+            'web' => webSettings::where('id', 1)->first(),
+            'prefix' => $this->setPrefix(),
+            'selectedPeriod' => $period,
+            'canManageMataKuliah' => $period?->isWritable() ?? false,
+            'kuri' => Kurikulum::query()->orderBy('name')->get(),
+            'pstudi' => ProgramStudi::query()->orderBy('name')->get(),
+            'dosen' => Dosen::query()->orderBy('dsn_name')->get(),
+            'matkul' => MataKuliah::query()
+                ->forAcademicPeriod($period)
+                ->with(['masterMataKuliah', 'kuri', 'taka', 'pstudi', 'requ', 'dosen1', 'dosen2', 'dosen3', 'kelas'])
+                ->orderBy('name')
+                ->get(),
+            'masterMatkul' => MasterMataKuliah::query()
+                ->orderBy('program_studi')
+                ->orderBy('semester')
+                ->orderBy('name')
+                ->get(),
+        ];
+    }
+
+    private function validateMataKuliah(Request $request, int $periodId, ?MataKuliah $mataKuliah = null): array
+    {
+        $programStudiCode = ProgramStudi::query()
+            ->whereKey($request->integer('pstudi_id'))
+            ->value('code');
+
+        return $request->validate([
+            'mid' => [
+                'required',
+                'integer',
+                Rule::exists('master_mata_kuliahs', 'id')->where(fn ($query) => $query->where('program_studi', $programStudiCode)),
+            ],
+            'code' => ['required', 'string', 'max:255', Rule::unique('mata_kuliahs', 'code')->ignore($mataKuliah?->id)],
+            'bsks' => ['required', 'integer', 'min:1', 'max:40'],
+            'desc' => ['required', 'string'],
+            'pstudi_id' => ['required', 'integer', 'exists:program_studis,id'],
+            'kuri_id' => ['required', 'integer', 'exists:kurikulums,id'],
+            'dosen_1' => ['required', 'integer', 'exists:dosens,id'],
+            'dosen_2' => ['nullable', 'integer', 'exists:dosens,id'],
+            'dosen_3' => ['nullable', 'integer', 'exists:dosens,id'],
+            'requ_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('mata_kuliahs', 'id')->where(fn ($query) => $query
+                    ->where('taka_id', $periodId)
+                    ->where('pstudi_id', $request->integer('pstudi_id'))),
+                Rule::notIn(array_filter([$mataKuliah?->id])),
+            ],
+        ], [
+            'mid.exists' => 'Mata kuliah master harus sesuai dengan program studi yang dipilih.',
+            'requ_id.exists' => 'Mata kuliah prasyarat harus berasal dari periode dan program studi yang sedang dipilih.',
+            'requ_id.not_in' => 'Mata kuliah tidak dapat menjadi prasyarat bagi dirinya sendiri.',
+        ]);
+    }
+
+    private function participantQuery(MataKuliah $mataKuliah, int $periodId, int $classId)
+    {
+        if (Schema::hasTable('penawaran_mata_kuliahs')) {
+            $offering = $mataKuliah->penawaran()->first();
+            if ($offering) {
+                return Mahasiswa::query()->forApprovedOffering($offering);
+            }
+        }
+
+        return Mahasiswa::query()->forAcademicClass($periodId, $classId);
     }
 }

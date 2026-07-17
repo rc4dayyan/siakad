@@ -325,6 +325,248 @@ Halaman untuk mengedit data pengguna {{ $student->mhs_name }}
     </section>
 
 </form>
+
+@if ($academicPeriod && ! $registration)
+<section class="section row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title">Registrasi Mahasiswa ke {{ $academicPeriod->name }}</h4>
+            </div>
+            <div class="card-body">
+                @if (! $academicPeriod->isWritable())
+                    <div class="alert alert-info mb-0">Registrasi tidak dapat dibuat karena periode ini sudah ditutup atau diarsipkan.</div>
+                @elseif ($latestRegistration?->hasTerminalAcademicStatus())
+                    <div class="alert alert-warning mb-0">
+                        Registrasi baru tidak dapat dibuat karena status terakhir mahasiswa adalah {{ $latestRegistration->academic_status_label }}.
+                    </div>
+                @elseif ($academicPeriodClasses->isEmpty())
+                    <div class="alert alert-warning mb-0">Belum ada kelas pada periode ini. Buat kelas sebelum melakukan registrasi.</div>
+                @elseif ($academicAdvisors->isEmpty())
+                    <div class="alert alert-warning mb-0">Belum ada dosen aktif yang dapat dipilih sebagai dosen wali.</div>
+                @else
+                    <form action="{{ route($prefix.'workers.student-registration-store', $student->mhs_code) }}" method="POST">
+                        @csrf
+                        <div class="row">
+                            <div class="form-group col-lg-2 col-12">
+                                <label for="semester_mahasiswa">Semester</label>
+                                <select name="semester_mahasiswa" id="semester_mahasiswa" class="form-select" required>
+                                    @for ($semester = 1; $semester <= 14; $semester++)
+                                        <option value="{{ $semester }}" @selected((int) old('semester_mahasiswa', $suggestedSemester) === $semester)>
+                                            Semester {{ $semester }}
+                                        </option>
+                                    @endfor
+                                </select>
+                                @error('semester_mahasiswa')
+                                    <small class="text-danger">{{ $message }}</small>
+                                @enderror
+                            </div>
+                            <div class="form-group col-lg-2 col-12">
+                                <label for="registration_status_akademik">Status akademik</label>
+                                <select name="status_akademik" id="registration_status_akademik" class="form-select" required>
+                                    @foreach (\App\Models\RegistrasiMahasiswa::academicStatuses() as $status)
+                                        <option value="{{ $status }}" @selected(old('status_akademik', \App\Models\RegistrasiMahasiswa::STATUS_AKADEMIK_AKTIF) === $status)>
+                                            {{ \App\Models\RegistrasiMahasiswa::academicStatusLabel($status) }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('status_akademik')
+                                    <small class="text-danger">{{ $message }}</small>
+                                @enderror
+                            </div>
+                            <div class="form-group col-lg-3 col-12">
+                                <label for="registration_kelas_id">Kelas</label>
+                                <select name="kelas_id" id="registration_kelas_id" class="form-select" required>
+                                    <option value="">Pilih kelas</option>
+                                    @foreach ($academicPeriodClasses as $class)
+                                        <option value="{{ $class->id }}" @selected((int) old('kelas_id') === $class->id)>{{ $class->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('kelas_id')
+                                    <small class="text-danger">{{ $message }}</small>
+                                @enderror
+                            </div>
+                            <div class="form-group col-lg-3 col-12">
+                                <label for="dosen_wali_id">Dosen wali</label>
+                                <select name="dosen_wali_id" id="dosen_wali_id" class="form-select" required>
+                                    <option value="">Pilih dosen wali</option>
+                                    @foreach ($academicAdvisors as $advisor)
+                                        <option value="{{ $advisor->id }}" @selected((int) old('dosen_wali_id') === $advisor->id)>{{ $advisor->dsn_name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('dosen_wali_id')
+                                    <small class="text-danger">{{ $message }}</small>
+                                @enderror
+                            </div>
+                            <div class="form-group col-lg-2 col-12">
+                                <label for="batas_sks">Batas SKS</label>
+                                <input type="number" name="batas_sks" id="batas_sks" class="form-control" min="1" max="24" value="{{ old('batas_sks', 24) }}" required>
+                                @error('batas_sks')
+                                    <small class="text-danger">{{ $message }}</small>
+                                @enderror
+                            </div>
+                        </div>
+                        @error('registration')
+                            <div class="alert alert-danger">{{ $message }}</div>
+                        @enderror
+                        <button type="submit" class="btn btn-outline-primary">Registrasikan mahasiswa</button>
+                    </form>
+                @endif
+            </div>
+        </div>
+    </div>
+</section>
+@endif
+
+<section class="section row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title">Status Akademik Periode</h4>
+            </div>
+            <div class="card-body">
+                @if (! $academicPeriod)
+                    <div class="alert alert-warning mb-0">Belum ada periode akademik yang dapat digunakan.</div>
+                @elseif (! $registration)
+                    <div class="alert alert-warning mb-0">
+                        Mahasiswa belum memiliki registrasi pada {{ $academicPeriod->name }}.
+                    </div>
+                @else
+                    <div class="row">
+                        <div class="col-lg-4 col-12 mb-3">
+                            <strong>Periode</strong><br>
+                            {{ $academicPeriod->name }}
+                        </div>
+                        <div class="col-lg-4 col-12 mb-3">
+                            <strong>Status saat ini</strong><br>
+                            <span class="badge bg-primary">{{ $registration->academic_status_label }}</span>
+                        </div>
+                        <div class="col-lg-4 col-12 mb-3">
+                            <strong>Semester mahasiswa</strong><br>
+                            Semester {{ $registration->semester_mahasiswa }}
+                        </div>
+                    </div>
+
+                    @if ($academicPeriod->isWritable() && count($academicStatusTransitions) > 0)
+                        <form action="{{ route($prefix.'workers.student-academic-status-update', $student->mhs_code) }}" method="POST" class="border rounded p-3 mb-4">
+                            @csrf
+                            @method('PATCH')
+                            <div class="row">
+                                <div class="form-group col-lg-4 col-12">
+                                    <label for="status_akademik">Status baru</label>
+                                    <select name="status_akademik" id="status_akademik" class="form-select" required>
+                                        <option value="">Pilih status</option>
+                                        @foreach ($academicStatusTransitions as $status)
+                                            <option value="{{ $status }}" @selected(old('status_akademik') === $status)>
+                                                {{ \App\Models\RegistrasiMahasiswa::academicStatusLabel($status) }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('status_akademik')
+                                        <small class="text-danger">{{ $message }}</small>
+                                    @enderror
+                                </div>
+                                <div class="form-group col-lg-3 col-12">
+                                    <label for="berlaku_mulai">Tanggal berlaku</label>
+                                    <input type="date" name="berlaku_mulai" id="berlaku_mulai" class="form-control" max="{{ now()->toDateString() }}" value="{{ old('berlaku_mulai', now()->toDateString()) }}" required>
+                                    @error('berlaku_mulai')
+                                        <small class="text-danger">{{ $message }}</small>
+                                    @enderror
+                                </div>
+                                <div class="form-group col-lg-5 col-12">
+                                    <label for="alasan">Alasan perubahan</label>
+                                    <textarea name="alasan" id="alasan" class="form-control" rows="2" maxlength="1000" required>{{ old('alasan') }}</textarea>
+                                    @error('alasan')
+                                        <small class="text-danger">{{ $message }}</small>
+                                    @enderror
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-outline-primary">Simpan perubahan status</button>
+                        </form>
+                    @elseif (! $academicPeriod->isWritable())
+                        <div class="alert alert-info">Periode ditutup atau diarsipkan sehingga status hanya dapat dilihat.</div>
+                    @else
+                        <div class="alert alert-info">Status ini bersifat terminal dan tidak dapat diubah kembali.</div>
+                    @endif
+
+                    <h5>Riwayat Perubahan</h5>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Tanggal berlaku</th>
+                                    <th>Perubahan</th>
+                                    <th>Alasan</th>
+                                    <th>Diubah oleh</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($registration->riwayatStatus->sortByDesc('created_at') as $history)
+                                    <tr>
+                                        <td>{{ $history->berlaku_mulai->format('d-m-Y') }}</td>
+                                        <td>
+                                            {{ \App\Models\RegistrasiMahasiswa::academicStatusLabel($history->status_sebelumnya) }}
+                                            &rarr;
+                                            {{ \App\Models\RegistrasiMahasiswa::academicStatusLabel($history->status_baru) }}
+                                        </td>
+                                        <td>{{ $history->alasan }}</td>
+                                        <td>{{ $history->changedBy->name }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="text-center">Belum ada perubahan status pada periode ini.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title">Riwayat Registrasi Akademik</h4>
+            </div>
+            <div class="card-body table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Periode</th>
+                            <th>Semester</th>
+                            <th>Status Akademik</th>
+                            <th>Status Registrasi</th>
+                            <th>Kelas</th>
+                            <th>Dosen Wali</th>
+                            <th>Batas SKS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($registrationHistory as $historyRegistration)
+                            <tr>
+                                <td>{{ $historyRegistration->taka->name }}</td>
+                                <td>{{ $historyRegistration->semester_mahasiswa }}</td>
+                                <td>{{ $historyRegistration->academic_status_label }}</td>
+                                <td>{{ ucfirst(str_replace('_', ' ', $historyRegistration->status_registrasi)) }}</td>
+                                <td>{{ $historyRegistration->kelas?->name ?? '-' }}</td>
+                                <td>{{ $historyRegistration->dosenWali?->dsn_name ?? '-' }}</td>
+                                <td>{{ $historyRegistration->batas_sks }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" class="text-center">Belum ada riwayat registrasi akademik.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
 @endsection
 @section('custom-js')
 <script>

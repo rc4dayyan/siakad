@@ -46,7 +46,7 @@
                     </div>
                     <div class="form-group col-lg-4 col-12">
                         <label for="mhs_class">Nama Kelas</label>
-                        <input type="text" readonly id="mhs_class" name="mhs_class" class="form-control" value="{{ $score->student->kelas->name }}">
+                        <input type="text" readonly id="mhs_class" name="mhs_class" class="form-control" value="{{ $score->task->jadkul->kelas->name }}">
                         @error('mhs_class')
                             <small class="text-danger">{{ $message }}</small>
                         @enderror

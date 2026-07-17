@@ -2,32 +2,52 @@
 
 namespace App\Http\Controllers\Mahasiswa\Pages;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-// SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\File;
-use Auth;
-use Hash;
-use Str;
-// SECTION ADDONS EXTERNAL
 use Alert;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-// SECTION MODELS
+use App\Http\Controllers\Controller;
+// SECTION ADDONS SYSTEM
 use App\Models\HasilStudi;
 use App\Models\NilaiMahasiswa;
-use App\Models\studentTask;
-use App\Models\studentScore;
 use App\Models\Settings\webSettings;
+// SECTION ADDONS EXTERNAL
+use App\Models\studentScore;
+// SECTION MODELS
+use App\Models\studentTask;
+use App\Services\Academic\AcademicPeriodContext;
+use App\Services\Academic\StudentAcademicContext;
+use Auth;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth as FacadesAuth;
+use Illuminate\Support\Facades\File;
+use Str;
 
 class StudentNilaiController extends Controller
 {
-    public function index()
-    {
+    public function index(
+        Request $request,
+        AcademicPeriodContext $context,
+        StudentAcademicContext $studentContext
+    ) {
         $user = FacadesAuth::guard('mahasiswa')->user();
+        $period = $context->published();
+        $hasAcademicContext = $studentContext->classFor($user, $period) !== null;
+        $isTranscript = $request->boolean('transkrip');
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['nilai'] = NilaiMahasiswa::where('mahasiswa_id', $user->id)->get();
+        $data['period'] = $period;
+        $data['isTranscript'] = $isTranscript;
+        $data['nilai'] = NilaiMahasiswa::query()
+            ->where('mahasiswa_id', $user->id)
+            ->when(! $isTranscript, fn ($query) => $query->forAcademicPeriod($period))
+            ->when(! $isTranscript && ! $hasAcademicContext, fn ($query) => $query->whereRaw('1 = 0'))
+            ->with(['taka', 'mataKuliah', 'kelas', 'dosen'])
+            ->orderBy('taka_id')
+            ->get();
+        $data['hasilStudi'] = HasilStudi::query()
+            ->where('student_id', $user->id)
+            ->when(! $isTranscript, fn ($query) => $query->forAcademicPeriod($period))
+            ->when(! $isTranscript && ! $hasAcademicContext, fn ($query) => $query->whereRaw('1 = 0'))
+            ->with('taka')
+            ->orderBy('taka_id')
+            ->get();
 
         return view('mahasiswa.pages.nilai-index', $data);
     }
@@ -38,8 +58,9 @@ class StudentNilaiController extends Controller
         $data['stask'] = StudentTask::where('code', $code)->first();
         $data['web'] = webSettings::where('id', 1)->first();
         $score = studentScore::where('stask_id', $data['stask']->id)->where('student_id', Auth::guard('mahasiswa')->user()->id)->get();
-        if($score->count() == 1){
+        if ($score->count() == 1) {
             Alert::error('Error', 'Kamu sudah mengumpulkan tugas ini.');
+
             return back();
         } else {
             return view('mahasiswa.pages.stask-view', $data);
@@ -73,13 +94,13 @@ class StudentNilaiController extends Controller
         $task = new studentScore;
 
         for ($i = 1; $i <= 8; $i++) {
-            $fileKey = 'file_' . $i;
+            $fileKey = 'file_'.$i;
 
             if ($request->hasFile($fileKey)) {
                 $file = $request->file($fileKey);
-                $filename = time() . '-part-' . $i . '.' . $file->getClientOriginalExtension(); // Menggunakan ekstensi file asli
+                $filename = time().'-part-'.$i.'.'.$file->getClientOriginalExtension(); // Menggunakan ekstensi file asli
                 $path = $file->storeAs('public/uploads/tugas', $filename); // Menyimpan file ke dalam direktori public/uploads/tugas
-                $task->{'file_' . $i} = 'tugas/' . $filename; // Menyimpan path relatif dari file ke dalam properti dinamis $task
+                $task->{'file_'.$i} = 'tugas/'.$filename; // Menyimpan path relatif dari file ke dalam properti dinamis $task
             }
             // Setelah menangani file, atur nilai-nilai lainnya
             $task->stask_id = $stask->id;  // Pastikan variabel $stask telah didefinisikan sebelumnya
@@ -111,8 +132,7 @@ class StudentNilaiController extends Controller
         // }
 
         Alert::success('Sukses', 'Tugas berhasil disimpan');
+
         return redirect()->route('mahasiswa.akademik.tugas-index');
     }
-
-
 }

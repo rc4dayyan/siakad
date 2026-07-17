@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -10,6 +11,37 @@ class JadwalKuliah extends Model
     use HasFactory;
 
     protected $guarded = [];
+
+    public function scopeForAcademicPeriod(Builder $query, TahunAkademik|int|null $period): Builder
+    {
+        $periodId = $period instanceof TahunAkademik ? $period->getKey() : $period;
+
+        if (! $periodId) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query
+            ->whereHas('matkul', fn (Builder $query) => $query->where('taka_id', $periodId))
+            ->whereHas('kelas', fn (Builder $query) => $query->where('taka_id', $periodId));
+    }
+
+    public function scopeForLecturer(Builder $query, int $lecturerId): Builder
+    {
+        return $query->where('dosen_id', $lecturerId);
+    }
+
+    public function scopeForStudentClass(Builder $query, int $classId): Builder
+    {
+        return $query->where('kelas_id', $classId);
+    }
+
+    public function scopeForApprovedStudent(Builder $query, int $studentId): Builder
+    {
+        return $query->whereHas('penawaranMataKuliah.krsItems.krs', fn (Builder $krs) => $krs
+            ->whereIn('status', [Krs::STATUS_APPROVED, Krs::STATUS_LOCKED])
+            ->whereHas('registrasiMahasiswa', fn (Builder $registration) => $registration
+                ->where('mahasiswa_id', $studentId)));
+    }
 
     // ATTRIBUTES ID HARI
     public function getDaysIdAttribute($value)
@@ -81,16 +113,29 @@ class JadwalKuliah extends Model
 
     public function matkul()
     {
-        return $this->belongsTo(MataKuliah::class, 'makul_id',);
+        return $this->belongsTo(MataKuliah::class, 'makul_id');
     }
+
+    public function penawaranMataKuliah()
+    {
+        return $this->belongsTo(PenawaranMataKuliah::class);
+    }
+
+    public function pertemuanKuliah()
+    {
+        return $this->hasOne(PertemuanKuliah::class, 'legacy_jadwal_kuliah_id');
+    }
+
     public function dosen()
     {
         return $this->belongsTo(Dosen::class, 'dosen_id');
     }
+
     public function kelas()
     {
         return $this->belongsTo(Kelas::class, 'kelas_id');
     }
+
     public function ruang()
     {
         return $this->belongsTo(Ruang::class, 'ruang_id');

@@ -68,6 +68,7 @@ class Kernel extends HttpKernel
         'mhs-access' => \App\Http\Middleware\MhsAccess::class,
         'dsn-access' => \App\Http\Middleware\DsnAccess::class,
         'is-active' => \App\Http\Middleware\isActive::class,
+        'academic-workflow-role' => \App\Http\Middleware\AcademicWorkflowRole::class,
 
     ];
 }

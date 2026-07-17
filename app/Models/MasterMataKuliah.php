@@ -23,4 +23,9 @@ class MasterMataKuliah extends Model
     {
         return $this->hasMany(MataKuliah::class, 'mid');
     }
+
+    public function penawarans()
+    {
+        return $this->hasMany(PenawaranMataKuliah::class);
+    }
 }

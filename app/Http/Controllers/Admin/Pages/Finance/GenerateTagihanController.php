@@ -2,36 +2,30 @@
 
 namespace App\Http\Controllers\Admin\Pages\Finance;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-// SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\File;
-use Auth;
-use Hash;
-use Str;
-// SECTION ADDONS EXTERNAL
 use Alert;
 use App\Helper\roleTrait;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-// SECTION MODELS
-use App\Models\User;
-use App\Models\Dosen;
-use App\Models\Kelas;
-use App\Models\ProgramStudi;
-use App\Models\ProgramKuliah;
-use App\Models\Mahasiswa;
-use App\Models\TagihanKuliah;
+// SECTION ADDONS SYSTEM
+use App\Http\Controllers\Controller;
 use App\Models\HistoryTagihan;
+// SECTION ADDONS EXTERNAL
+use App\Models\Mahasiswa;
+use App\Models\ProgramKuliah;
+// SECTION MODELS
+use App\Models\ProgramStudi;
 use App\Models\Settings\webSettings;
+use App\Models\TagihanKuliah;
+use App\Services\Academic\AcademicAuditService;
+use Auth;
+use Illuminate\Http\Request;
+use Str;
 
 class GenerateTagihanController extends Controller
 {
     use roleTrait;
-    
+
     public function index(Request $request)
     {
-        $data['income'] = HistoryTagihan::where('stat', 1)->whereHas('tagihan', function ($query) use ($request){
+        $data['income'] = HistoryTagihan::where('stat', 1)->whereHas('tagihan', function ($query) {
             $query->select('price');
         })->with('tagihan')->get()->sum(function ($history) {
             return $history->tagihan->price;
@@ -48,9 +42,10 @@ class GenerateTagihanController extends Controller
 
         return view('user.finance.pages.tagihan-index', $data);
     }
+
     public function create(Request $request)
     {
-        $data['income'] = HistoryTagihan::where('stat', 1)->whereHas('tagihan', function ($query) use ($request){
+        $data['income'] = HistoryTagihan::where('stat', 1)->whereHas('tagihan', function ($query) {
             $query->select('price');
         })->with('tagihan')->get()->sum(function ($history) {
             return $history->tagihan->price;
@@ -84,6 +79,7 @@ class GenerateTagihanController extends Controller
         // Validasi jika hanya satu nilai yang valid
         if ($count != 1) {
             Alert::error('error', 'Hanya boleh memilih salah satu.');
+
             return back()->withInput();
         }
 
@@ -99,6 +95,7 @@ class GenerateTagihanController extends Controller
         $tagihan->save();
 
         Alert::success('success', 'Data berhasil ditambahkan');
+
         return back();
     }
 
@@ -120,6 +117,7 @@ class GenerateTagihanController extends Controller
         // Validasi jika hanya satu nilai yang valid
         if ($count != 1) {
             Alert::error('error', 'Hanya boleh memilih salah satu.');
+
             return back()->withInput();
         }
 
@@ -135,15 +133,24 @@ class GenerateTagihanController extends Controller
         $tagihan->save();
 
         Alert::success('success', 'Data berhasil diupdate');
+
         return back();
     }
 
-    public function destroy(Request $request, $code)
+    public function destroy(Request $request, $code, AcademicAuditService $audit)
     {
-        $tagihan = TagihanKuliah::where('code', $code)->first();
-        $tagihan->delete();
+        $tagihan = TagihanKuliah::where('code', $code)->firstOrFail();
+        if ($tagihan->taka_id) {
+            $before = ['status' => $tagihan->status];
+            $tagihan->update(['status' => TagihanKuliah::STATUS_DIBATALKAN]);
+            $audit->record('billing.cancelled', $tagihan, $tagihan->taka_id, $request->user(), $before,
+                ['status' => TagihanKuliah::STATUS_DIBATALKAN]);
+        } else {
+            $tagihan->delete();
+        }
 
         Alert::success('success', 'Data telah berhasil dihapus');
+
         return back();
     }
 }

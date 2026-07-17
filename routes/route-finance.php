@@ -19,6 +19,11 @@ Route::group(['prefix' => 'finance', 'middleware' => ['user-access:Departement F
         Route::post('/data-tagihan/store',[App\Http\Controllers\Admin\Pages\Finance\GenerateTagihanController::class, 'store'])->name('finance.tagihan-store');
         Route::patch('/data-tagihan/{code}/update',[App\Http\Controllers\Admin\Pages\Finance\GenerateTagihanController::class, 'update'])->name('finance.tagihan-update');
         Route::delete('/data-tagihan/{code}/destroy',[App\Http\Controllers\Admin\Pages\Finance\GenerateTagihanController::class, 'destroy'])->name('finance.tagihan-destroy');
+        Route::get('/billing-period', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'index'])->name('billing-period.index');
+        Route::post('/billing-period/templates', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'store'])->name('billing-period.store');
+        Route::post('/billing-period/templates/{template}/preview', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'preview'])->name('billing-period.preview');
+        Route::post('/billing-period/templates/{template}/issue', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'issue'])->name('billing-period.issue');
+        Route::post('/billing-period/override/{registration}', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'override'])->name('billing-period.override');
         // MENU KHUSUS FINANCE DEPARTEMENT => DATA PEMBAYARAN
         Route::get('/data-pembayaran',[App\Http\Controllers\Admin\Pages\Finance\PembayaranController::class, 'index'])->name('finance.pembayaran-index');
         Route::get('/data-pembayaran/create',[App\Http\Controllers\Admin\Pages\Finance\PembayaranController::class, 'create'])->name('finance.pembayaran-create');

@@ -14,7 +14,25 @@
             <span class="navbar-toggler-icon"></span>
         </button>
 @php
-    $notif = App\Models\Notification::latest()->paginate(6);
+    $notificationQuery = App\Models\Notification::query()->latest();
+    if (Auth::guard('mahasiswa')->check()) {
+        $studentId = Auth::guard('mahasiswa')->id();
+        $notificationQuery->where(function ($query) use ($studentId) {
+            $query->where('student_id', $studentId)
+                ->orWhere(function ($global) {
+                    $global->whereIn('send_to', [0, 3])->whereNull('student_id');
+                });
+        });
+    } elseif (Auth::guard('dosen')->check()) {
+        $lecturerId = Auth::guard('dosen')->id();
+        $notificationQuery->where(function ($query) use ($lecturerId) {
+            $query->where('lecture_id', $lecturerId)
+                ->orWhere(function ($global) {
+                    $global->whereIn('send_to', [0, 2])->whereNull('lecture_id');
+                });
+        });
+    }
+    $notif = $notificationQuery->paginate(6);
 
     if(Auth::check()){
         if(Auth::user()->raw_type == '0'){
@@ -34,6 +52,26 @@
         <div class="collapse navbar-collapse" id="navbarSupportedContent">
             <ul class="navbar-nav ms-auto mb-lg-0 dashboard-navbar-actions">
                 @auth
+                    <li class="nav-item me-2 d-flex align-items-center">
+                        @if (isset($academicPeriods) && $academicPeriods->isNotEmpty())
+                            <form method="POST" action="{{ route($prefix.'academic-period.select') }}">
+                                @csrf
+                                @method('PATCH')
+                                <label for="academic-period-selector" class="visually-hidden">Periode akademik</label>
+                                <select name="code" id="academic-period-selector" class="form-select form-select-sm"
+                                    onchange="this.form.submit()" title="Pilih konteks periode akademik">
+                                    @foreach ($academicPeriods as $period)
+                                        <option value="{{ $period->code }}"
+                                            @selected($selectedAcademicPeriod?->is($period))>
+                                            {{ $period->code }}{{ $activeAcademicPeriod?->is($period) ? ' (Aktif)' : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </form>
+                        @else
+                            <span class="badge bg-warning text-dark">Belum ada periode aktif</span>
+                        @endif
+                    </li>
                     @if ((int) Auth::user()->raw_type === 0 && Auth::user()->status == 1)
                         <li class="nav-item me-1">
                             <form method="POST" action="{{ route('web-admin.system.cache-clear') }}" onsubmit="return confirm('Bersihkan seluruh cache aplikasi?')">
@@ -79,13 +117,13 @@
                         @foreach ($notif as $item)
 
                         <li class="dropdown-item notification-item">
-                            <a class="d-flex align-items-center" href="#">
+                            <a class="d-flex align-items-center" href="{{ $item->slug ?: '#' }}">
                                 <div class="notification-icon bg-primary">
                                     <i class="fa-solid fa-bell"></i>
                                 </div>
                                 <div class="notification-text ms-4">
                                     <p class="notification-title font-bold">{{ $item->name }}</p>
-                                    <p class="notification-subtitle font-thin text-sm">{!! substr($item->desc, 0 ,25) !!}</p>
+                                    <p class="notification-subtitle font-thin text-sm">{{ \Illuminate\Support\Str::limit($item->desc, 25) }}</p>
                                 </div>
                             </a>
                         </li>

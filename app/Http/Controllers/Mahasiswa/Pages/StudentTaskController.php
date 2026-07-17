@@ -2,44 +2,48 @@
 
 namespace App\Http\Controllers\Mahasiswa\Pages;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-// SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\File;
-use Auth;
-use Hash;
-use Str;
-// SECTION ADDONS EXTERNAL
 use Alert;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-// SECTION MODELS
+use App\Http\Controllers\Controller;
+// SECTION ADDONS SYSTEM
 use App\Models\HasilStudi;
-use App\Models\studentTask;
-use App\Models\studentScore;
 use App\Models\Settings\webSettings;
+use App\Models\studentScore;
+// SECTION ADDONS EXTERNAL
+use App\Models\studentTask;
+// SECTION MODELS
+use App\Services\Academic\AcademicPeriodContext;
+use App\Services\Academic\StudentAcademicContext;
+use Auth;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+use Str;
 
 class StudentTaskController extends Controller
 {
-    public function index()
+    public function index(AcademicPeriodContext $periodContext, StudentAcademicContext $studentContext)
     {
         $user = Auth::guard('mahasiswa')->user();
+        $period = $periodContext->published();
+        $classId = $studentContext->classIdFor($user, $period);
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['stask'] = StudentTask::whereHas('jadkul', function($query) use ($user) {
-            $query->where('kelas_id', $user->class_id);
-        })->get();
+        $data['stask'] = StudentTask::query()
+            ->forAcademicPeriod($period)
+            ->when($classId, fn ($query) => $query->whereHas('jadkul', fn ($schedule) => $schedule->where('kelas_id', $classId)))
+            ->when(! $classId, fn ($query) => $query->whereRaw('1 = 0'))
+            ->get();
 
         return view('mahasiswa.pages.stask-index', $data);
     }
 
-    public function view($code)
+    public function view($code, AcademicPeriodContext $periodContext, StudentAcademicContext $studentContext)
     {
-
-        $data['stask'] = StudentTask::where('code', $code)->first();
+        $user = Auth::guard('mahasiswa')->user();
+        $data['stask'] = $this->taskForStudent($code, $user, $periodContext, $studentContext);
         $data['web'] = webSettings::where('id', 1)->first();
         $score = studentScore::where('stask_id', $data['stask']->id)->where('student_id', Auth::guard('mahasiswa')->user()->id)->get();
-        if($score->count() == 1){
+        if ($score->count() == 1) {
             Alert::error('Error', 'Kamu sudah mengumpulkan tugas ini.');
+
             return back();
         } else {
             return view('mahasiswa.pages.stask-view', $data);
@@ -47,8 +51,12 @@ class StudentTaskController extends Controller
 
     }
 
-    public function store(Request $request, $code)
-    {
+    public function store(
+        Request $request,
+        $code,
+        AcademicPeriodContext $periodContext,
+        StudentAcademicContext $studentContext
+    ) {
         $request->validate([
             'desc' => 'required',
             'file_1' => 'required|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,gif|max:20480',
@@ -67,19 +75,19 @@ class StudentTaskController extends Controller
             // Add similar messages for other files if needed
         ]);
 
-        $stask = studentTask::where('code', $code)->first();
         $user = Auth::guard('mahasiswa')->user();
+        $stask = $this->taskForStudent($code, $user, $periodContext, $studentContext);
 
         $task = new studentScore;
 
         for ($i = 1; $i <= 8; $i++) {
-            $fileKey = 'file_' . $i;
+            $fileKey = 'file_'.$i;
 
             if ($request->hasFile($fileKey)) {
                 $file = $request->file($fileKey);
-                $filename = time() . '-part-' . $i . '.' . $file->getClientOriginalExtension(); // Menggunakan ekstensi file asli
+                $filename = time().'-part-'.$i.'.'.$file->getClientOriginalExtension(); // Menggunakan ekstensi file asli
                 $path = $file->storeAs('public/uploads/tugas', $filename); // Menyimpan file ke dalam direktori public/uploads/tugas
-                $task->{'file_' . $i} = 'tugas/' . $filename; // Menyimpan path relatif dari file ke dalam properti dinamis $task
+                $task->{'file_'.$i} = 'tugas/'.$filename; // Menyimpan path relatif dari file ke dalam properti dinamis $task
             }
             // Setelah menangani file, atur nilai-nilai lainnya
             $task->stask_id = $stask->id;  // Pastikan variabel $stask telah didefinisikan sebelumnya
@@ -111,8 +119,24 @@ class StudentTaskController extends Controller
         // }
 
         Alert::success('Sukses', 'Tugas berhasil disimpan');
+
         return redirect()->route('mahasiswa.akademik.tugas-index');
     }
 
+    private function taskForStudent(
+        string $code,
+        $student,
+        AcademicPeriodContext $periodContext,
+        StudentAcademicContext $studentContext
+    ): studentTask {
+        $period = $periodContext->published();
+        $classId = $studentContext->classIdFor($student, $period);
 
+        return studentTask::query()
+            ->forAcademicPeriod($period)
+            ->when($classId, fn ($query) => $query->whereHas('jadkul', fn ($schedule) => $schedule->where('kelas_id', $classId)))
+            ->when(! $classId, fn ($query) => $query->whereRaw('1 = 0'))
+            ->where('code', $code)
+            ->firstOrFail();
+    }
 }

@@ -32,11 +32,17 @@
                     <div class="">
 
                         <a href="{{ route($prefix.'master.matkul-index') }}" class="btn btn-outline-warning"><i class="fa-solid fa-backward"></i></a>
-                        <button type="submit" class="btn btn-outline-primary"><i class="fa-solid fa-paper-plane"></i></button>
+                        <button type="submit" class="btn btn-outline-primary" @disabled(! $canManageMataKuliah)><i class="fa-solid fa-paper-plane"></i></button>
                     </div>
 
                 </div>
                 <div class="card-body row">
+                    @if (! $canManageMataKuliah)
+                        <div class="col-12"><div class="alert alert-warning">Periode belum dipilih atau sudah tidak dapat diubah.</div></div>
+                    @endif
+                    @error('academic_period')
+                        <div class="col-12"><div class="alert alert-danger">{{ $message }}</div></div>
+                    @enderror
                     <div class="form-group col-lg-3 col-12">
                         <label for="mid">Nama Mata Kuliah</label>
                         <select name="mid" id="mid" class="choices form-select">
@@ -72,7 +78,7 @@
                     </div>
                     <div class="form-group col-lg-3 col-12">
                         <label for="bsks">Beban SKS Mata Kuliah</label>
-                        <input type="number" min="10" max="40" name="bsks" id="bsks" class="form-control" placeholder="Inputkan beban sks matakuliah...">
+                        <input type="number" min="1" max="40" name="bsks" id="bsks" class="form-control" value="{{ old('bsks') }}" placeholder="Inputkan beban sks matakuliah...">
                         @error('bsks')
                             <small class="text-danger">{{ $message }}</small>
                         @enderror
@@ -91,16 +97,8 @@
                         @enderror
                     </div>
                     <div class="form-group col-lg-4 col-12">
-                        <label for="taka_id">Tahun Akademik</label>
-                        <select name="taka_id" id="taka_id" class="form-select" name="taka_id" id="taka_id">
-                            <option value="" selected>Pilih Tahun Akademik</option>
-                            @foreach ($taka as $item_t)
-                            <option value="{{ $item_t->id }}">{{ $item_t->name . ' - ' . $item_t->semester }}</option>
-                            @endforeach
-                        </select>
-                        @error('taka_id')
-                        <small class="text-danger">{{ $message }}</small>
-                        @enderror
+                        <label for="selected-period">Tahun Akademik</label>
+                        <input id="selected-period" class="form-control" value="{{ $selectedPeriod?->name ?? 'Belum dipilih' }}" readonly>
                     </div>
                     <div class="form-group col-lg-4 col-12">
                         <label for="pstudi_id">Program Studi</label>

@@ -103,9 +103,7 @@ Halaman untuk melihat Jadwal Kuliah
         <div class="card-header">
             <h5 class="card-title d-flex justify-content-between align-items-center">
                 @yield('submenu')
-                <div class="">
-                    <a href="{{ route('web-admin.master.jadkul-create') }}" class="btn btn-outline-primary"><i class="fa-solid fa-plus"></i></a>
-                </div>
+                <span class="badge bg-primary">Periode akademik aktif</span>
             </h5>
         </div>
         <div class="card-body">

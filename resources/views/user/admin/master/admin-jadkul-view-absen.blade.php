@@ -131,14 +131,18 @@ table th {
                         <td data-label="Number">{{ ++$key }}</td>
                         <td data-label="Nama Mahasiswa">{{ $item->mahasiswa->mhs_name }}</td>
                         <td data-label="Nomor NIM Mahasiswa">{{ $item->mahasiswa->mhs_nim }}</td>
-                        <td data-label="Nama Kelas">{{ $item->mahasiswa->kelas->name }}</td>
+                        <td data-label="Nama Kelas">{{ $jadkul->kelas->name }}</td>
                         <td data-label="Status Absen">
                             {{ $item->absen_type }} <br> 
                         </td>
                         <td data-label="Tanggal Absen">{{ \Carbon\Carbon::parse($item->absen_date)->format('d M Y') }}</td>
                         <td data-label="Waktu Absen">{{ \Carbon\Carbon::parse($item->absen_time)->format('H:i') }} WIB</td>
                         <td class="d-flex justify-content-center align-items-center">
+                            @if ($canManageJadwal)
                             <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#updateAbsen{{ $item->code }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
+                            @else
+                            <span class="badge bg-secondary">Hanya baca</span>
+                            @endif
                             {{-- <a href="{{ route($prefix.'master.jadkul-view-absen', $item->code) }}"  style="margin-right: 10px" class="btn btn-outline-info"><i class="fa-solid fa-user-check"></i></a> --}}
                             {{-- <form id="delete-form-{{ $item->code }}"
                                 action="{{ route($prefix.'master.jadkul-destroy', $item->code) }}" method="POST">
@@ -166,6 +170,7 @@ table th {
 <div class="me-1 mb-1 d-inline-block">
 
     <!--Extra Large Modal -->
+    @if ($canManageJadwal)
     @foreach ($absen as $item)
     <form action="{{ route($prefix.'master.jadkul-absen-update', $item->code) }}" method="POST" enctype="multipart/form-data">
         @method('patch')
@@ -205,6 +210,7 @@ table th {
         </div>
     </form>
     @endforeach
+    @endif
 </div>
 <div class="me-1 mb-1 d-inline-block">
 

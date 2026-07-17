@@ -85,28 +85,28 @@
                                     </div>
                                     <div class="form-group col-lg-6 col-12">
                                         <label for="years_id">Tahun Masuk</label>
-                                        <input type="text" name="years_id" id="years_id" class="form-control" placeholder="Nama Program Studi..." readonly value="Angkatan {{ Auth::guard('mahasiswa')->user()->kelas->taka->year_start }}">
+                                        <input type="text" name="years_id" id="years_id" class="form-control" placeholder="Nama Program Studi..." readonly value="Angkatan {{ $academicRegistration?->taka?->year_start ?? $academicClass?->taka?->year_start ?? '-' }}">
                                         @error('years_id')
                                             <small class="text-danger">{{ $message }}</small>
                                         @enderror
                                     </div>
                                     <div class="form-group col-lg-6 col-12">
                                         <label for="faku_id">Fakultas</label>
-                                        <input type="text" name="faku_id" id="faku_id" class="form-control" placeholder="Nama Program Studi..." readonly value="{{ Auth::guard('mahasiswa')->user()->kelas->pstudi->fakultas->name }}">
+                                        <input type="text" name="faku_id" id="faku_id" class="form-control" placeholder="Nama Program Studi..." readonly value="{{ $academicClass?->pstudi?->fakultas?->name ?? '-' }}">
                                         @error('faku_id')
                                             <small class="text-danger">{{ $message }}</small>
                                         @enderror
                                     </div>
                                     <div class="form-group col-lg-6 col-12">
                                         <label for="class_id">Program Studi</label>
-                                        <input type="text" name="class_id" id="class_id" class="form-control" placeholder="Nama Program Studi..." readonly value="{{ Auth::guard('mahasiswa')->user()->kelas->pstudi->name . ' - ' . Auth::guard('mahasiswa')->user()->kelas->taka->semester }}">
+                                        <input type="text" name="class_id" id="class_id" class="form-control" placeholder="Nama Program Studi..." readonly value="{{ ($academicClass?->pstudi?->name ?? '-') . ' - Semester ' . ($academicRegistration?->semester_mahasiswa ?? '-') }}">
                                         @error('class_id')
                                             <small class="text-danger">{{ $message }}</small>
                                         @enderror
                                     </div>
                                     <div class="form-group col-lg-6 col-12">
                                         <label for="class_id">Kelas</label>
-                                        <input type="text" name="class_id" id="class_id" class="form-control" placeholder="Nama Kelas..." readonly value="{{ Auth::guard('mahasiswa')->user()->kelas->code }}">
+                                        <input type="text" name="class_id" id="class_id" class="form-control" placeholder="Nama Kelas..." readonly value="{{ $academicClass?->code ?? '-' }}">
                                         @error('class_id')
                                             <small class="text-danger">{{ $message }}</small>
                                         @enderror

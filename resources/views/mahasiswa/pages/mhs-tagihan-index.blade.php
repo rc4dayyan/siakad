@@ -26,6 +26,7 @@
                         {{-- <a href="{{ route('web-admin.master.tagihan-index') }}" class="btn btn-outline-primary"><i class="fa-solid fa-plus"></i></a> --}}
                     </div>
                 </h5>
+                <small class="text-muted">Periode: {{ $period?->name ?? ($period ? $period->year_start.' / '.$period->year_end.' - '.$period->term_label : 'belum aktif') }}</small>
             </div>
             <div class="card-body">
                 <table class="table table-striped" id="table1">
@@ -45,7 +46,7 @@
                                 <td data-label="Number">{{ ++$key }}</td>
                                 <td data-label="Kode Tagihan"><span style="text-transform: uppercase">{{ $item->code }}</span></td>
                                 <td data-label="Nama Tagihan">{{ $item->name }}</td>
-                                <td data-label="Nominal Bayar">Rp. {{ number_format($item->price, 0, ',', '.') }}</td>
+                                <td data-label="Nominal Bayar">Rp. {{ number_format($item->nominal ?? $item->price, 0, ',', '.') }}</td>
                                 <td data-label="Status">
                                     @php
                                         $status = $history

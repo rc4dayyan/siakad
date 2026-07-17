@@ -2,26 +2,20 @@
 
 namespace App\Http\Controllers\Admin\Pages\Inventory;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-// SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\File;
-use Auth;
-use Hash;
-use Str;
-// SECTION ADDONS EXTERNAL
 use Alert;
 use App\Helper\roleTrait;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-// SECTION MODELS
+// SECTION ADDONS SYSTEM
+// SECTION ADDONS EXTERNAL
+use App\Http\Controllers\Controller;
 use App\Models\Gedung;
+// SECTION MODELS
 use App\Models\Ruang;
 use App\Models\Settings\webSettings;
+use Illuminate\Http\Request;
 
 class RuangController extends Controller
 {
-    use roleTrait; 
+    use roleTrait;
 
     public function index()
     {
@@ -39,6 +33,7 @@ class RuangController extends Controller
             'gedu_id' => 'required|integer',
             'type' => 'required|integer',
             'floor' => 'required|integer',
+            'kapasitas' => 'required|integer|min:1|max:1000',
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:5',
         ]);
@@ -47,11 +42,13 @@ class RuangController extends Controller
         $ruang->gedu_id = $request->gedu_id;
         $ruang->type = $request->type;
         $ruang->floor = $request->floor;
+        $ruang->kapasitas = $request->kapasitas;
         $ruang->name = $request->name;
         $ruang->code = $request->code;
         $ruang->save();
 
         Alert::success('success', 'Data telah berhasil disimpan');
+
         return back();
     }
 
@@ -61,6 +58,7 @@ class RuangController extends Controller
             'gedu_id' => 'required|integer',
             'type' => 'required|integer',
             'floor' => 'required|integer',
+            'kapasitas' => 'required|integer|min:1|max:1000',
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:5',
         ]);
@@ -69,11 +67,13 @@ class RuangController extends Controller
         $ruang->gedu_id = $request->gedu_id;
         $ruang->type = $request->type;
         $ruang->floor = $request->floor;
+        $ruang->kapasitas = $request->kapasitas;
         $ruang->name = $request->name;
         $ruang->code = $request->code;
         $ruang->save();
 
         Alert::success('success', 'Data telah berhasil diupdate');
+
         return back();
     }
 
@@ -84,6 +84,7 @@ class RuangController extends Controller
         $ruang->delete();
 
         Alert::success('success', 'Data telah berhasil dihapus');
+
         return back();
     }
 }

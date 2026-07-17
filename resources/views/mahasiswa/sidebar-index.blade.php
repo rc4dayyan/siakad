@@ -12,6 +12,12 @@
 </li> -->
 
 <li class="sidebar-title">Menu Akademik</li>
+<li class="sidebar-item {{ Route::is('mahasiswa.akademik.krs-*', request()->path()) ? 'active' : '' }}">
+    <a href="{{ route('mahasiswa.akademik.krs-index') }}" class='sidebar-link'>
+        <i class="fa-solid fa-file-signature"></i>
+        <span>Kartu Rencana Studi</span>
+    </a>
+</li>
 <li class="sidebar-item  {{ Route::is('mahasiswa.home-jadkul-*', request()->path()) ? 'active' : '' }}">
     <a href="{{ route('mahasiswa.home-jadkul-index') }}" class='sidebar-link'>
         <i class="fa-solid fa-calendar"></i>

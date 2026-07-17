@@ -54,6 +54,48 @@ class MasterMataKuliahTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('tahun_akademiks', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('code')->unique();
+            $table->integer('semester');
+            $table->integer('year_start');
+            $table->integer('year_end')->nullable();
+            $table->string('term')->nullable();
+            $table->date('starts_at')->nullable();
+            $table->date('ends_at')->nullable();
+            $table->boolean('is_active')->default(false);
+            $table->string('status')->default('draft');
+            $table->timestamp('activated_at')->nullable();
+            $table->unsignedBigInteger('activated_by')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('program_studis', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('code')->unique();
+            $table->timestamps();
+        });
+        Schema::create('kurikulums', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->timestamps();
+        });
+        Schema::create('dosens', function (Blueprint $table) {
+            $table->id();
+            $table->string('dsn_name');
+            $table->timestamps();
+        });
+
+        DB::table('tahun_akademiks')->insert([
+            'id' => 1, 'name' => '2026/2027 Ganjil', 'code' => '20261', 'semester' => 1,
+            'year_start' => 2026, 'year_end' => 2027, 'term' => 'ganjil', 'is_active' => 1,
+            'status' => 'active', 'activated_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('program_studis')->insert(['id' => 1, 'name' => 'PAI', 'code' => 'PAI', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('kurikulums')->insert(['id' => 1, 'name' => 'Kurikulum', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('dosens')->insert(['id' => 1, 'dsn_name' => 'Dosen', 'created_at' => now(), 'updated_at' => now()]);
+
         (require database_path('migrations/2026_07_17_000001_create_master_mata_kuliahs_table.php'))->up();
         (require database_path('migrations/2026_07_17_000002_add_mid_to_mata_kuliahs_table.php'))->up();
     }

@@ -1,179 +1,224 @@
 @extends('base.base-dash-index')
-@section('title')
-Data Master Tahun Akademik - Siakad By Internal Developer
-@endsection
-@section('menu')
-Data Master Tahun Akademik
-@endsection
-@section('submenu')
-Daftar Data Tahun Akademik
-@endsection
-@section('submenu0')
-Tambah Data Tahun Akademik
-@endsection
-@section('urlmenu')
-#
-@endsection
-@section('subdesc')
-Halaman untuk mengelola Data Tahun Akademik
-@endsection
-@section('content')
-<section class="section row">
 
+@section('title', 'Data Master Tahun Akademik - Siakad')
+@section('menu', 'Data Master Tahun Akademik')
+@section('submenu', 'Daftar Data Tahun Akademik')
+@section('submenu0', 'Tambah Data Tahun Akademik')
+@section('urlmenu', '#')
+@section('subdesc', 'Halaman untuk mengelola Data Tahun Akademik')
+
+@section('content')
+    <div class="mb-3"><a class="btn btn-outline-primary" href="{{ route($prefix.'period-opening.index') }}">Dashboard Pembukaan Periode</a></div>
+<section class="section row">
     <div class="col-lg-4 col-12">
-        <form action="{{ route($prefix.'master.taka-store') }}" method="POST" enctype="multipart/form-data">
+        <form action="{{ route($prefix.'master.taka-store') }}" method="POST">
             @csrf
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title">@yield('submenu0')</h5>
-                    <button type="submit" class="btn btn-outline-primary"><i class="fa-solid fa-paper-plane"></i></button>
+                    <button type="submit" class="btn btn-outline-primary" title="Simpan sebagai draft">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
                 </div>
                 <div class="card-body">
                     <div class="form-group">
-                        <label for="name">Nama Tahun Akademik</label>
-                        <input type="text" class="form-control" name="name" id="name" placeholder="Inputkan nama tahun akademik...">
-                        @error('name')
-                        <small class="text-danger">{{ $message }}</small>
-                        @enderror
+                        <label for="name">Nama Periode Akademik</label>
+                        <input type="text" class="form-control" name="name" id="name"
+                            value="{{ old('name') }}" placeholder="Contoh: Tahun Akademik 2026/2027 Ganjil">
+                        @error('name') <small class="text-danger">{{ $message }}</small> @enderror
                     </div>
                     <div class="form-group">
-                        <label for="code">Kode Fakultas ( 6 Angka )</label>
-                        <input type="text" class="form-control" name="code" id="code" placeholder="Inputkan kode tahun akademik..." maxlength="6" uppercase onkeydown="return /[a-zA-Z0-9]/i.test(event.key)">
-                        @error('code')
-                        <small class="text-danger">{{ $message }}</small>
-                        @enderror
+                        <label for="code">Kode Periode</label>
+                        <input type="text" class="form-control" name="code" id="code"
+                            value="{{ old('code') }}" placeholder="Contoh: 2026-GANJIL" maxlength="32">
+                        @error('code') <small class="text-danger">{{ $message }}</small> @enderror
                     </div>
                     <div class="form-group">
-                        <label for="semester">Semester Perkuliahan</label>
-                        <input type="text" class="form-control" name="semester" id="semester" placeholder="Inputkan kode tahun akademik...">
-                        @error('semester')
-                        <small class="text-danger">{{ $message }}</small>
-                        @enderror
+                        <label for="term">Jenis Periode</label>
+                        <select class="form-select" name="term" id="term">
+                            <option value="">Pilih jenis periode</option>
+                            @foreach ($terms as $term)
+                                <option value="{{ $term }}" @selected(old('term') === $term)>
+                                    {{ ucfirst($term) }}
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('term') <small class="text-danger">{{ $message }}</small> @enderror
+                    </div>
+                    <div class="row">
+                        <div class="form-group col-md-6">
+                            <label for="year_start">Tahun Mulai</label>
+                            <input type="number" class="form-control" name="year_start" id="year_start"
+                                min="2000" max="2100" value="{{ old('year_start', now()->year) }}">
+                            @error('year_start') <small class="text-danger">{{ $message }}</small> @enderror
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="year_end">Tahun Selesai</label>
+                            <input type="number" class="form-control" name="year_end" id="year_end"
+                                min="2000" max="2101" value="{{ old('year_end', now()->year + 1) }}">
+                            @error('year_end') <small class="text-danger">{{ $message }}</small> @enderror
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label for="year_start">Pilih Tahun Masuk</label>
-                        <input type="number" class="form-control" name="year_start" id="year_start" min="2000" max="2100" maxlength="4" value="{{ \Carbon\Carbon::now()->format('Y') }}" placeholder="Inputkan tahun masuk...">
-                        @error('year_start')
-                        <small class="text-danger">{{ $message }}</small>
-                        @enderror
+                        <label for="starts_at">Tanggal Mulai</label>
+                        <input type="date" class="form-control" name="starts_at" id="starts_at"
+                            value="{{ old('starts_at') }}">
+                        @error('starts_at') <small class="text-danger">{{ $message }}</small> @enderror
                     </div>
+                    <div class="form-group">
+                        <label for="ends_at">Tanggal Selesai</label>
+                        <input type="date" class="form-control" name="ends_at" id="ends_at"
+                            value="{{ old('ends_at') }}">
+                        @error('ends_at') <small class="text-danger">{{ $message }}</small> @enderror
+                    </div>
+                    <small class="text-muted">Periode baru disimpan sebagai draft dan harus diaktifkan secara terpisah.</small>
                 </div>
             </div>
         </form>
     </div>
+
     <div class="col-lg-8 col-12">
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title">@yield('submenu')</h5>
-
             </div>
             <div class="card-body">
-                <table class="table table-striped" id="table1">
-                    <thead>
-                        <th class="text-center">#</th>
-                        <th class="text-center">Nama Tahun Akademik</th>
-                        <th class="text-center">Kode Tahun Akademik</th>
-                        <th class="text-center">Semester Perkuliahan</th>
-                        <th class="text-center">Status</th>
-                        <th class="text-center">Button</th>
-                    </thead>
-                    <tbody>
-                        @foreach ($taka as $key => $item)
-                        <tr>
-                            <td data-label="Number">{{ ++$key }}</td>
-                            <td data-label="Tahun Akademik">{{ $item->name }}</td>
-                            <td data-label="Kode Tahun Akademik">{{ $item->code }}</td>
-                            <td data-label="Semester">{{ $item->semester }}</td>
-                            <td data-label="Status">@if($item->is_active === 0) Tidak Aktif @elseif($item->is_active === 1) Aktif @endif</td>
-                            <td class="d-flex justify-content-center align-items-center">
-                                <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#updateTaka{{ $item->code }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
-                                {{-- <a href="{{ route($prefix.'staffmanager-dosen-view', $item->code) }}" style="margin-right: 10px" class="btn btn-outline-info"><i class="fa-solid fa-eye"></i></a> --}}
-                                <form id="delete-form-{{ $item->code }}"
-                                    action="{{ route($prefix.'master.taka-destroy', $item->code) }}" method="POST">
-                                    @csrf
-                                    @method('DELETE')
-                                    <a type="button" class="bs-tooltip btn btn-rounded btn-outline-danger"
-                                        data-bs-toggle="tooltip" data-bs-placement="top" title="Delete"
-                                        data-original-title="Delete"
-                                        data-url="{{ route($prefix.'master.taka-destroy', $item->code) }}"
-                                        data-name="{{ $item->name }}"
-                                        onclick="deleteData('{{ $item->code }}')">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                </form>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                <div class="table-responsive">
+                    <table class="table table-striped" id="table1">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Periode</th>
+                                <th>Jenis</th>
+                                <th>Rentang</th>
+                                <th>Status</th>
+                                <th class="text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($taka as $key => $item)
+                                @php
+                                    $badge = match ($item->status) {
+                                        'active' => 'bg-success',
+                                        'closed' => 'bg-secondary',
+                                        'archived' => 'bg-dark',
+                                        default => 'bg-warning text-dark',
+                                    };
+                                @endphp
+                                <tr>
+                                    <td>{{ $key + 1 }}</td>
+                                    <td>
+                                        <strong>{{ $item->name }}</strong><br>
+                                        <small class="text-muted">{{ $item->code }}</small>
+                                    </td>
+                                    <td>{{ $item->term_label }}</td>
+                                    <td>
+                                        {{ $item->year_start }}–{{ $item->year_end ?? '?' }}<br>
+                                        <small class="text-muted">
+                                            {{ $item->starts_at?->format('d-m-Y') ?? '-' }} s.d.
+                                            {{ $item->ends_at?->format('d-m-Y') ?? '-' }}
+                                        </small>
+                                    </td>
+                                    <td><span class="badge {{ $badge }}">{{ $item->status_label }}</span></td>
+                                    <td>
+                                        <div class="d-flex justify-content-center gap-1">
+                                            @if ($item->status === 'draft')
+                                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                                    data-bs-toggle="modal" data-bs-target="#updateTaka{{ $item->id }}"
+                                                    title="Ubah periode">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <form action="{{ route($prefix.'master.taka-activate', $item->code) }}"
+                                                    method="POST" onsubmit="return confirm('Aktifkan periode ini? Periode aktif sebelumnya akan ditutup.')">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Aktifkan periode">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                </form>
+                                                <form action="{{ route($prefix.'master.taka-destroy', $item->code) }}"
+                                                    method="POST" onsubmit="return confirm('Hapus periode draft ini?')">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus periode">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <span class="text-muted small">Terkunci</span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="6" class="text-center text-muted">Belum ada periode akademik.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
-
 </section>
-<div class="me-1 mb-1 d-inline-block">
 
-    <!--Extra Large Modal -->
-    @foreach ($taka as $item)
-    <form action="{{ route($prefix.'master.taka-update', $item->code) }}" method="POST" enctype="multipart/form-data">
-        @method('patch')
+@foreach ($taka->where('status', 'draft') as $item)
+    <form action="{{ route($prefix.'master.taka-update', $item->code) }}" method="POST">
         @csrf
-        <div class="modal fade text-left w-100" id="updateTaka{{$item->code}}" tabindex="-1" role="dialog"
-            aria-labelledby="myModalLabel16" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-l"
-                role="document">
+        @method('PATCH')
+        <div class="modal fade" id="updateTaka{{ $item->id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h4 class="modal-title" id="myModalLabel16">Edit {{ $item->name }}</h4>
-                        <div class="">
-
-                            <button type="submit" class="btn btn-outline-primary">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal"
-                                aria-label="Close">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
+                        <h4 class="modal-title">Edit {{ $item->name }}</h4>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <div class="modal-body">
+                        <div class="form-group">
+                            <label for="name-{{ $item->id }}">Nama Periode Akademik</label>
+                            <input type="text" class="form-control" name="name" id="name-{{ $item->id }}" value="{{ $item->name }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="code-{{ $item->id }}">Kode Periode</label>
+                            <input type="text" class="form-control" name="code" id="code-{{ $item->id }}" value="{{ $item->code }}" maxlength="32">
+                        </div>
+                        <div class="form-group">
+                            <label for="term-{{ $item->id }}">Jenis Periode</label>
+                            <select class="form-select" name="term" id="term-{{ $item->id }}">
+                                @foreach ($terms as $term)
+                                    <option value="{{ $term }}" @selected($item->term === $term)>{{ ucfirst($term) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                         <div class="row">
-                            <div class="form-group">
-                                <label for="name">Nama Tahun Akademik</label>
-                                <input type="text" class="form-control" name="name" id="name" value="{{ $item->name }}" placeholder="Inputkan nama tahun akademik...">
-                                @error('name')
-                                <small class="text-danger">{{ $message }}</small>
-                                @enderror
+                            <div class="form-group col-md-6">
+                                <label for="year-start-{{ $item->id }}">Tahun Mulai</label>
+                                <input type="number" class="form-control" name="year_start" id="year-start-{{ $item->id }}"
+                                    min="2000" max="2100" value="{{ $item->year_start }}">
                             </div>
-                            <div class="form-group">
-                                <label for="code">Kode Fakultas ( 6 Angka )</label>
-                                <input type="text" class="form-control" name="code" id="code" placeholder="Inputkan kode tahun akademik..." value="{{ $item->code }}" maxlength="6" uppercase onkeydown="return /[a-zA-Z0-9]/i.test(event.key)">
-                                @error('code')
-                                <small class="text-danger">{{ $message }}</small>
-                                @enderror
-                            </div>
-                            <div class="form-group">
-                                <label for="semester">Semester Perkuliahan</label>
-                                <input type="text" class="form-control" name="semester" id="semester" placeholder="Inputkan kode tahun akademik..." value="{{ $item->raw_semester }}">
-                                @error('semester')
-                                <small class="text-danger">{{ $message }}</small>
-                                @enderror
-                            </div>
-                            <div class="form-group">
-                                <label for="year_start">Pilih Tahun Masuk</label>
-                                <input type="number" class="form-control" name="year_start" id="year_start" min="2000" max="2100" maxlength="4" value="{{ $item->year_start }}" placeholder="Inputkan tahun masuk...">
-                                @error('year_start')
-                                <small class="text-danger">{{ $message }}</small>
-                                @enderror
+                            <div class="form-group col-md-6">
+                                <label for="year-end-{{ $item->id }}">Tahun Selesai</label>
+                                <input type="number" class="form-control" name="year_end" id="year-end-{{ $item->id }}"
+                                    min="2000" max="2101" value="{{ $item->year_end }}">
                             </div>
                         </div>
+                        <div class="form-group">
+                            <label for="starts-at-{{ $item->id }}">Tanggal Mulai</label>
+                            <input type="date" class="form-control" name="starts_at" id="starts-at-{{ $item->id }}"
+                                value="{{ $item->starts_at?->format('Y-m-d') }}">
+                        </div>
+                        <div class="form-group">
+                            <label for="ends-at-{{ $item->id }}">Tanggal Selesai</label>
+                            <input type="date" class="form-control" name="ends_at" id="ends-at-{{ $item->id }}"
+                                value="{{ $item->ends_at?->format('Y-m-d') }}">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-outline-primary">Simpan</button>
                     </div>
                 </div>
             </div>
         </div>
     </form>
-    @endforeach
-</div>
-@endsection
-@section('custom-js')
+@endforeach
 @endsection

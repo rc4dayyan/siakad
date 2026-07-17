@@ -19,7 +19,9 @@ use App\Models\User;
 use App\Models\Dosen;
 use App\Models\Kelas;
 use App\Models\Mahasiswa;
+use App\Models\RegistrasiMahasiswa;
 use App\Models\Settings\webSettings;
+use App\Services\Academic\AcademicPeriodContext;
 
 class WorkersController extends Controller
 {
@@ -517,11 +519,19 @@ class WorkersController extends Controller
         return back();
     }
     // KHUSUS KELOLA DATA ROLE MAHASISWA
-    public function indexStudent()
+    public function indexStudent(AcademicPeriodContext $periodContext)
     {
         $data['prefix'] = $this->setPrefix();
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['student'] = Mahasiswa::all();
+        $data['academicPeriod'] = $periodContext->current(auth()->user());
+        $data['student'] = Mahasiswa::query()
+            ->with([
+                'kelas',
+                'registrasiAkademik' => fn ($query) => $query
+                    ->where('taka_id', $data['academicPeriod']?->id)
+                    ->with('kelas'),
+            ])
+            ->get();
         $data['kelas'] = Kelas::all();
 
         return view('user.admin.pages.workers-student-index', $data);
@@ -537,12 +547,43 @@ class WorkersController extends Controller
         return view('user.admin.pages.workers-student-create', $data);
 
     }
-    public function editStudent(Request $request, $code)
+    public function editStudent(Request $request, $code, AcademicPeriodContext $periodContext)
     {
         $data['prefix'] = $this->setPrefix();
         $data['web'] = webSettings::where('id', 1)->first();
         $data['kelas'] = Kelas::all();
-        $data['student'] = Mahasiswa::where('mhs_code', $code)->first();
+        $data['student'] = Mahasiswa::where('mhs_code', $code)->firstOrFail();
+        $data['academicPeriod'] = $periodContext->current($request->user());
+        $data['registration'] = $data['academicPeriod']
+            ? RegistrasiMahasiswa::query()
+                ->where('mahasiswa_id', $data['student']->id)
+                ->where('taka_id', $data['academicPeriod']->id)
+                ->with(['riwayatStatus.changedBy'])
+                ->first()
+            : null;
+        $data['academicStatusTransitions'] = $data['registration']
+            ? $data['registration']->allowedAcademicStatusTransitions()
+            : [];
+        $data['academicPeriodClasses'] = $data['academicPeriod']
+            ? Kelas::query()->forAcademicPeriod($data['academicPeriod'])->orderBy('name')->get()
+            : collect();
+        $data['academicAdvisors'] = Dosen::query()
+            ->where('dsn_stat', 1)
+            ->orderBy('dsn_name')
+            ->get();
+        $data['registrationHistory'] = RegistrasiMahasiswa::query()
+            ->where('mahasiswa_id', $data['student']->id)
+            ->with(['taka', 'kelas', 'dosenWali'])
+            ->get()
+            ->sortByDesc(fn (RegistrasiMahasiswa $registration) => [
+                $registration->taka?->starts_at?->timestamp ?? 0,
+                $registration->id,
+            ]);
+        $data['latestRegistration'] = $data['registrationHistory']->first();
+        $data['suggestedSemester'] = min(
+            14,
+            max(1, ((int) ($data['latestRegistration']?->semester_mahasiswa ?? 0)) + 1)
+        );
 
         return view('user.admin.pages.workers-student-edit', $data);
 

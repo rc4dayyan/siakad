@@ -26,4 +26,9 @@ class Dosen extends Authenticatable
     {
         return $this->attributes['dsn_stat'];
     }
+
+    public function mahasiswaWaliRegistrations()
+    {
+        return $this->hasMany(RegistrasiMahasiswa::class, 'dosen_wali_id');
+    }
 }

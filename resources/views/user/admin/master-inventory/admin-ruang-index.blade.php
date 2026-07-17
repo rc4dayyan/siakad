@@ -63,6 +63,11 @@
                         @enderror
                     </div>
                     <div class="form-group">
+                        <label for="kapasitas">Kapasitas Ruangan</label>
+                        <input type="number" min="1" max="1000" class="form-control" name="kapasitas" id="kapasitas" value="40" required>
+                        @error('kapasitas')<small class="text-danger">{{ $message }}</small>@enderror
+                    </div>
+                    <div class="form-group">
                         <label for="name">Nama Ruangan</label>
                         <input type="text" class="form-control" name="name" id="name" placeholder="Inputkan nama ruangan...">
                         @error('name')
@@ -96,6 +101,7 @@
                         <th class="text-center">Nama Gedung</th>
                         <th class="text-center">Nama Ruangan</th>
                         <th class="text-center">Kode Ruangan</th>
+                        <th class="text-center">Kapasitas</th>
                         <th class="text-center">Button</th>
                     </thead>
                     <tbody>
@@ -105,6 +111,7 @@
                                 <td data-label="Nama Gedung">{{ $item->gedung->name . ' - Lantai ' . $item->floor }}</td>
                                 <td data-label="Nama Ruang">{{ $item->type . ' - ' .$item->name }}</td>
                                 <td data-label="Kode Ruang">{{ $item->code }}</td>
+                                <td data-label="Kapasitas">{{ $item->kapasitas }}</td>
                                 <td class="d-flex justify-content-center align-items-center">
                                     <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#updateRuang{{ $item->code }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
                                     {{-- <a href="{{ route($prefix.'staffmanager-dosen-view', $item->code) }}"  style="margin-right: 10px" class="btn btn-outline-info"><i class="fa-solid fa-eye"></i></a> --}}
@@ -221,6 +228,10 @@
                                 @error('floor')
                                     <small class="text-danger">{{ $message }}</small>
                                 @enderror
+                            </div>
+                            <div class="form-group">
+                                <label for="kapasitas-{{ $item->id }}">Kapasitas Ruangan</label>
+                                <input type="number" min="1" max="1000" class="form-control" name="kapasitas" id="kapasitas-{{ $item->id }}" value="{{ $item->kapasitas }}" required>
                             </div>
                             <div class="form-group">
                                 <label for="name">Nama Ruangan</label>

@@ -2,132 +2,145 @@
 
 namespace App\Http\Controllers\Admin\Pages\Core;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-// SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\File;
-use Auth;
-use Hash;
-use Str;
-// SECTION ADDONS EXTERNAL
 use Alert;
 use App\Helper\roleTrait;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-// SECTION MODELS
-use App\Models\Kelas;
+use App\Http\Controllers\Controller;
 use App\Models\Dosen;
-use App\Models\TahunAkademik;
-use App\Models\ProgramStudi;
-use App\Models\ProgramKuliah;
+use App\Models\Kelas;
 use App\Models\Mahasiswa;
+use App\Models\ProgramKuliah;
+use App\Models\ProgramStudi;
 use App\Models\Settings\webSettings;
+use App\Services\Academic\AcademicPeriodContext;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 
 class KelasController extends Controller
 {
     use roleTrait;
 
-    public function index()
+    public function index(AcademicPeriodContext $context): View
     {
-        $data['web'] = webSettings::where('id', 1)->first();
-        $data['prefix'] = $this->setPrefix();
-        $data['kelas'] = Kelas::all();
-        $data['taka'] = TahunAkademik::all();
-        $data['pstudi'] = ProgramStudi::all();
-        $data['proku'] = ProgramKuliah::all();
-        $data['dosen'] = Dosen::all();
+        $period = $context->current(auth()->user());
 
-        return view('user.admin.master.admin-kelas-index', $data);
-    }
-    public function viewMahasiswa($code)
-    {
-        $data['web'] = webSettings::where('id', 1)->first();
-        $data['prefix'] = $this->setPrefix();
-        $class = Kelas::where('code', $code)->first();
-        $data['kelas'] = Kelas::where('code', $code)->first();
-        $data['taka'] = TahunAkademik::all();
-        $data['mahasiswa'] = Mahasiswa::where('class_id', $class->id)->get();
-        $data['pstudi'] = ProgramStudi::all();
-        $data['proku'] = ProgramKuliah::all();
-        $data['dosen'] = Dosen::all();
-
-        // dd($data['mahasiswa']);
-
-        return view('user.admin.master.admin-kelas-view-mahasiswa', $data);
-    }
-    public function cetakMahasiswa($code)
-    {
-        $data['web'] = webSettings::where('id', 1)->first();
-        $data['prefix'] = $this->setPrefix();
-        $class = Kelas::where('code', $code)->first();
-        $data['kelas'] = Kelas::where('code', $code)->first();
-        $data['mahasiswa'] = Mahasiswa::where('class_id', $class->id)->get();
-
-        return view('base.cetak.cetak-data-kehadiran', $data);
-        // $pdf = PDF::loadView('base.cetak.cetak-data-kehadiran', $data);
-       
-        return $pdf->download('Daftar-Absen-'.$jadwal->matkul->name.'-'.$jadwal->pert_id.'-'.$request->kode_kelas.'.pdf');
+        return view('user.admin.master.admin-kelas-index', [
+            'web' => webSettings::where('id', 1)->first(),
+            'prefix' => $this->setPrefix(),
+            'selectedPeriod' => $period,
+            'canManageClasses' => $period?->isWritable() ?? false,
+            'kelas' => Kelas::query()
+                ->forAcademicPeriod($period)
+                ->with(['taka', 'pstudi', 'proku', 'dosen'])
+                ->withCount(['registrasiMahasiswas as mahasiswas_count' => fn ($query) => $query->where('taka_id', $period?->id)])
+                ->orderBy('name')
+                ->get(),
+            'pstudi' => ProgramStudi::query()->orderBy('name')->get(),
+            'proku' => ProgramKuliah::query()
+                ->when($period, fn ($query) => $query->where('taka_id', $period->id))
+                ->when(! $period, fn ($query) => $query->whereRaw('1 = 0'))
+                ->orderBy('name')
+                ->get(),
+            'dosen' => Dosen::query()->orderBy('dsn_name')->get(),
+        ]);
     }
 
-    public function store(Request $request)
+    public function viewMahasiswa(string $code, AcademicPeriodContext $context): View
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'code' => 'required|string|max:255',
-            'taka_id' => 'required|integer',
-            'dosen_id' => 'required|integer',
-            'proku_id' => 'required|integer',
-            'capacity' => 'required|integer',
-            'pstudi_id' => 'required|integer',
+        $period = $context->requireCurrent(auth()->user());
+        $kelas = Kelas::query()
+            ->forAcademicPeriod($period)
+            ->where('code', $code)
+            ->firstOrFail();
+
+        return view('user.admin.master.admin-kelas-view-mahasiswa', [
+            'web' => webSettings::where('id', 1)->first(),
+            'prefix' => $this->setPrefix(),
+            'kelas' => $kelas,
+            'mahasiswa' => Mahasiswa::query()->forAcademicClass($period, $kelas->id)->get(),
+        ]);
+    }
+
+    public function cetakMahasiswa(string $code, AcademicPeriodContext $context): View
+    {
+        $period = $context->requireCurrent(auth()->user());
+        $kelas = Kelas::query()
+            ->forAcademicPeriod($period)
+            ->where('code', $code)
+            ->firstOrFail();
+
+        return view('base.cetak.cetak-data-kehadiran', [
+            'web' => webSettings::where('id', 1)->first(),
+            'prefix' => $this->setPrefix(),
+            'kelas' => $kelas,
+            'mahasiswa' => Mahasiswa::query()->forAcademicClass($period, $kelas->id)->get(),
+        ]);
+    }
+
+    public function store(Request $request, AcademicPeriodContext $context): RedirectResponse
+    {
+        $period = $context->requireWritableCurrent($request->user());
+        $validated = $this->validateKelas($request, $period->id);
+
+        Kelas::create([
+            ...$validated,
+            'taka_id' => $period->id,
         ]);
 
-        $kelas = new Kelas;
-        $kelas->name = $request->name;
-        $kelas->code = $request->code;
-        $kelas->taka_id = $request->taka_id;
-        $kelas->dosen_id = $request->dosen_id;
-        $kelas->proku_id = $request->proku_id;
-        $kelas->capacity = $request->capacity;
-        $kelas->pstudi_id = $request->pstudi_id;
-        $kelas->save();
+        Alert::success('Berhasil', 'Data kelas berhasil disimpan.');
 
-        Alert::success('success', 'Data telah berhasil disimpan');
         return back();
     }
 
-    public function update(Request $request, $code)
+    public function update(Request $request, string $code, AcademicPeriodContext $context): RedirectResponse
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'code' => 'required|string|max:255',
-            'taka_id' => 'required|integer',
-            'dosen_id' => 'required|integer',
-            'proku_id' => 'required|integer',
-            'capacity' => 'required|integer',
-            'pstudi_id' => 'required|integer',
-        ]);
+        $period = $context->requireWritableCurrent($request->user());
+        $kelas = Kelas::query()
+            ->forAcademicPeriod($period)
+            ->where('code', $code)
+            ->firstOrFail();
+        $validated = $this->validateKelas($request, $period->id, $kelas);
 
-        $kelas = Kelas::where('code', $code)->first();
-        $kelas->name = $request->name;
-        $kelas->code = $request->code;
-        $kelas->taka_id = $request->taka_id;
-        $kelas->dosen_id = $request->dosen_id;
-        $kelas->proku_id = $request->proku_id;
-        $kelas->capacity = $request->capacity;
-        $kelas->pstudi_id = $request->pstudi_id;
-        $kelas->save();
+        $kelas->update($validated);
 
-        Alert::success('success', 'Data telah berhasil diupdate');
+        Alert::success('Berhasil', 'Data kelas berhasil diperbarui.');
+
         return back();
     }
 
-    public function destroy(Request $request, $code)
+    public function destroy(string $code, AcademicPeriodContext $context): RedirectResponse
     {
+        $period = $context->requireWritableCurrent(auth()->user());
+        $kelas = Kelas::query()
+            ->forAcademicPeriod($period)
+            ->where('code', $code)
+            ->firstOrFail();
 
-        $kelas = Kelas::where('code', $code)->first();
         $kelas->delete();
 
-        Alert::success('success', 'Data telah berhasil dihapus');
+        Alert::success('Berhasil', 'Data kelas berhasil dihapus.');
+
         return back();
+    }
+
+    private function validateKelas(Request $request, int $periodId, ?Kelas $kelas = null): array
+    {
+        return $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'code' => ['required', 'string', 'max:32', Rule::unique('kelas', 'code')->ignore($kelas?->id)],
+            'capacity' => ['required', 'integer', 'between:1,35'],
+            'pstudi_id' => ['required', 'integer', 'exists:program_studis,id'],
+            'proku_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('program_kuliahs', 'id')->where(fn ($query) => $query
+                    ->where('taka_id', $periodId)
+                    ->where('pstudi_id', $request->integer('pstudi_id'))),
+            ],
+            'dosen_id' => ['nullable', 'integer', 'exists:dosens,id'],
+        ], [
+            'proku_id.exists' => 'Program kuliah tidak tersedia pada periode dan program studi yang dipilih.',
+        ]);
     }
 }

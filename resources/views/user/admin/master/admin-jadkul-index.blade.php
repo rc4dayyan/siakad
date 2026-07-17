@@ -22,11 +22,20 @@ Halaman untuk mengelola Jadwal Kuliah
     <div class="card">
         <div class="card-header">
             <h5 class="card-title d-flex justify-content-between align-items-center">
-                @yield('submenu')
+                <span>@yield('submenu') <small class="text-muted">— {{ $selectedPeriod?->name ?? 'Periode belum dipilih' }}</small></span>
                 <div class="">
-                    <a href="{{ route($prefix.'master.jadkul-create') }}" class="btn btn-outline-primary"><i class="fa-solid fa-plus"></i></a>
-                    <a href="{{ route($prefix.'services.convert.export-jadkul') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
-                    <a href="#" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importJadwalKuliah"><i class="fa-solid fa-file-import"></i></a>
+                    @if (Route::has($prefix.'master.jadwal-mingguan-index'))
+                        <a href="{{ route($prefix.'master.jadwal-mingguan-index') }}" class="btn btn-outline-dark">Jadwal Mingguan</a>
+                    @endif
+                    @if ($canManageJadwal)
+                        <a href="{{ route($prefix.'master.jadkul-create') }}" class="btn btn-outline-primary"><i class="fa-solid fa-plus"></i></a>
+                        <a href="#" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importJadwalKuliah"><i class="fa-solid fa-file-import"></i></a>
+                    @elseif ($selectedPeriod)
+                        <span class="badge bg-secondary">Mode hanya baca</span>
+                    @endif
+                    @if ($selectedPeriod)
+                        <a href="{{ route($prefix.'services.convert.export-jadkul') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
+                    @endif
                 </div>
             </h5>
         </div>
@@ -46,7 +55,7 @@ Halaman untuk mengelola Jadwal Kuliah
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($jadkul as $key => $item)
+                    @forelse ($jadkul as $key => $item)
 
                     <tr>
                         <td data-label="Number">{{ ++$key }}</td>
@@ -59,8 +68,11 @@ Halaman untuk mengelola Jadwal Kuliah
                         <td data-label="Waktu Perkuliahan">{{ $item->start }} <br> - <br> {{ $item->ended }}</td>
                         <td>
                             <div class="d-flex justify-content-center align-items-center w-100" style="padding: 10px;">
+                                @if ($canManageJadwal)
                                 <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#updateJadkul{{ $item->code }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
+                                @endif
                                 <a href="{{ route($prefix.'master.jadkul-absen-view', $item->code) }}" style="margin-right: 10px" class="btn btn-outline-info"><i class="fa-solid fa-user-check"></i></a>
+                                @if ($canManageJadwal)
                                 <form id="delete-form-{{ $item->code }}"
                                     action="{{ route($prefix.'master.jadkul-destroy', $item->code) }}" method="POST">
                                     @csrf
@@ -74,11 +86,14 @@ Halaman untuk mengelola Jadwal Kuliah
                                         <i class="fas fa-trash"></i>
                                     </a>
                                 </form>
+                                @endif
                             </div>
 
                         </td>
                     </tr>
-                    @endforeach
+                    @empty
+                    <tr><td colspan="9" class="text-center text-muted">Belum ada jadwal pada periode ini.</td></tr>
+                    @endforelse
 
                 </tbody>
             </table>
@@ -86,6 +101,7 @@ Halaman untuk mengelola Jadwal Kuliah
     </div>
 
 </section>
+@if ($canManageJadwal)
 <div class="me-1 mb-1 d-inline-block">
     <form action="{{ route($prefix.'services.convert.import-jadkul') }}" method="POST" enctype="multipart/form-data">
         @csrf
@@ -290,6 +306,7 @@ Halaman untuk mengelola Jadwal Kuliah
     </form>
     @endforeach
 </div>
+@endif
 @endsection
 @section('custom-js')
 

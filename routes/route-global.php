@@ -8,6 +8,18 @@ use Illuminate\Support\Facades\Route;
     Route::get('/home',[App\Http\Controllers\Admin\HomeController::class, 'index'])->name('home-index');
     Route::get('/home/ajax/GetMhsGender',[App\Http\Controllers\Admin\HomeController::class, 'getMhsGender'])->name('home.ajax-mhs-gender');
     Route::get('/profile',[App\Http\Controllers\Admin\HomeController::class, 'profile'])->name('home-profile');
+    Route::patch('/academic-period/select',[App\Http\Controllers\Admin\AcademicPeriodContextController::class, 'update'])->name('academic-period.select');
+    Route::middleware('academic-workflow-role:0,1,3,4')->group(function (): void {
+        Route::get('/period-opening', [App\Http\Controllers\Admin\PeriodOpeningController::class, 'index'])->name('period-opening.index');
+        Route::post('/period-opening/inspect', [App\Http\Controllers\Admin\PeriodOpeningController::class, 'inspect'])->name('period-opening.inspect');
+    });
+    Route::middleware('academic-workflow-role:0')->group(function (): void {
+        Route::post('/period-opening/publish', [App\Http\Controllers\Admin\PeriodOpeningController::class, 'publish'])->name('period-opening.publish');
+    });
+    Route::middleware('academic-workflow-role:0,3')->group(function (): void {
+        Route::post('/period-opening/copy/preview', [App\Http\Controllers\Admin\PeriodOpeningController::class, 'copyPreview'])->name('period-opening.copy-preview');
+        Route::post('/period-opening/copy/execute', [App\Http\Controllers\Admin\PeriodOpeningController::class, 'copyExecute'])->name('period-opening.copy-execute');
+    });
     Route::get('/absen-harian',[App\Http\Controllers\Admin\PresensiController::class, 'absenHarian'])->name('presensi.absen-harian');
     Route::get('/absen-izin-cuti',[App\Http\Controllers\Admin\PresensiController::class, 'absenIzinCuti'])->name('presensi.absen-izin-cuti');
     Route::get('/absen-harian/view/{code}',[App\Http\Controllers\Admin\PresensiController::class, 'absenView'])->name('presensi.absen-harian-view');

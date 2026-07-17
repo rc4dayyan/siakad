@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
+use App\Services\Academic\AcademicPeriodContext;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,5 +24,20 @@ class AppServiceProvider extends ServiceProvider
     {
         Carbon::setLocale('id');
         date_default_timezone_set('Asia/Jakarta');
+
+        View::composer('base.panel.base-panel-header', function ($view): void {
+            if (! auth()->check()) {
+                return;
+            }
+
+            $context = app(AcademicPeriodContext::class);
+            $user = auth()->user();
+
+            $view->with([
+                'academicPeriods' => $context->availableFor($user),
+                'selectedAcademicPeriod' => $context->current($user),
+                'activeAcademicPeriod' => $context->active(),
+            ]);
+        });
     }
 }

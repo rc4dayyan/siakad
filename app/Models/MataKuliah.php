@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -10,6 +11,15 @@ class MataKuliah extends Model
     use HasFactory;
 
     protected $guarded = [];
+
+    public function scopeForAcademicPeriod(Builder $query, TahunAkademik|int|null $period): Builder
+    {
+        $periodId = $period instanceof TahunAkademik ? $period->getKey() : $period;
+
+        return $periodId
+            ? $query->where('taka_id', $periodId)
+            : $query->whereRaw('1 = 0');
+    }
 
     public function masterMataKuliah()
     {
@@ -59,5 +69,10 @@ class MataKuliah extends Model
     public function nilais()
     {
         return $this->hasMany(NilaiMahasiswa::class);
+    }
+
+    public function penawaran()
+    {
+        return $this->hasOne(PenawaranMataKuliah::class, 'legacy_mata_kuliah_id');
     }
 }

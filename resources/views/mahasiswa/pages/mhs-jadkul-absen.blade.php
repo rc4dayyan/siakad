@@ -153,7 +153,7 @@ table th {
           </div>
           <div class="form-group col-lg-3 col-12">
             <label for="author_class">Kelas Mahasiswa</label>
-            <input type="text" name="author_class" id="author_class" value="{{ Auth::guard('mahasiswa')->user()->kelas->name }}" readonly class="form-control" placeholder="inputkan id mahasiswa...">
+            <input type="text" name="author_class" id="author_class" value="{{ $academicClass?->name ?? '-' }}" readonly class="form-control" placeholder="inputkan id mahasiswa...">
             @error('author_class')
               <small class="text-danger">{{ $message }}</small>
             @enderror

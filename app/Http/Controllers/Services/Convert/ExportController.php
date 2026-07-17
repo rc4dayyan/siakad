@@ -3,25 +3,17 @@
 namespace App\Http\Controllers\Services\Convert;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 // SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\File;
-use Auth;
-use Hash;
-use Str;
-use Carbon\Carbon;
 // SECTION ADDONS EXTERNAL
-use Alert;
-use Rap2hpoutre\FastExcel\FastExcel;
+use App\Models\Gedung;
 // SECTION MODELS
-use App\Models\User;
-use App\Models\Mahasiswa;
-use App\Models\Dosen;
+use App\Models\JadwalKuliah;
 use App\Models\Kelas;
 use App\Models\MataKuliah;
-use App\Models\JadwalKuliah;
-use App\Models\Gedung;
 use App\Models\Ruang;
+use App\Models\User;
+use App\Services\Academic\AcademicPeriodContext;
+use Rap2hpoutre\FastExcel\FastExcel;
 
 class ExportController extends Controller
 {
@@ -48,35 +40,37 @@ class ExportController extends Controller
 
     }
 
-    public function exportStudent()
+    public function exportStudent(AcademicPeriodContext $context)
     {
-        $users = Mahasiswa::all();
+        $period = $context->requireCurrent(auth()->user());
+        $registrations = \App\Models\RegistrasiMahasiswa::query()
+            ->forAcademicPeriod($period)->with(['mahasiswa', 'kelas', 'taka'])->get();
 
-        (new FastExcel($users))->export('export-student-'.uniqid().'.csv', function ($user) {
+        return (new FastExcel($registrations))->download('export-student-'.$period->code.'-'.uniqid().'.csv', function ($registration) {
             return [
-                'NIM' => $user->mhs_nim,
-                'Email' => $user->mhs_mail,
-                'Phone' => $user->mhs_phone,
-                'FullName' => $user->mhs_name,
-                'Gender' => $user->mhs_gend,
-                'Religion' => $user->raw_mhs_reli,
-                'BirthPlace' => $user->mhs_birthplace,
-                'BirthDate' => $user->mhs_birthdate,
-                'TypeUser' => $user->raw_mhs_stat,
-                'YearsID' => $user->years_id,
-                'ClassID' => $user->class_id,
+                'Kode Tahun Akademik' => $registration->taka?->code,
+                'NIM' => $registration->mahasiswa?->mhs_nim,
+                'Email' => $registration->mahasiswa?->mhs_mail,
+                'Telepon' => $registration->mahasiswa?->mhs_phone,
+                'Nama' => $registration->mahasiswa?->mhs_name,
+                'Kode Kelas' => $registration->kelas?->code,
+                'Semester Mahasiswa' => $registration->semester_mahasiswa,
+                'Status Akademik' => $registration->status_akademik,
+                'Status Registrasi' => $registration->status_registrasi,
+                'Batas SKS' => $registration->batas_sks,
             ];
         });
-
-        return (new FastExcel($users))->download('export-student-'.uniqid().'.csv');
-
     }
 
-    public function exportKelas()
+    public function exportKelas(AcademicPeriodContext $context)
     {
-        $kelas = Kelas::with(['taka', 'pstudi', 'proku', 'dosen'])->get();
+        $period = $context->requireCurrent(auth()->user());
+        $kelas = Kelas::query()
+            ->forAcademicPeriod($period)
+            ->with(['taka', 'pstudi', 'proku', 'dosen'])
+            ->get();
 
-        return (new FastExcel($kelas))->download('export-kelas-'.uniqid().'.csv', function (Kelas $item) {
+        return (new FastExcel($kelas))->download('export-kelas-'.$period->code.'-'.uniqid().'.csv', function (Kelas $item) {
             return [
                 'Kode Kelas' => $item->code,
                 'Nama Kelas' => $item->name,
@@ -89,19 +83,22 @@ class ExportController extends Controller
         });
     }
 
-    public function exportMataKuliah()
+    public function exportMataKuliah(AcademicPeriodContext $context)
     {
-        $mataKuliah = MataKuliah::with([
-            'kuri',
-            'taka',
-            'pstudi',
-            'requ',
-            'dosen1',
-            'dosen2',
-            'dosen3',
-        ])->get();
+        $period = $context->requireCurrent(auth()->user());
+        $mataKuliah = MataKuliah::query()
+            ->forAcademicPeriod($period)
+            ->with([
+                'kuri',
+                'taka',
+                'pstudi',
+                'requ',
+                'dosen1',
+                'dosen2',
+                'dosen3',
+            ])->get();
 
-        return (new FastExcel($mataKuliah))->download('export-mata-kuliah-'.uniqid().'.csv', function (MataKuliah $item) {
+        return (new FastExcel($mataKuliah))->download('export-mata-kuliah-'.$period->code.'-'.uniqid().'.csv', function (MataKuliah $item) {
             return [
                 'Kode' => $item->code,
                 'Nama' => $item->name,
@@ -118,12 +115,17 @@ class ExportController extends Controller
         });
     }
 
-    public function exportJadwalKuliah()
+    public function exportJadwalKuliah(AcademicPeriodContext $context)
     {
-        $jadwalKuliah = JadwalKuliah::with(['matkul', 'kelas', 'dosen', 'ruang'])->get();
+        $period = $context->requireCurrent(auth()->user());
+        $jadwalKuliah = JadwalKuliah::query()
+            ->forAcademicPeriod($period)
+            ->with(['matkul', 'kelas', 'dosen', 'ruang'])
+            ->get();
 
-        return (new FastExcel($jadwalKuliah))->download('export-jadwal-kuliah-'.uniqid().'.csv', function (JadwalKuliah $item) {
+        return (new FastExcel($jadwalKuliah))->download('export-jadwal-kuliah-'.$period->code.'-'.uniqid().'.csv', function (JadwalKuliah $item) use ($period) {
             return [
+                'Kode Tahun Akademik' => $period->code,
                 'Kode Jadwal' => $item->code,
                 'Kode Mata Kuliah' => $item->matkul?->code,
                 'Kode Kelas' => $item->kelas?->code,

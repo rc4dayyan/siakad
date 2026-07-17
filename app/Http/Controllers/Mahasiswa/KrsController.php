@@ -1,0 +1,83 @@
+<?php
+
+namespace App\Http\Controllers\Mahasiswa;
+
+use App\Http\Controllers\Controller;
+use App\Models\PenawaranMataKuliah;
+use App\Services\Academic\AcademicPeriodContext;
+use App\Services\Academic\KrsService;
+use App\Services\Academic\StudentAcademicContext;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
+
+class KrsController extends Controller
+{
+    public function index(StudentAcademicContext $context, KrsService $service): View
+    {
+        $student = Auth::guard('mahasiswa')->user();
+        $period = app(AcademicPeriodContext::class)->published();
+        $registration = $context->registrationFor($student, $period);
+        $krs = $registration ? $service->forRegistration($registration)->load('items.penawaranMataKuliah.masterMataKuliah') : null;
+
+        return view('mahasiswa.pages.krs-index', [
+            'period' => $period,
+            'registration' => $registration,
+            'krs' => $krs,
+            'offerings' => $registration ? PenawaranMataKuliah::query()
+                ->forAcademicPeriod($period)
+                ->where('pstudi_id', $registration->kelas?->pstudi_id)
+                ->where('kelas_id', $registration->kelas_id)
+                ->with(['masterMataKuliah', 'kelas', 'dosenUtama', 'prasyaratMaster'])
+                ->orderBy('code')->get() : collect(),
+        ]);
+    }
+
+    public function add(PenawaranMataKuliah $penawaran, StudentAcademicContext $context, KrsService $service): RedirectResponse
+    {
+        $krs = $this->currentKrs($context, $service);
+        $service->add($krs, $penawaran);
+
+        return back()->with('success', 'Mata kuliah berhasil ditambahkan ke draft KRS.');
+    }
+
+    public function remove(int $item, StudentAcademicContext $context, KrsService $service): RedirectResponse
+    {
+        $service->remove($this->currentKrs($context, $service), $item);
+
+        return back()->with('success', 'Mata kuliah berhasil dihapus dari draft KRS.');
+    }
+
+    public function submit(Request $request, StudentAcademicContext $context, KrsService $service): RedirectResponse
+    {
+        $data = $request->validate(['catatan_mahasiswa' => ['nullable', 'string', 'max:2000']]);
+        $service->submit($this->currentKrs($context, $service), $data['catatan_mahasiswa'] ?? null);
+
+        return back()->with('success', 'KRS berhasil diajukan kepada dosen wali.');
+    }
+
+    public function print(StudentAcademicContext $context, KrsService $service): View
+    {
+        $krs = $this->currentKrs($context, $service)->load([
+            'registrasiMahasiswa.mahasiswa', 'registrasiMahasiswa.taka', 'registrasiMahasiswa.kelas',
+            'registrasiMahasiswa.dosenWali', 'items.penawaranMataKuliah.masterMataKuliah',
+            'items.penawaranMataKuliah.dosenUtama',
+        ]);
+
+        return view('base.cetak.cetak-krs', compact('krs'));
+    }
+
+    private function currentKrs(StudentAcademicContext $context, KrsService $service)
+    {
+        $student = Auth::guard('mahasiswa')->user();
+        $period = app(AcademicPeriodContext::class)->published();
+        $registration = $context->registrationFor($student, $period);
+        if (! $registration) {
+            throw ValidationException::withMessages(['krs' => 'Registrasi mahasiswa untuk periode aktif belum tersedia.']);
+        }
+
+        return $service->forRegistration($registration);
+    }
+}

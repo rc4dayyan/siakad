@@ -11,6 +11,11 @@ class Ruang extends Model
 
     protected $guarded = [];
 
+    protected function casts(): array
+    {
+        return ['kapasitas' => 'integer'];
+    }
+
     public function getTypeAttribute($value)
     {
         $types = [
@@ -32,5 +37,10 @@ class Ruang extends Model
     public function gedung()
     {
         return $this->belongsTo(Gedung::class, 'gedu_id');
+    }
+
+    public function jadwalMingguans()
+    {
+        return $this->hasMany(JadwalMingguan::class);
     }
 }

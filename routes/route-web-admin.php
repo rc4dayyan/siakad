@@ -37,10 +37,15 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::delete('/workers/data-dosen/{code}/destroy',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'destroyLecture'])->name('workers.lecture-destroy');
         // MENU KHUSUS DATA PENGGUNA => DATA MAHASISWA
         Route::get('/workers/data-mahasiswa',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'indexStudent'])->name('workers.student-index');
+        Route::get('/workers/kenaikan-semester',[App\Http\Controllers\Admin\SemesterPromotionController::class, 'index'])->name('workers.student-promotion-index');
+        Route::post('/workers/kenaikan-semester/preview',[App\Http\Controllers\Admin\SemesterPromotionController::class, 'preview'])->name('workers.student-promotion-preview');
+        Route::post('/workers/kenaikan-semester/execute',[App\Http\Controllers\Admin\SemesterPromotionController::class, 'execute'])->name('workers.student-promotion-execute');
         Route::get('/workers/data-mahasiswa/create',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'createStudent'])->name('workers.student-create');
         Route::get('/workers/data-mahasiswa/{code}/edit',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'editStudent'])->name('workers.student-edit');
         Route::post('/workers/data-mahasiswa/store',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'storeStudent'])->name('workers.student-store');
+        Route::post('/workers/data-mahasiswa/{code}/registrasi',[App\Http\Controllers\Admin\StudentRegistrationController::class, 'store'])->name('workers.student-registration-store');
         Route::patch('/workers/data-mahasiswa/{code}/update',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'updateStudent'])->name('workers.student-update');
+        Route::patch('/workers/data-mahasiswa/{code}/status-akademik',[App\Http\Controllers\Admin\AcademicStatusController::class, 'update'])->name('workers.student-academic-status-update');
         Route::delete('/workers/data-mahasiswa/{code}/destroy',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'destroyStudent'])->name('workers.student-destroy');
 
         // MENU KHUSUS DATA MASTER => DATA FAKULTAS
@@ -57,6 +62,7 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::get('/master/data-taka',[App\Http\Controllers\Admin\Pages\Core\TahunAkademikController::class, 'index'])->name('master.taka-index');
         Route::post('/master/data-taka/store',[App\Http\Controllers\Admin\Pages\Core\TahunAkademikController::class, 'store'])->name('master.taka-store');
         Route::patch('/master/data-taka/{code}/update',[App\Http\Controllers\Admin\Pages\Core\TahunAkademikController::class, 'update'])->name('master.taka-update');
+        Route::patch('/master/data-taka/{code}/activate',[App\Http\Controllers\Admin\Pages\Core\TahunAkademikController::class, 'activate'])->name('master.taka-activate');
         Route::delete('/master/data-taka/{code}/destroy',[App\Http\Controllers\Admin\Pages\Core\TahunAkademikController::class, 'destroy'])->name('master.taka-destroy');
         // MENU KHUSUS DATA MASTER => DATA PROGRAM KULIAH
         Route::get('/master/data-proku',[App\Http\Controllers\Admin\Pages\Core\ProgramKuliahController::class, 'index'])->name('master.proku-index');
@@ -92,6 +98,14 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::get('/master/data-matkul/{code}/nilai', [App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'nilai'])->name('master.matkul-nilai');
         Route::post('/master/data-matkul/storenilai', [App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'storenilai'])->name('master.matkul-storenilai');
         Route::delete('/master/data-matkul/{code}/destroy',[App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'destroy'])->name('master.matkul-destroy');
+        Route::get('/master/penawaran-matkul', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'index'])->name('master.penawaran-index');
+        Route::post('/master/penawaran-matkul', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'store'])->name('master.penawaran-store');
+        Route::patch('/master/penawaran-matkul/jadwal-krs', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'updateKrsWindow'])->name('master.penawaran-krs-window');
+        Route::patch('/master/penawaran-matkul/{penawaran}', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'update'])->name('master.penawaran-update');
+        Route::delete('/master/penawaran-matkul/{penawaran}', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'destroy'])->name('master.penawaran-destroy');
+        Route::post('/master/penawaran-matkul/salin/pratinjau', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'copyPreview'])->name('master.penawaran-copy-preview');
+        Route::post('/master/penawaran-matkul/salin/eksekusi', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'copyExecute'])->name('master.penawaran-copy-execute');
+        Route::get('/master/penawaran-matkul/{penawaran}/peserta', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'participants'])->name('master.penawaran-participants');
         Route::get('/services/convert/export-matkul', [App\Http\Controllers\Services\Convert\ExportController::class, 'exportMataKuliah'])->name('services.convert.export-matkul');
         // MENU KHUSUS DATA MASTER => DATA JADWAL KULIAH
         Route::get('/master/data-jadkul',[App\Http\Controllers\Admin\Pages\Core\JadwalKuliahController::class, 'index'])->name('master.jadkul-index');
@@ -104,6 +118,14 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::delete('/master/data-jadkul/{code}/destroy',[App\Http\Controllers\Admin\Pages\Core\JadwalKuliahController::class, 'destroy'])->name('master.jadkul-destroy');
         Route::get('/services/convert/export-jadkul', [App\Http\Controllers\Services\Convert\ExportController::class, 'exportJadwalKuliah'])->name('services.convert.export-jadkul');
         Route::post('/services/convert/import-jadkul', [App\Http\Controllers\Services\Convert\ImportController::class, 'importJadwalKuliah'])->name('services.convert.import-jadkul');
+        Route::get('/master/jadwal-mingguan', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'index'])->name('master.jadwal-mingguan-index');
+        Route::get('/master/jadwal-mingguan/rekap-presensi', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'recap'])->name('master.jadwal-mingguan-recap');
+        Route::post('/master/jadwal-mingguan', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'store'])->name('master.jadwal-mingguan-store');
+        Route::post('/master/jadwal-mingguan/kalender-libur', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'storeHoliday'])->name('master.jadwal-mingguan-holiday-store');
+        Route::patch('/master/jadwal-mingguan/{jadwal}', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'update'])->name('master.jadwal-mingguan-update');
+        Route::delete('/master/jadwal-mingguan/{jadwal}', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'destroy'])->name('master.jadwal-mingguan-destroy');
+        Route::post('/master/jadwal-mingguan/{jadwal}/pertemuan/pratinjau', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'preview'])->name('master.jadwal-mingguan-preview');
+        Route::post('/master/jadwal-mingguan/{jadwal}/pertemuan/generate', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'generate'])->name('master.jadwal-mingguan-generate');
 
 
         // MENU KHUSUS DATA INVENTORY => DATA GEDUNG
@@ -130,6 +152,11 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::post('/finance/data-tagihan/store',[App\Http\Controllers\Admin\Pages\Finance\GenerateTagihanController::class, 'store'])->name('finance.tagihan-store');
         Route::patch('/finance/data-tagihan/{code}/update',[App\Http\Controllers\Admin\Pages\Finance\GenerateTagihanController::class, 'update'])->name('finance.tagihan-update');
         Route::delete('/finance/data-tagihan/{code}/destroy',[App\Http\Controllers\Admin\Pages\Finance\GenerateTagihanController::class, 'destroy'])->name('finance.tagihan-destroy');
+        Route::get('/finance/billing-period', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'index'])->name('billing-period.index');
+        Route::post('/finance/billing-period/templates', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'store'])->name('billing-period.store');
+        Route::post('/finance/billing-period/templates/{template}/preview', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'preview'])->name('billing-period.preview');
+        Route::post('/finance/billing-period/templates/{template}/issue', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'issue'])->name('billing-period.issue');
+        Route::post('/finance/billing-period/override/{registration}', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'override'])->name('billing-period.override');
         // MENU KHUSUS FINANCE DEPARTEMENT => DATA PEMBAYARAN
         Route::get('/finance/data-pembayaran',[App\Http\Controllers\Admin\Pages\Finance\PembayaranController::class, 'index'])->name('finance.pembayaran-index');
         Route::get('/finance/data-pembayaran/create',[App\Http\Controllers\Admin\Pages\Finance\PembayaranController::class, 'create'])->name('finance.pembayaran-create');

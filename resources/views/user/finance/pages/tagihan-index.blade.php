@@ -78,6 +78,7 @@
                     <div class="card-header d-flex align-items-center justify-content-between">
                         <h5 class="card-title">@yield('menu')</h5>
                         <div class="">
+                            <a href="{{ route($prefix . 'billing-period.index') }}" class="btn btn-outline-primary">Keuangan Periode</a>
                             <a href="{{ route($prefix . 'finance.tagihan-create') }}" class="btn btn-primary"><i class="fa-solid fa-plus"></i></a>
                         </div>
 

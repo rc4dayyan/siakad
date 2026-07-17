@@ -2,56 +2,58 @@
 
 namespace App\Http\Controllers\Services\Convert;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-// SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Storage;
-use Auth;
-use Hash;
-use Str;
-// SECTION ADDONS EXTERNAL
 use Alert;
-use Rap2hpoutre\FastExcel\FastExcel;
-// SECTION MODELS
-use App\Models\User;
-use App\Models\Mahasiswa;
+use App\Http\Controllers\Controller;
 use App\Models\Dosen;
-use App\Models\MataKuliah;
+// SECTION ADDONS SYSTEM
+use App\Models\Gedung;
+use App\Models\JadwalKuliah;
 use App\Models\Kelas;
+// SECTION ADDONS EXTERNAL
+use App\Models\Mahasiswa;
+use App\Models\MasterMataKuliah;
+// SECTION MODELS
+use App\Models\MataKuliah;
 use App\Models\ProgramKuliah;
 use App\Models\ProgramStudi;
-use App\Models\TahunAkademik;
-use App\Models\JadwalKuliah;
+use App\Models\RegistrasiMahasiswa;
 use App\Models\Ruang;
-use App\Models\Gedung;
-use DateTime;
+use App\Models\TahunAkademik;
+use App\Models\User;
+use App\Services\Academic\AcademicPeriodContext;
 use Carbon\Carbon;
+use DateTime;
+use Hash;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Rap2hpoutre\FastExcel\FastExcel;
+use Str;
 
 class ImportController extends Controller
 {
     public function importUsers(Request $request)
     {
         $request->validate(
-        [
-            'import' => 'required|file|mimes:xls,xlsx,csv|max:2048', // max:2048 untuk batasan 2MB
-        ],
-        [
-            'import.required' => 'File harus diunggah.',
-            'import.mimes' => 'File harus dalam format xls, xlsx, atau csv.',
-            'import.max' => 'Ukuran file tidak boleh melebihi 2MB.',
-        ]);
+            [
+                'import' => 'required|file|mimes:xls,xlsx,csv|max:2048', // max:2048 untuk batasan 2MB
+            ],
+            [
+                'import.required' => 'File harus diunggah.',
+                'import.mimes' => 'File harus dalam format xls, xlsx, atau csv.',
+                'import.max' => 'Ukuran file tidak boleh melebihi 2MB.',
+            ]);
 
         $path = $request->file('import')->store('public/excel-files');
-        $users = (new FastExcel)->import(storage_path('app/' . $path) , function ($line) {
+        $users = (new FastExcel)->import(storage_path('app/'.$path), function ($line) {
             return User::create([
                 'user' => $line['Username'],
                 'email' => $line['Email'],
                 'phone' => $line['Phone'],
                 'name' => $line['FullName'],
-                'gend' => $line['Gender'] ,
+                'gend' => $line['Gender'],
                 'reli' => $line['Religion'] == null ? null : $line['Religion'],
                 'birth_place' => $line['BirthPlace'] == null ? null : $line['BirthPlace'],
                 'birth_date' => $line['BirthDate'] == null ? null : $line['BirthDate'],
@@ -63,180 +65,194 @@ class ImportController extends Controller
         });
 
         Alert::success('Sukses', 'Data berhasil diimport !');
+
         return back();
     }
-    public function importStudent(Request $request)
+
+    public function importStudent(Request $request, AcademicPeriodContext $context)
     {
-        $request->validate(
-        [
-            'import' => 'required|file|mimes:xls,xlsx,csv|max:2048', // max:2048 untuk batasan 2MB
-        ],
-        [
-            'import.required' => 'File harus diunggah.',
-            'import.mimes' => 'File harus dalam format xls, xlsx, atau csv.',
-            'import.max' => 'Ukuran file tidak boleh melebihi 2MB.',
+        $period = $context->requireWritableCurrent($request->user());
+        $this->assertPeriodImportAllowed($request, $period);
+        $request->validate([
+            'import' => ['required', 'file', 'mimes:xlsx,csv', 'max:2048'],
+            'class_id' => ['required', 'integer', Rule::exists('kelas', 'id')->where(fn ($query) => $query->where('taka_id', $period->id))],
         ]);
-
-
-        $path = $request->file('import')->store('public/excel-files');
-        $rows = (new FastExcel)->import(storage_path('app/' . $path));
-        $message = '';
-
-        $class_id = $request->input('class_id');
-
-        DB::beginTransaction();
-
+        $class = Kelas::forAcademicPeriod($period)->findOrFail($request->integer('class_id'));
+        $path = $request->file('import')->store('excel-files', 'local');
         try {
-            $continue = true;
-            $totalSavedData = 0;
-            foreach ($rows as $line) {
-                if (Mahasiswa::where('mhs_nim', $line['NIM'])->exists()) {
+            $rows = (new FastExcel)->import(storage_path('app/'.$path));
+        } catch (\Throwable) {
+            throw ValidationException::withMessages(['import' => 'File mahasiswa tidak dapat dibaca.']);
+        } finally {
+            Storage::disk('local')->delete($path);
+        }
+        $required = ['NIM', 'NIK', 'Email', 'Telepon', 'Nama', 'Jenis Kelamin', 'Tempat,Tanggal Lahir', 'Tanggal Masuk'];
+        if ($rows->isEmpty() || ($missing = array_diff($required, array_keys($rows->first()))) !== []) {
+            throw ValidationException::withMessages(['import' => $rows->isEmpty()
+                ? 'File import tidak berisi data mahasiswa.'
+                : 'Kolom wajib tidak ditemukan: '.implode(', ', $missing).'.']);
+        }
+
+        $totalSavedData = $this->runImport($request, function () use ($rows, $period, $class): int {
+            $saved = 0;
+            foreach ($rows as $index => $line) {
+                $row = $index + 2;
+                $nim = trim((string) $line['NIM']);
+                if ($nim === '' || Mahasiswa::where('mhs_nim', $nim)->exists()) {
+                    if ($nim === '') {
+                        throw ValidationException::withMessages(['import' => "Baris {$row}: NIM wajib diisi."]);
+                    }
+
                     continue;
-                    // $message = "❌ Data dengan NIM {$line['NIM']} sudah ada. Import dihentikan.";
-                    // $continue = false;
-                    // break; // ❗ Stop the loop immediately
                 }
-                $ttl          = explode(',', $line['Tempat,Tanggal Lahir']);
-                $tempatLahir  = $ttl[0] ?? '';
-                if(isset($ttl[1])){
-                    $date = new DateTime($ttl[1]);
-                    $tanggalLahir = $date->format('Y-m-d');
-                } else {
-                    $tanggalLahir = '';
+                try {
+                    [$birthplace, $birthdateText] = array_pad(explode(',', (string) $line['Tempat,Tanggal Lahir'], 2), 2, null);
+                    $birthdate = $birthdateText ? (new DateTime($birthdateText))->format('Y-m-d') : null;
+                    $registerDate = (new DateTime((string) $line['Tanggal Masuk']))->format('Y-m-d');
+                } catch (\Throwable) {
+                    throw ValidationException::withMessages(['import' => "Baris {$row}: tanggal lahir atau tanggal masuk tidak valid."]);
                 }
-
-                $regDateTmp = new DateTime($line['Tanggal Masuk']);
-                $registerDate = $regDateTmp->format('Y-m-d');
-                
-
-                Mahasiswa::create([
-                    'mhs_nim'             => $line['NIM'],
-                    'mhs_nik'             => $line['NIK'],
-                    'mhs_mail'            => $line['Email'],
-                    'mhs_phone'           => $line['Telepon'],
-                    'mhs_name'            => $line['Nama'],
-                    'mhs_gend'            => $line['Jenis Kelamin'],
-                    'mhs_reli'            => $line['Agama'] ?? '',
-                    'mhs_birthplace'      => $tempatLahir,
-                    'mhs_birthdate'       => $tanggalLahir,
-                    'mhs_stat'            => 1,
-                    'years_id'            => 0,
-                    'class_id'            => $class_id,
-                    'mhs_code'            => Str::random(6),
-                    'mhs_user'            => Str::random(6),
-                    'password'            => Hash::make($line['NIK']),
-                    'mhs_register_date'   => $registerDate,
-                    'mhs_status'          => $line['Status Mahasiswa'],
-                    'mhs_register_type'   => $line['Jenis Pendaftaran'],
-                    'mhs_register_amount' => $line['Biaya Masuk'],
-                    'mhs_sync_status'     => $line['Status Sync'],
+                $student = Mahasiswa::create([
+                    'mhs_nim' => $nim, 'mhs_nik' => $line['NIK'], 'mhs_mail' => $line['Email'],
+                    'mhs_phone' => $line['Telepon'], 'mhs_name' => $line['Nama'], 'mhs_gend' => $line['Jenis Kelamin'],
+                    'mhs_reli' => $line['Agama'] ?? '', 'mhs_birthplace' => trim((string) $birthplace),
+                    'mhs_birthdate' => $birthdate, 'mhs_stat' => 1, 'taka_id' => $period->id,
+                    'years_id' => 0, 'class_id' => $class->id, 'mhs_code' => Str::random(12),
+                    'mhs_user' => Str::random(12), 'password' => Hash::make((string) $line['NIK']),
+                    'mhs_register_date' => $registerDate, 'mhs_status' => $line['Status Mahasiswa'] ?? null,
+                    'mhs_register_type' => $line['Jenis Pendaftaran'] ?? null,
+                    'mhs_register_amount' => $line['Biaya Masuk'] ?? null, 'mhs_sync_status' => $line['Status Sync'] ?? null,
                 ]);
-
-                $totalSavedData++;
+                RegistrasiMahasiswa::create([
+                    'mahasiswa_id' => $student->id, 'taka_id' => $period->id, 'semester_mahasiswa' => 1,
+                    'status_akademik' => RegistrasiMahasiswa::STATUS_AKADEMIK_AKTIF,
+                    'status_registrasi' => RegistrasiMahasiswa::STATUS_REGISTRASI_TERDAFTAR,
+                    'kelas_id' => $class->id, 'dosen_wali_id' => $class->dosen_id, 'batas_sks' => 24,
+                ]);
+                $saved++;
             }
 
-            if($continue) {
-                // Commit transaction
-                DB::commit();
-            } else {
-                DB::rollBack();
-            }
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            $message = "Failed! " . $e->getMessage();
-        }
-
-
-        if(empty($message)){
-            $message = "✅ Data berhasil diimport dengan total data baru masuk berjumlah $totalSavedData.";
-            Alert::success('Sukses', $message);
-        } else {
-            var_dump($message);exit;
-            Alert::error('Gagal', $message);
-        }
-
+            return $saved;
+        });
+        Alert::success('Sukses', $request->boolean('dry_run')
+            ? "Dry-run berhasil. {$totalSavedData} mahasiswa valid; tidak ada data disimpan."
+            : "Data mahasiswa berhasil diimport dan diregistrasikan. Total: {$totalSavedData}.");
 
         return back();
     }
 
-    public function importMataKuliah(Request $request)
+    public function importMataKuliah(Request $request, AcademicPeriodContext $context)
     {
+        $period = $context->requireWritableCurrent($request->user());
+        $this->assertPeriodImportAllowed($request, $period);
+
         $request->validate(
             [
-                'import' => 'required|file|mimes:xls,xlsx,csv|max:2048', // max:2048 untuk batasan 2MB
+                'import' => 'required|file|mimes:xlsx,csv|max:2048',
+                'pstudi_id' => 'required|integer|exists:program_studis,id',
+                'kuri_id' => 'required|integer|exists:kurikulums,id',
+                'dosen_1' => 'required|integer|exists:dosens,id',
             ],
             [
                 'import.required' => 'File harus diunggah.',
-                'import.mimes' => 'File harus dalam format xls, xlsx, atau csv.',
+                'import.mimes' => 'File harus dalam format xlsx atau csv.',
                 'import.max' => 'Ukuran file tidak boleh melebihi 2MB.',
             ]
         );
 
-        $taka_id   = $request->input('taka_id');
-        $pstudi_id = $request->input('pstudi_id');
-        $dosen_1 = $request->input('dosen_1');
-
-
-        $path = $request->file('import')->store('public/excel-files');
-        $rows = (new FastExcel)->import(storage_path('app/' . $path));
-        $message = '';
-
-        DB::beginTransaction();
-
+        $programStudi = ProgramStudi::findOrFail($request->integer('pstudi_id'));
+        $path = $request->file('import')->store('excel-files', 'local');
         try {
-            $continue = true;
+            $rows = (new FastExcel)->import(storage_path('app/'.$path));
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                'import' => 'File tidak dapat dibaca. Pastikan file menggunakan format xlsx atau csv yang valid.',
+            ]);
+        } finally {
+            Storage::disk('local')->delete($path);
+        }
+
+        if ($rows->isEmpty()) {
+            throw ValidationException::withMessages([
+                'import' => 'File import tidak berisi data mata kuliah.',
+            ]);
+        }
+
+        $missingHeaders = array_diff(['Nama', 'Kode', 'Kode Tahun Akademik'], array_keys($rows->first()));
+
+        if ($missingHeaders !== []) {
+            throw ValidationException::withMessages([
+                'import' => 'Kolom wajib tidak ditemukan: '.implode(', ', $missingHeaders).'.',
+            ]);
+        }
+
+        $totalSavedData = $this->runImport($request, function () use ($request, $rows, $period, $programStudi) {
             $totalSavedData = 0;
-            foreach ($rows as $line) {
-                
-                if (MataKuliah::where('code', $line['Kode'])->where('taka_id', $taka_id)->exists()) {
-                    continue;
-                    // $message = "❌ Data dengan matakuliah {$line['Kode']} sudah ada. Import dihentikan.";
-                    // $continue = false;
-                    // break; // ❗ Stop the loop immediately
+
+            foreach ($rows as $index => $line) {
+                $rowNumber = $index + 2;
+                $name = trim((string) $line['Nama']);
+                $code = trim((string) $line['Kode']);
+                $periodCode = trim((string) $line['Kode Tahun Akademik']);
+
+                if ($name === '' || strlen($name) > 255 || $code === '' || strlen($code) > 255) {
+                    throw ValidationException::withMessages([
+                        'import' => "Baris {$rowNumber}: nama dan kode mata kuliah wajib diisi dengan benar.",
+                    ]);
                 }
 
+                if ($periodCode !== $period->code) {
+                    throw ValidationException::withMessages([
+                        'import' => "Baris {$rowNumber}: kode tahun akademik harus {$period->code}.",
+                    ]);
+                }
+
+                if (MataKuliah::where('code', $code)->exists()) {
+                    continue;
+                }
+
+                $masters = MasterMataKuliah::query()
+                    ->where('program_studi', $programStudi->code)
+                    ->where('name', $name)
+                    ->get();
+
+                if ($masters->count() !== 1) {
+                    throw ValidationException::withMessages([
+                        'import' => "Baris {$rowNumber}: mata kuliah {$name} harus cocok tepat dengan satu data master pada program studi {$programStudi->code}.",
+                    ]);
+                }
+
+                $master = $masters->first();
                 MataKuliah::create([
-                    'kuri_id'   => 1,
-                    'taka_id'   => $taka_id,
-                    'pstudi_id' => $pstudi_id,
-                    'dosen_1'   => $dosen_1,
-                    'dosen_2'   => null,
-                    'dosen_3'   => null,
-                    'name'      => $line['Nama'],
-                    'code'      => $line['Kode'],
-                    'bsks'      => 20,
-                    'desc'      => '',
+                    'mid' => $master->id,
+                    'kuri_id' => $request->integer('kuri_id'),
+                    'taka_id' => $period->id,
+                    'pstudi_id' => $programStudi->id,
+                    'dosen_1' => $request->integer('dosen_1'),
+                    'name' => $master->name,
+                    'code' => $code,
+                    'bsks' => $master->sks,
+                    'desc' => 'Data mata kuliah hasil import.',
                 ]);
+
                 $totalSavedData++;
             }
 
-            if ($continue) {
-                // Commit transaction
-                DB::commit();
-            } else {
-                DB::rollBack();
-            }
-        } catch (\Exception $e) {
-            DB::rollBack();
+            return $totalSavedData;
+        });
 
-            $message = "Failed! " . $e->getMessage();
-        }
-
-
-        if (empty($message)) {
-            $message = "✅ Data berhasil diimport dengan data baru masuk berjumlah $totalSavedData";
-            Alert::success('Sukses', $message);
-        } else {
-            Alert::error('Gagal', $message);
-        }
-
+        Alert::success('Sukses', $request->boolean('dry_run')
+            ? "Dry-run berhasil. {$totalSavedData} baris mata kuliah valid; tidak ada data disimpan."
+            : "Data mata kuliah berhasil diimport. Total data baru: {$totalSavedData}.");
 
         return back();
     }
 
-    public function importKelas(Request $request)
+    public function importKelas(Request $request, AcademicPeriodContext $context)
     {
+        $period = $context->requireWritableCurrent($request->user());
+        $this->assertPeriodImportAllowed($request, $period);
+
         $request->validate(
             [
                 'import' => 'required|file|mimes:xlsx,csv|max:2048',
@@ -283,7 +299,7 @@ class ImportController extends Controller
             ]);
         }
 
-        $totalSavedData = DB::transaction(function () use ($rows) {
+        $totalSavedData = $this->runImport($request, function () use ($rows, $period) {
             $totalSavedData = 0;
 
             foreach ($rows as $index => $line) {
@@ -302,21 +318,26 @@ class ImportController extends Controller
                     ]);
                 }
 
+                if ($takaCode !== $period->code) {
+                    throw ValidationException::withMessages([
+                        'import' => "Baris {$rowNumber}: kode tahun akademik harus {$period->code} sesuai periode yang sedang dipilih.",
+                    ]);
+                }
+
                 if (Kelas::where('code', $code)->exists()) {
                     continue;
                 }
 
-                $taka = TahunAkademik::where('code', $takaCode)->first();
                 $pstudi = ProgramStudi::where('code', $pstudiCode)->first();
                 $proku = $prokuCode === '' ? null : ProgramKuliah::where('code', $prokuCode)
-                    ->where('taka_id', $taka?->id)
+                    ->where('taka_id', $period->id)
                     ->where('pstudi_id', $pstudi?->id)
                     ->first();
                 $dosen = $dosenNidn === '' ? null : Dosen::where('dsn_nidn', $dosenNidn)->first();
 
-                if (! $taka || ! $pstudi || ($prokuCode !== '' && ! $proku) || ($dosenNidn !== '' && ! $dosen)) {
+                if (! $pstudi || ($prokuCode !== '' && ! $proku) || ($dosenNidn !== '' && ! $dosen)) {
                     throw ValidationException::withMessages([
-                        'import' => "Baris {$rowNumber}: referensi tahun akademik, program studi, program kuliah, atau wali dosen tidak ditemukan/tidak sesuai.",
+                        'import' => "Baris {$rowNumber}: referensi program studi, program kuliah, atau wali dosen tidak ditemukan/tidak sesuai.",
                     ]);
                 }
 
@@ -324,7 +345,7 @@ class ImportController extends Controller
                 $kelas->name = $name;
                 $kelas->code = $code;
                 $kelas->capacity = $capacity;
-                $kelas->taka_id = $taka->id;
+                $kelas->taka_id = $period->id;
                 $kelas->pstudi_id = $pstudi->id;
                 $kelas->proku_id = $proku?->id;
                 $kelas->dosen_id = $dosen?->id;
@@ -336,13 +357,18 @@ class ImportController extends Controller
             return $totalSavedData;
         });
 
-        Alert::success('Sukses', "Data kelas berhasil diimport. Total data baru: {$totalSavedData}.");
+        Alert::success('Sukses', $request->boolean('dry_run')
+            ? "Dry-run berhasil. {$totalSavedData} baris kelas valid; tidak ada data disimpan."
+            : "Data kelas berhasil diimport. Total data baru: {$totalSavedData}.");
 
         return back();
     }
 
-    public function importJadwalKuliah(Request $request)
+    public function importJadwalKuliah(Request $request, AcademicPeriodContext $context)
     {
+        $period = $context->requireWritableCurrent($request->user());
+        $this->assertPeriodImportAllowed($request, $period);
+
         $request->validate(
             [
                 'import' => 'required|file|mimes:xlsx,csv|max:2048',
@@ -367,6 +393,7 @@ class ImportController extends Controller
         }
 
         $requiredHeaders = [
+            'Kode Tahun Akademik',
             'Kode Jadwal',
             'Kode Mata Kuliah',
             'Kode Kelas',
@@ -395,12 +422,13 @@ class ImportController extends Controller
             ]);
         }
 
-        $totalSavedData = DB::transaction(function () use ($rows) {
+        $totalSavedData = $this->runImport($request, function () use ($rows, $period) {
             $totalSavedData = 0;
 
             foreach ($rows as $index => $line) {
                 $rowNumber = $index + 2;
                 $code = trim((string) $line['Kode Jadwal']);
+                $periodCode = trim((string) $line['Kode Tahun Akademik']);
                 $mataKuliahCode = trim((string) $line['Kode Mata Kuliah']);
                 $kelasCode = trim((string) $line['Kode Kelas']);
                 $dosenNidn = trim((string) $line['NIDN Dosen']);
@@ -423,18 +451,24 @@ class ImportController extends Controller
                     ]);
                 }
 
+                if ($periodCode !== $period->code) {
+                    throw ValidationException::withMessages([
+                        'import' => "Baris {$rowNumber}: kode tahun akademik harus {$period->code}.",
+                    ]);
+                }
+
                 if (JadwalKuliah::where('code', $code)->exists()) {
                     continue;
                 }
 
-                $mataKuliah = MataKuliah::where('code', $mataKuliahCode)->first();
-                $kelas = Kelas::where('code', $kelasCode)->first();
+                $mataKuliah = MataKuliah::query()->forAcademicPeriod($period)->where('code', $mataKuliahCode)->first();
+                $kelas = Kelas::query()->forAcademicPeriod($period)->where('code', $kelasCode)->first();
                 $dosen = Dosen::where('dsn_nidn', $dosenNidn)->first();
                 $ruang = Ruang::where('code', $ruangCode)->first();
 
                 if (! $mataKuliah || ! $kelas || ! $dosen || ! $ruang) {
                     throw ValidationException::withMessages([
-                        'import' => "Baris {$rowNumber}: mata kuliah, kelas, dosen, atau ruang tidak ditemukan.",
+                        'import' => "Baris {$rowNumber}: mata kuliah atau kelas tidak ditemukan pada periode {$period->code}, atau dosen/ruang tidak ditemukan.",
                     ]);
                 }
 
@@ -503,7 +537,9 @@ class ImportController extends Controller
             return $totalSavedData;
         });
 
-        Alert::success('Sukses', "Data jadwal kuliah berhasil diimport. Total data baru: {$totalSavedData}.");
+        Alert::success('Sukses', $request->boolean('dry_run')
+            ? "Dry-run berhasil. {$totalSavedData} baris jadwal valid; tidak ada data disimpan."
+            : "Data jadwal kuliah berhasil diimport. Total data baru: {$totalSavedData}.");
 
         return back();
     }
@@ -549,7 +585,7 @@ class ImportController extends Controller
             ]);
         }
 
-        $totalSavedData = DB::transaction(function () use ($rows) {
+        $totalSavedData = $this->runImport($request, function () use ($rows) {
             $totalSavedData = 0;
 
             foreach ($rows as $index => $line) {
@@ -624,7 +660,7 @@ class ImportController extends Controller
             ]);
         }
 
-        $totalSavedData = DB::transaction(function () use ($rows) {
+        $totalSavedData = $this->runImport($request, function () use ($rows) {
             $totalSavedData = 0;
 
             foreach ($rows as $index => $line) {
@@ -676,5 +712,32 @@ class ImportController extends Controller
         Alert::success('Sukses', "Data ruang berhasil diimport. Total data baru: {$totalSavedData}.");
 
         return back();
+    }
+
+    private function runImport(Request $request, callable $callback): mixed
+    {
+        DB::beginTransaction();
+
+        try {
+            $result = $callback();
+            $request->boolean('dry_run') ? DB::rollBack() : DB::commit();
+
+            return $result;
+        } catch (\Throwable $exception) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
+            throw $exception;
+        }
+    }
+
+    private function assertPeriodImportAllowed(Request $request, TahunAkademik $period): void
+    {
+        if ($period->status !== TahunAkademik::STATUS_DRAFT && ! $request->boolean('dry_run')) {
+            throw ValidationException::withMessages([
+                'academic_period' => 'Import yang mengubah data hanya diizinkan pada periode draft. Gunakan dry-run untuk memeriksa file pada periode aktif.',
+            ]);
+        }
     }
 }

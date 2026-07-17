@@ -23,15 +23,30 @@
     <div class="col-lg-12 col-12">
         <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
-                <h5 class="card-title">@yield('submenu')</h5>
                 <div>
-                    <a href="#" data-bs-toggle="modal" data-bs-target="#tambahKelas" class="btn btn-outline-primary"><i class="fas fa-plus"></i></a>
-                    <a href="{{ route($prefix.'services.convert.export-kelas') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
-                    <a href="#" data-bs-toggle="modal" data-bs-target="#importKelas" class="btn btn-outline-danger"><i class="fa-solid fa-file-import"></i></a>
+                    <h5 class="card-title mb-1">@yield('submenu')</h5>
+                    <small class="text-muted">
+                        Periode: {{ $selectedPeriod?->name ?? 'Belum dipilih' }}
+                    </small>
+                </div>
+                <div>
+                    @if ($canManageClasses)
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#tambahKelas" class="btn btn-outline-primary"><i class="fas fa-plus"></i></a>
+                        <a href="{{ route($prefix.'services.convert.export-kelas') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#importKelas" class="btn btn-outline-danger"><i class="fa-solid fa-file-import"></i></a>
+                    @elseif ($selectedPeriod)
+                        <a href="{{ route($prefix.'services.convert.export-kelas') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
+                        <span class="badge bg-secondary">Periode hanya-baca</span>
+                    @else
+                        <button type="button" class="btn btn-outline-secondary" disabled>Periode belum tersedia</button>
+                    @endif
                 </div>
 
             </div>
             <div class="card-body">
+                @error('academic_period')
+                    <div class="alert alert-warning">{{ $message }}</div>
+                @enderror
                 <table class="table table-striped" id="table1">
                     <thead>
                         <th class="text-center">#</th>
@@ -42,14 +57,13 @@
                         <th class="text-center">Button</th>
                     </thead>
                     <tbody>
-                        @foreach ($kelas as $key => $item)
+                        @forelse ($kelas as $key => $item)
                             <tr class="text-center">
                                 <td data-label="Number">{{ ++$key }}</td>
-                                <td data-label="Kelas">{{ $item->proku->name . ' - ' . $item->name }}</td>
-                                <td data-label="Program Studi">{{ $item->pstudi->name . ' - ' . $item->taka->semester}}</td>
-                                @php $mhs = \App\Models\Mahasiswa::where('class_id', $item->id)->count();                              @endphp
-                                <td data-label="Kapasitas">{{ $mhs . ' / ' . $item->capacity . ' Mahasiswa' }}</td>
-                                <td data-label="Wali Dosen">{{ $item->dosen->dsn_name }}</td>
+                                <td data-label="Kelas">{{ ($item->proku?->name ? $item->proku->name.' - ' : '').$item->name }}</td>
+                                <td data-label="Program Studi">{{ $item->pstudi?->name ?? '-' }}</td>
+                                <td data-label="Kapasitas">{{ $item->mahasiswas_count.' / '.$item->capacity.' Mahasiswa' }}</td>
+                                <td data-label="Wali Dosen">{{ $item->dosen?->dsn_name ?? '-' }}</td>
                                 <td class="d-flex justify-content-center align-items-center">
                                     <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#updateKelas{{ $item->code }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
                                     <a href="{{ route($prefix.'master.kelas-mahasiswa-view', $item->code) }}" style="margin-right: 10px" class="btn btn-outline-info"><i class="fa-solid fa-users"></i></a>
@@ -68,7 +82,11 @@
                                     </form>
                                 </td>
                             </tr>
-                        @endforeach
+                        @empty
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">Belum ada kelas pada periode yang dipilih.</td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>
@@ -96,7 +114,8 @@
                     </div>
                     <div class="modal-body">
                         <p class="text-muted">
-                            Gunakan hasil export sebagai template. Jangan ubah nama kolom. Kode kelas yang sudah ada akan dilewati.
+                            Gunakan hasil export sebagai template. Kode Tahun Akademik setiap baris harus
+                            <strong>{{ $selectedPeriod?->code }}</strong>. Kode kelas yang sudah ada akan dilewati.
                         </p>
                         <div class="form-group">
                             <label for="import_kelas">Import Files (xlsx, csv)</label>
@@ -159,16 +178,8 @@
                                 @enderror
                             </div>
                             <div class="form-group col-lg-6 col-12">
-                                <label for="taka_id">Tahun Akademik</label>
-                                <select name="taka_id" id="taka_id" class="form-select">
-                                    <option value="" selected>Pilih Tahun Akademik</option>
-                                    @foreach ($taka as $item)
-                                        <option value="{{ $item->id }}">{{ $item->name . ' - ' . $item->semester }}</option>
-                                    @endforeach
-                                </select>
-                                @error('taka_id')
-                                    <small class="text-danger">{{ $message }}</small>
-                                @enderror
+                                <label>Periode Akademik</label>
+                                <input type="text" class="form-control" value="{{ $selectedPeriod?->name }}" readonly>
                             </div>
                             <div class="form-group col-lg-6 col-12">
                                 <label for="pstudi_id">Program Studi</label>
@@ -262,16 +273,8 @@
                                 @enderror
                             </div>
                             <div class="form-group col-lg-6 col-12">
-                                <label for="taka_id">Tahun Akademik</label>
-                                <select name="taka_id" id="taka_id" class="form-select">
-                                    <option value="" selected>Pilih Tahun Akademik</option>
-                                    @foreach ($taka as $taaka)
-                                        <option value="{{ $taaka->id }}" {{ $item->taka_id == $taaka->id ? 'selected' : '' }}>{{ $taaka->name . ' - ' . $taaka->semester }}</option>
-                                    @endforeach
-                                </select>
-                                @error('taka_id')
-                                    <small class="text-danger">{{ $message }}</small>
-                                @enderror
+                                <label>Periode Akademik</label>
+                                <input type="text" class="form-control" value="{{ $selectedPeriod?->name }}" readonly>
                             </div>
                             <div class="form-group col-lg-6 col-12">
                                 <label for="pstudi_id">Program Studi</label>
