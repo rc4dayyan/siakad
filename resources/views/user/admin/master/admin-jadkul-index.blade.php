@@ -25,6 +25,8 @@ Halaman untuk mengelola Jadwal Kuliah
                 @yield('submenu')
                 <div class="">
                     <a href="{{ route($prefix.'master.jadkul-create') }}" class="btn btn-outline-primary"><i class="fa-solid fa-plus"></i></a>
+                    <a href="{{ route($prefix.'services.convert.export-jadkul') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
+                    <a href="#" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importJadwalKuliah"><i class="fa-solid fa-file-import"></i></a>
                 </div>
             </h5>
         </div>
@@ -84,6 +86,37 @@ Halaman untuk mengelola Jadwal Kuliah
     </div>
 
 </section>
+<div class="me-1 mb-1 d-inline-block">
+    <form action="{{ route($prefix.'services.convert.import-jadkul') }}" method="POST" enctype="multipart/form-data">
+        @csrf
+        <div class="modal fade text-left w-100" id="importJadwalKuliah" tabindex="-1" role="dialog"
+            aria-labelledby="importJadwalKuliahLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="modal-title" id="importJadwalKuliahLabel">Import Jadwal Kuliah</h4>
+                        <div>
+                            <button type="submit" class="btn btn-outline-primary"><i class="fas fa-paper-plane"></i></button>
+                            <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal" aria-label="Close"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted">
+                            Gunakan hasil export sebagai template. Metode: 0 Tatap Muka, 1 Teleconference. Hari: 0 Minggu sampai 6 Sabtu. Kode jadwal yang sudah ada akan dilewati.
+                        </p>
+                        <div class="form-group">
+                            <label for="import_jadkul">Import Files (xlsx, csv)</label>
+                            <input type="file" name="import" id="import_jadkul" class="form-control" accept=".xlsx,.csv" required>
+                            @error('import')
+                                <small class="text-danger">{{ $message }}</small>
+                            @enderror
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
 <div class="me-1 mb-1 d-inline-block">
 
     <!--Extra Large Modal -->

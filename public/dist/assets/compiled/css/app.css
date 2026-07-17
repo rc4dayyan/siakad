@@ -18609,7 +18609,7 @@ body .bi:before,
         left: 0;
     }
     #sidebar ~ #main {
-        margin-left: 290px;
+        margin-left: 280px;
     }
 }
 #sidebar.inactive .sidebar-wrapper {
@@ -18845,7 +18845,7 @@ body .bi:before,
     width: inherit;
 }
 .navbar {
-    height: var(--navbar-height);
+    height: auto;
     padding: 1.5rem;
 }
 .navbar .navbar-brand img {
@@ -19382,7 +19382,7 @@ body .bi:before,
     margin: 0;
 }
 #main #main-content {
-    padding: 2rem;
+    padding: 1rem;
 }
 #main,
 #main-content {

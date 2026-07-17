@@ -70,6 +70,8 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::post('/master/data-kelas/{code}/cetak/mahasiswa',[App\Http\Controllers\Admin\Pages\Core\KelasController::class, 'cetakMahasiswa'])->name('master.kelas-mahasiswa-cetak');
         Route::patch('/master/data-kelas/{code}/update',[App\Http\Controllers\Admin\Pages\Core\KelasController::class, 'update'])->name('master.kelas-update');
         Route::delete('/master/data-kelas/{code}/destroy',[App\Http\Controllers\Admin\Pages\Core\KelasController::class, 'destroy'])->name('master.kelas-destroy');
+        Route::get('/services/convert/export-kelas', [App\Http\Controllers\Services\Convert\ExportController::class, 'exportKelas'])->name('services.convert.export-kelas');
+        Route::post('/services/convert/import-kelas', [App\Http\Controllers\Services\Convert\ImportController::class, 'importKelas'])->name('services.convert.import-kelas');
         // MENU KHUSUS DATA MASTER => DATA KURIKULUM
         Route::get('/master/data-kurikulum',[App\Http\Controllers\Admin\Pages\Core\KurikulumController::class, 'index'])->name('master.kurikulum-index');
         Route::get('/master/data-kurikulum/{code}/view/',[App\Http\Controllers\Admin\Pages\Core\KurikulumController::class, 'view'])->name('master.kurikulum-view');
@@ -84,6 +86,7 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::get('/master/data-matkul/{code}/nilai', [App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'nilai'])->name('master.matkul-nilai');
         Route::post('/master/data-matkul/storenilai', [App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'storenilai'])->name('master.matkul-storenilai');
         Route::delete('/master/data-matkul/{code}/destroy',[App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'destroy'])->name('master.matkul-destroy');
+        Route::get('/services/convert/export-matkul', [App\Http\Controllers\Services\Convert\ExportController::class, 'exportMataKuliah'])->name('services.convert.export-matkul');
         // MENU KHUSUS DATA MASTER => DATA JADWAL KULIAH
         Route::get('/master/data-jadkul',[App\Http\Controllers\Admin\Pages\Core\JadwalKuliahController::class, 'index'])->name('master.jadkul-index');
         Route::get('/master/data-jadkul/{code}/viewAbsen',[App\Http\Controllers\Admin\Pages\Core\JadwalKuliahController::class, 'viewAbsen'])->name('master.jadkul-absen-view');
@@ -93,6 +96,8 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::patch('/master/data-jadkul/{code}/updateAbsen',[App\Http\Controllers\Admin\Pages\Core\JadwalKuliahController::class, 'updateAbsen'])->name('master.jadkul-absen-update');
         Route::patch('/master/data-jadkul/{code}/update',[App\Http\Controllers\Admin\Pages\Core\JadwalKuliahController::class, 'update'])->name('master.jadkul-update');
         Route::delete('/master/data-jadkul/{code}/destroy',[App\Http\Controllers\Admin\Pages\Core\JadwalKuliahController::class, 'destroy'])->name('master.jadkul-destroy');
+        Route::get('/services/convert/export-jadkul', [App\Http\Controllers\Services\Convert\ExportController::class, 'exportJadwalKuliah'])->name('services.convert.export-jadkul');
+        Route::post('/services/convert/import-jadkul', [App\Http\Controllers\Services\Convert\ImportController::class, 'importJadwalKuliah'])->name('services.convert.import-jadkul');
 
 
         // MENU KHUSUS DATA INVENTORY => DATA GEDUNG
@@ -100,11 +105,15 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::post('/inventory/data-gedung/store',[App\Http\Controllers\Admin\Pages\Inventory\GedungController::class, 'store'])->name('inventory.gedung-store');
         Route::patch('/inventory/data-gedung/{code}/update',[App\Http\Controllers\Admin\Pages\Inventory\GedungController::class, 'update'])->name('inventory.gedung-update');
         Route::delete('/inventory/data-gedung/{code}/destroy',[App\Http\Controllers\Admin\Pages\Inventory\GedungController::class, 'destroy'])->name('inventory.gedung-destroy');
+        Route::get('/services/convert/export-gedung', [App\Http\Controllers\Services\Convert\ExportController::class, 'exportGedung'])->name('services.convert.export-gedung');
+        Route::post('/services/convert/import-gedung', [App\Http\Controllers\Services\Convert\ImportController::class, 'importGedung'])->name('services.convert.import-gedung');
         // MENU KHUSUS DATA INVENTORY => DATA RUANG
         Route::get('/inventory/data-ruang',[App\Http\Controllers\Admin\Pages\Inventory\RuangController::class, 'index'])->name('inventory.ruang-index');
         Route::post('/inventory/data-ruang/store',[App\Http\Controllers\Admin\Pages\Inventory\RuangController::class, 'store'])->name('inventory.ruang-store');
         Route::patch('/inventory/data-ruang/{code}/update',[App\Http\Controllers\Admin\Pages\Inventory\RuangController::class, 'update'])->name('inventory.ruang-update');
         Route::delete('/inventory/data-ruang/{code}/destroy',[App\Http\Controllers\Admin\Pages\Inventory\RuangController::class, 'destroy'])->name('inventory.ruang-destroy');
+        Route::get('/services/convert/export-ruang', [App\Http\Controllers\Services\Convert\ExportController::class, 'exportRuang'])->name('services.convert.export-ruang');
+        Route::post('/services/convert/import-ruang', [App\Http\Controllers\Services\Convert\ImportController::class, 'importRuang'])->name('services.convert.import-ruang');
 
 
 

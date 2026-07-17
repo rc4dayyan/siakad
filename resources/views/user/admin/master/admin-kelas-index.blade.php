@@ -24,7 +24,11 @@
         <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
                 <h5 class="card-title">@yield('submenu')</h5>
-                <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#tambahKelas" class="btn btn-outline-primary"><i class="fas fa-plus"></i></a>
+                <div>
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#tambahKelas" class="btn btn-outline-primary"><i class="fas fa-plus"></i></a>
+                    <a href="{{ route($prefix.'services.convert.export-kelas') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#importKelas" class="btn btn-outline-danger"><i class="fa-solid fa-file-import"></i></a>
+                </div>
 
             </div>
             <div class="card-body">
@@ -72,6 +76,42 @@
     </div>
 
 </section>
+<div class="me-1 mb-1 d-inline-block">
+    <form action="{{ route($prefix.'services.convert.import-kelas') }}" method="POST" enctype="multipart/form-data">
+        @csrf
+        <div class="modal fade text-left w-100" id="importKelas" tabindex="-1" role="dialog"
+            aria-labelledby="importKelasLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="modal-title" id="importKelasLabel">Import Data Kelas</h4>
+                        <div>
+                            <button type="submit" class="btn btn-outline-primary">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal" aria-label="Close">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted">
+                            Gunakan hasil export sebagai template. Jangan ubah nama kolom. Kode kelas yang sudah ada akan dilewati.
+                        </p>
+                        <div class="form-group">
+                            <label for="import_kelas">Import Files (xlsx, csv)</label>
+                            <input type="file" name="import" id="import_kelas" class="form-control"
+                                accept=".xlsx,.csv" required>
+                            @error('import')
+                                <small class="text-danger">{{ $message }}</small>
+                            @enderror
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
 <div class="me-1 mb-1 d-inline-block">
 
     <!--Extra Large Modal -->

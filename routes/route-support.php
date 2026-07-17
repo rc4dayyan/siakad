@@ -17,11 +17,15 @@ Route::group(['prefix' => 'support', 'middleware' => ['user-access:Departement S
         Route::post('/inventory/data-gedung/store',[App\Http\Controllers\Admin\Pages\Inventory\GedungController::class, 'store'])->name('inventory.gedung-store');
         Route::patch('/inventory/data-gedung/{code}/update',[App\Http\Controllers\Admin\Pages\Inventory\GedungController::class, 'update'])->name('inventory.gedung-update');
         Route::delete('/inventory/data-gedung/{code}/destroy',[App\Http\Controllers\Admin\Pages\Inventory\GedungController::class, 'destroy'])->name('inventory.gedung-destroy');
+        Route::get('/services/convert/export-gedung', [App\Http\Controllers\Services\Convert\ExportController::class, 'exportGedung'])->name('services.convert.export-gedung');
+        Route::post('/services/convert/import-gedung', [App\Http\Controllers\Services\Convert\ImportController::class, 'importGedung'])->name('services.convert.import-gedung');
         // MENU KHUSUS DATA INVENTORY => DATA RUANG
         Route::get('/inventory/data-ruang',[App\Http\Controllers\Admin\Pages\Inventory\RuangController::class, 'index'])->name('inventory.ruang-index');
         Route::post('/inventory/data-ruang/store',[App\Http\Controllers\Admin\Pages\Inventory\RuangController::class, 'store'])->name('inventory.ruang-store');
         Route::patch('/inventory/data-ruang/{code}/update',[App\Http\Controllers\Admin\Pages\Inventory\RuangController::class, 'update'])->name('inventory.ruang-update');
         Route::delete('/inventory/data-ruang/{code}/destroy',[App\Http\Controllers\Admin\Pages\Inventory\RuangController::class, 'destroy'])->name('inventory.ruang-destroy');
+        Route::get('/services/convert/export-ruang', [App\Http\Controllers\Services\Convert\ExportController::class, 'exportRuang'])->name('services.convert.export-ruang');
+        Route::post('/services/convert/import-ruang', [App\Http\Controllers\Services\Convert\ImportController::class, 'importRuang'])->name('services.convert.import-ruang');
 
 
 

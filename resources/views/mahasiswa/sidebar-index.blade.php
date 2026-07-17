@@ -4,12 +4,12 @@
         <span>Home</span>
     </a>
 </li>
-<li class="sidebar-item  {{ Route::is('mahasiswa.home-profile*', request()->path()) ? 'active' : '' }}">
+<!-- <li class="sidebar-item  {{ Route::is('mahasiswa.home-profile*', request()->path()) ? 'active' : '' }}">
     <a href="{{ route('mahasiswa.home-profile') }}" class='sidebar-link'>
         <i class="fa-solid fa-user-edit"></i>
         <span>Profile User</span>
     </a>
-</li>
+</li> -->
 
 <li class="sidebar-title">Menu Akademik</li>
 <li class="sidebar-item  {{ Route::is('mahasiswa.home-jadkul-*', request()->path()) ? 'active' : '' }}">

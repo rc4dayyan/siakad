@@ -82,9 +82,12 @@
     </div>
     <div class="col-lg-8 col-12">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title">@yield('submenu')</h5>
-
+                <div>
+                    <a href="{{ route($prefix.'services.convert.export-ruang') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
+                    <a href="#" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importRuang"><i class="fa-solid fa-file-import"></i></a>
+                </div>
             </div>
             <div class="card-body">
                 <table class="table table-striped" id="table1">
@@ -128,6 +131,37 @@
     </div>
 
 </section>
+<div class="me-1 mb-1 d-inline-block">
+    <form action="{{ route($prefix.'services.convert.import-ruang') }}" method="POST" enctype="multipart/form-data">
+        @csrf
+        <div class="modal fade text-left w-100" id="importRuang" tabindex="-1" role="dialog"
+            aria-labelledby="importRuangLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="modal-title" id="importRuangLabel">Import Data Ruang</h4>
+                        <div>
+                            <button type="submit" class="btn btn-outline-primary"><i class="fas fa-paper-plane"></i></button>
+                            <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal" aria-label="Close"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted">
+                            Gunakan hasil export sebagai template. Tipe: 0 Kelas, 1 Laboratorium, 2 Kerja, 3 Pribadi, 4 Fasilitas Umum. Kode ruang yang sudah ada akan dilewati.
+                        </p>
+                        <div class="form-group">
+                            <label for="import_ruang">Import Files (xlsx, csv)</label>
+                            <input type="file" name="import" id="import_ruang" class="form-control" accept=".xlsx,.csv" required>
+                            @error('import')
+                                <small class="text-danger">{{ $message }}</small>
+                            @enderror
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
 <div class="me-1 mb-1 d-inline-block">
 
     <!--Extra Large Modal -->

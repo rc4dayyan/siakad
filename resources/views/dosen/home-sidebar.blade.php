@@ -4,12 +4,12 @@
                 <span>Home</span>
             </a>
         </li>
-        <li class="sidebar-item {{ Route::is('dosen.home-profile*', request()->path()) ? 'active' : '' }}">
+        <!-- <li class="sidebar-item {{ Route::is('dosen.home-profile*', request()->path()) ? 'active' : '' }}">
             <a href="{{ route('dosen.home-profile') }}" class='sidebar-link'>
                 <i class="fa-solid fa-user-edit"></i>
                 <span>Profile User</span>
             </a>
-        </li>
+        </li> -->
         <li class="sidebar-title">Data Akademik</li>
 
         <li class="sidebar-item {{ Route::is('dosen.akademik.jadwal-*', request()->path()) ? 'active' : '' }}">

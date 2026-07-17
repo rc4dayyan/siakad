@@ -6,7 +6,7 @@
             <i class="bi bi-justify fs-3"></i>
         </a>
             <div>
-                <small>Ruang kerja digital</small>
+                <!-- <small>Ruang kerja digital</small> -->
                 <strong>@yield('menu')</strong>
             </div>
         </div>

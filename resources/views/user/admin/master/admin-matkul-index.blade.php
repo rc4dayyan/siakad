@@ -22,6 +22,7 @@ Halaman untuk mengelola Mata Kuliah
                 @yield('submenu')
                 <div class="">
                     <a href="{{ route($prefix.'master.matkul-create') }}" class="btn btn-outline-primary"><i class="fa-solid fa-plus"></i></a>
+                    <a href="{{ route($prefix.'services.convert.export-matkul') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
                     <a href="#" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importMataKuliah"><i class="fa-solid fa-file-import"></i></a>
                 </div>
             </h5>
