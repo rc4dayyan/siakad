@@ -258,9 +258,6 @@
     <script src="{{ asset('dist') }}/assets/compiled/js/app.js"></script>
 
 
-    <script src="{{ asset('dist') }}/assets/extensions/apexcharts/apexcharts.min.js"></script>
-    <script src="{{ asset('dist') }}/assets/static/js/pages/dashboard.js"></script>
-
     @yield('custom-js')
 </body>
 
