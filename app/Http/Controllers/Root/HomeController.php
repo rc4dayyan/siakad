@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Root;
 
 use App\Http\Controllers\Controller;
+use Coderflex\LaravelTurnstile\Rules\TurnstileCheck;
 use Illuminate\Http\Request;
 // SECTION ADDONS SYSTEM
 use Illuminate\Support\Facades\Mail;
@@ -173,6 +174,9 @@ class HomeController extends Controller
             'email' => 'required|email',
             'subject' => 'required|string|max:255',
             'desc' => 'required',
+            'cf-turnstile-response' => ['required', new TurnstileCheck],
+        ], [
+            'cf-turnstile-response.required' => 'Silakan selesaikan verifikasi Cloudflare terlebih dahulu.',
         ]);
 
         $saran = new KotakSaran;

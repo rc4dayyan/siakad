@@ -76,6 +76,12 @@
                                     <textarea name="desc" id="desc" rows="7" class="public-input public-textarea @error('desc') is-invalid @enderror" placeholder="Jelaskan saran atau masukan Anda secara rinci">{{ old('desc') }}</textarea>
                                     @error('desc')<small class="public-error">{{ $message }}</small>@enderror
                                 </div>
+                                <div class="col-12">
+                                    <x-turnstile-widget theme="auto" language="id" />
+                                    @error('cf-turnstile-response')
+                                        <small class="public-error">{{ $message }}</small>
+                                    @enderror
+                                </div>
                                 <div class="col-12 public-form-card__footer">
                                     <p><i class="fa-solid fa-shield-halved"></i> Data Anda dikirim dengan aman.</p>
                                     <button type="submit" class="home-btn home-btn--primary">
