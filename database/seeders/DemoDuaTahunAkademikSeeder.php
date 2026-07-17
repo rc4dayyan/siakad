@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\AbsensiMahasiswa;
 use App\Models\AcademicWorkflowAudit;
 use App\Models\Dosen;
-use App\Models\Fakultas;
 use App\Models\Gedung;
 use App\Models\HasilStudi;
 use App\Models\HistoryTagihan;
@@ -46,7 +45,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
     {
         DB::transaction(function (): void {
             $lecturers = $this->seedLecturers();
-            $studyProgram = $this->seedStudyProgram($lecturers[0]);
+            $studyProgram = $this->seedStudyProgram();
             $curriculum = $this->seedCurriculum();
             $room = $this->seedRoom();
             $periods = $this->seedPeriods();
@@ -204,25 +203,18 @@ class DemoDuaTahunAkademikSeeder extends Seeder
         ]), $definitions);
     }
 
-    private function seedStudyProgram(Dosen $head): ProgramStudi
+    private function seedStudyProgram(): ProgramStudi
     {
-        $faculty = Fakultas::query()
+        $studyProgram = ProgramStudi::query()
             ->where('code', 'not like', 'DEMO-%')
             ->orderBy('id')
-            ->first() ?? Fakultas::query()->orderBy('id')->first();
+            ->first() ?? ProgramStudi::query()->orderBy('id')->first();
 
-        if (! $faculty) {
-            throw new RuntimeException('Seeder demo membutuhkan minimal satu data fakultas yang sudah tersedia.');
+        if (! $studyProgram) {
+            throw new RuntimeException('Seeder demo membutuhkan minimal satu data program studi yang sudah tersedia.');
         }
-        return ProgramStudi::firstOrCreate(['code' => 'DEMO-PAI'], [
-            'faku_id' => $faculty->id,
-            'name' => 'Pendidikan Agama Islam Demo',
-            'cnim' => '99',
-            'slug' => 'pendidikan-agama-islam-demo',
-            'head_id' => $head->id,
-            'title' => 'S.Pd.',
-            'level' => 'S1',
-        ]);
+
+        return $studyProgram;
     }
 
     private function seedCurriculum(): Kurikulum
