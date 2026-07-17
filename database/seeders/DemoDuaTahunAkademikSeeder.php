@@ -187,8 +187,10 @@ class DemoDuaTahunAkademikSeeder extends Seeder
     private function seedLecturers(): array
     {
         $definitions = [
-            ['DEMO-DSN-01', '9900000001', 'Dr. Ahmad Demo', 'demo.dosen1', 'demo.dosen1@example.test', '089900000001'],
-            ['DEMO-DSN-02', '9900000002', 'Dr. Aisyah Demo', 'demo.dosen2', 'demo.dosen2@example.test', '089900000002'],
+            ['DEMO-DSN-01', '9900000001', 'DEVI GANJAR MUSTHOFA, M.Pd', 'demo.dosen1', 'demo.dosen1@example.test', '089900000001'],
+            ['DEMO-DSN-02', '9900000002', 'ENIH HARTIANI, M.Pd', 'demo.dosen2', 'demo.dosen2@example.test', '089900000002'],
+            ['DEMO-DSN-03', '9900000003', 'ANTO FEBRIANTO, M.Pd', 'demo.dosen3', 'demo.dosen3@example.test', '089900000003'],
+            ['DEMO-DSN-04', '9900000004', 'MUHAMMAD ZAKIYAMAN, M.Pd.I', 'demo.dosen4', 'demo.dosen4@example.test', '089900000004'],
         ];
 
         return array_map(fn (array $data) => Dosen::updateOrCreate(['dsn_code' => $data[0]], [
