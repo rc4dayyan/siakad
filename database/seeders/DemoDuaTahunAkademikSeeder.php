@@ -206,7 +206,6 @@ class DemoDuaTahunAkademikSeeder extends Seeder
 
     private function seedStudyProgram(Dosen $head): ProgramStudi
     {
-        return true;
         $faculty = Fakultas::query()
             ->where('code', 'not like', 'DEMO-%')
             ->orderBy('id')
@@ -215,8 +214,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
         if (! $faculty) {
             throw new RuntimeException('Seeder demo membutuhkan minimal satu data fakultas yang sudah tersedia.');
         }
-
-        return ProgramStudi::updateOrCreate(['code' => 'DEMO-PAI'], [
+        return ProgramStudi::firstOrCreate(['code' => 'DEMO-PAI'], [
             'faku_id' => $faculty->id,
             'name' => 'Pendidikan Agama Islam Demo',
             'cnim' => '99',
