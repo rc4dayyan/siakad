@@ -78,6 +78,12 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::post('/master/data-kurikulum/store',[App\Http\Controllers\Admin\Pages\Core\KurikulumController::class, 'store'])->name('master.kurikulum-store');
         Route::patch('/master/data-kurikulum/{code}/update',[App\Http\Controllers\Admin\Pages\Core\KurikulumController::class, 'update'])->name('master.kurikulum-update');
         Route::delete('/master/data-kurikulum/{code}/destroy',[App\Http\Controllers\Admin\Pages\Core\KurikulumController::class, 'destroy'])->name('master.kurikulum-destroy');
+        // MENU KHUSUS DATA MASTER => MASTER MATA KULIAH
+        Route::get('/master/master-matkul',[App\Http\Controllers\Admin\Pages\Core\MasterMataKuliahController::class, 'index'])->name('master.master-matkul-index');
+        Route::post('/master/master-matkul/store',[App\Http\Controllers\Admin\Pages\Core\MasterMataKuliahController::class, 'store'])->name('master.master-matkul-store');
+        Route::patch('/master/master-matkul/{masterMataKuliah}/update',[App\Http\Controllers\Admin\Pages\Core\MasterMataKuliahController::class, 'update'])->name('master.master-matkul-update');
+        Route::post('/master/master-matkul/import',[App\Http\Controllers\Admin\Pages\Core\MasterMataKuliahController::class, 'import'])->name('master.master-matkul-import');
+        Route::get('/master/master-matkul/export',[App\Http\Controllers\Admin\Pages\Core\MasterMataKuliahController::class, 'export'])->name('master.master-matkul-export');
         // MENU KHUSUS DATA MASTER => DATA MATAKULIAH
         Route::get('/master/data-matkul',[App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'index'])->name('master.matkul-index');
         Route::get('/master/data-matkul/create',[App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'create'])->name('master.matkul-create');
@@ -157,6 +163,7 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         // MENU KHUSUS ATTRIBUTE SYSTEM => DATA WEB SETTINGS
         Route::get('/system/setting',[App\Http\Controllers\Core\WebSettingController::class, 'index'])->name('system.setting-index');
         Route::patch('/system/setting/update',[App\Http\Controllers\Core\WebSettingController::class, 'update'])->name('system.setting-update');
+        Route::post('/system/cache/clear',[App\Http\Controllers\Admin\MaintenanceController::class, 'clearCache'])->name('system.cache-clear');
         Route::get('/system/database/export',[App\Http\Controllers\Core\WebSettingController::class, 'databaseExport'])->name('system.database-export');
         Route::post('/system/database/import',[App\Http\Controllers\Core\WebSettingController::class, 'databaseImport'])->name('system.database-import');
         Route::post('/system/update/check',[App\Http\Controllers\Core\WebSettingController::class, 'updateCheck'])->name('system.website-check');

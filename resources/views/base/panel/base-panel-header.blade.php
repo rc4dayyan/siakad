@@ -33,6 +33,18 @@
 @endphp
         <div class="collapse navbar-collapse" id="navbarSupportedContent">
             <ul class="navbar-nav ms-auto mb-lg-0 dashboard-navbar-actions">
+                @auth
+                    @if ((int) Auth::user()->raw_type === 0 && Auth::user()->status == 1)
+                        <li class="nav-item me-1">
+                            <form method="POST" action="{{ route('web-admin.system.cache-clear') }}" onsubmit="return confirm('Bersihkan seluruh cache aplikasi?')">
+                                @csrf
+                                <button type="submit" class="nav-link border-0" title="Bersihkan cache" aria-label="Bersihkan cache">
+                                    <i class="bi bi-arrow-clockwise fs-4"></i>
+                                </button>
+                            </form>
+                        </li>
+                    @endif
+                @endauth
                 @auth('dosen')
 
                 @else

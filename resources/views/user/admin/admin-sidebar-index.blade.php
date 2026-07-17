@@ -80,7 +80,7 @@
                 </li>
             </ul>
         </li> -->
-        <li class="sidebar-item has-sub {{ Route::is('web-admin.master.kurikulum-*', 'web-admin.master.kelas-*', 'web-admin.master.matkul-*', 'web-admin.master.jadkul-*') ? 'active' : '' }}">
+        <li class="sidebar-item has-sub {{ Route::is('web-admin.master.kurikulum-*', 'web-admin.master.kelas-*', 'web-admin.master.master-matkul-*', 'web-admin.master.matkul-*', 'web-admin.master.jadkul-*') ? 'active' : '' }}">
             <a href="#" class='sidebar-link'>
                 <i class="fa-solid fa-school"></i>
                 <span>Data KBM</span>
@@ -91,6 +91,9 @@
                 </li>
                 <li class="submenu-item {{ Route::is('web-admin.master.kelas-*') ? 'active' : '' }}">
                     <a href="{{ route('web-admin.master.kelas-index') }}" class="submenu-link">Data Kelas</a>
+                </li>
+                <li class="submenu-item {{ Route::is('web-admin.master.master-matkul-*') ? 'active' : '' }}">
+                    <a href="{{ route('web-admin.master.master-matkul-index') }}" class="submenu-link">Master Mata Kuliah</a>
                 </li>
                 <li class="submenu-item {{ Route::is('web-admin.master.matkul-*') ? 'active' : '' }}">
                     <a href="{{ route('web-admin.master.matkul-index') }}" class="submenu-link">Data Mata Kuliah</a>
