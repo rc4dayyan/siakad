@@ -13,6 +13,7 @@
 {{-- PLUGIN FONT AWESOME --}}
 <link rel="stylesheet" href="{{ asset('vendor') }}/fontawesome/css/all.min.css" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('dist') }}/custom/banner.css">
+<link rel="stylesheet" href="{{ asset('dist') }}/custom/dashboard.css">
 {{-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script> --}}
 
 @yield('custom-css')

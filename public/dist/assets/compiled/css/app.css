@@ -18609,7 +18609,7 @@ body .bi:before,
         left: 0;
     }
     #sidebar ~ #main {
-        margin-left: 300px;
+        margin-left: 290px;
     }
 }
 #sidebar.inactive .sidebar-wrapper {
@@ -19320,7 +19320,7 @@ body .bi:before,
 }
 .bi {
     width: 1rem;
-    height: 1rem;
+    /* height: 1rem; */
 }
 .bi.bi-middle:before {
     vertical-align: middle;

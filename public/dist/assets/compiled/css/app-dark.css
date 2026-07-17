@@ -10039,7 +10039,7 @@ html[data-bs-theme="dark"] .progress .progress-bar.progress-label:before {
 }
 html[data-bs-theme="dark"] .bi {
     width: 1rem;
-    height: 1rem;
+    /* height: 1rem; */
 }
 html[data-bs-theme="dark"] .bi.bi-middle:before {
     vertical-align: middle;
