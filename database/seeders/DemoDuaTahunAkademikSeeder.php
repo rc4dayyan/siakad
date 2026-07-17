@@ -206,6 +206,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
 
     private function seedStudyProgram(Dosen $head): ProgramStudi
     {
+        return true;
         $faculty = Fakultas::query()
             ->where('code', 'not like', 'DEMO-%')
             ->orderBy('id')
