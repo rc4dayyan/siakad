@@ -100,6 +100,34 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
         $this->assertDatabaseHas('history_tagihans', ['code' => 'DEMO-BYR-252602-2', 'status' => 'pending']);
     }
 
+    public function test_academic_purge_previews_then_removes_transactions_but_preserves_identities(): void
+    {
+        $this->seed(DemoDuaTahunAkademikSeeder::class);
+
+        $this->artisan('academic:purge', ['--preview' => true])
+            ->expectsOutputToContain('PREVIEW selesai')
+            ->assertSuccessful();
+
+        $this->assertSame(4, TahunAkademik::count());
+        $this->assertSame(2, Mahasiswa::where('mhs_code', 'like', 'DEMO-%')->count());
+
+        $this->artisan('academic:purge', ['--confirm' => true])
+            ->expectsOutputToContain('Pembersihan selesai')
+            ->assertSuccessful();
+
+        $this->assertSame(0, TahunAkademik::count());
+        $this->assertSame(0, DB::table('registrasi_mahasiswas')->count());
+        $this->assertSame(0, DB::table('penawaran_mata_kuliahs')->count());
+        $this->assertSame(0, DB::table('pertemuan_kuliahs')->count());
+        $this->assertSame(0, DB::table('krs')->count());
+        $this->assertSame(0, DB::table('tagihan_kuliahs')->count());
+        $this->assertSame(2, Mahasiswa::where('mhs_code', 'like', 'DEMO-%')->count());
+        $this->assertSame(2, DB::table('dosens')->where('dsn_code', 'like', 'DEMO-%')->count());
+        $this->assertSame(2, DB::table('users')->where('code', 'like', 'DEMO-STAFF-%')->count());
+        $this->assertSame(8, DB::table('master_mata_kuliahs')->where('program_studi', 'DEMO-PAI')->count());
+        $this->assertSame(0, Mahasiswa::where('mhs_code', 'like', 'DEMO-%')->where(fn ($query) => $query->where('taka_id', '!=', 0)->orWhere('class_id', '!=', 0))->count());
+    }
+
     private function migrationFiles(): array
     {
         return [
