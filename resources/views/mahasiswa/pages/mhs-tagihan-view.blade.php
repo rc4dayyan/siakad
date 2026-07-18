@@ -1,120 +1,77 @@
 @extends('base.base-dash-index')
-@section('title')
-Data Tagihan Perkuliahan - Siakad By Internal Developer
-@endsection
-@section('menu')
-Data Tagihan Perkuliahan
-@endsection
-@section('submenu')
-Lihat Tagihan {{ $tagihan->code }}
-@endsection
-@section('urlmenu')
-@endsection
-@section('subdesc')
-Halaman untuk melihat Tagihan {{ $tagihan->code }}
-@endsection
-@section('custom-css')
-<meta name="csrf-token" content="{{ csrf_token() }}">
-<meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
-<meta name="viewport" content="width=device-width, initial-scale=1">
 
+@section('title', 'Konfirmasi Pembayaran')
+@section('menu', 'Konfirmasi Pembayaran')
+@section('submenu', $tagihan->code)
+@section('urlmenu', route('mahasiswa.home-tagihan-index'))
+@section('subdesc', 'Kirim bukti pembayaran untuk diperiksa petugas keuangan')
 
-@endsection
 @section('content')
 <section class="section">
     <div class="card">
-        <div class="card-header">
-            <h5 class="card-title d-flex justify-content-between align-items-center">
-                @yield('menu')
-                <div class="">
-                    <a href="{{ route('mahasiswa.home-tagihan-index') }}" class="btn btn-outline-warning"><i class="fa-solid fa-backward"></i></a>
-                </div>
-            </h5>
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-1">{{ $tagihan->name }}</h5>
+                <small>{{ $tagihan->code }}</small>
+            </div>
+            <a href="{{ route('mahasiswa.home-tagihan-index') }}" class="btn btn-outline-secondary">Kembali</a>
         </div>
-        <div class="card-body ">
-            <form id="payment-form" action="{{ route('mahasiswa.home-tagihan-payment', $tagihan->code) }}" method="POST" enctype="multipart/form-data">
-                @csrf
+        <div class="card-body">
+            @if ($errors->any())
+                <div class="alert alert-danger"><ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
+            @endif
 
-                <div class="form-group">
-                    <label for="name">Name</label>
-                    <input type="text" class="form-control" id="name" readonly value="{{ Auth::guard('mahasiswa')->user()->mhs_name }}" name="name">
+            <dl class="row">
+                <dt class="col-sm-3">Nominal</dt><dd class="col-sm-9">Rp {{ number_format($tagihan->nominal ?? $tagihan->price, 0, ',', '.') }}</dd>
+                <dt class="col-sm-3">Jatuh tempo</dt><dd class="col-sm-9">{{ $tagihan->jatuh_tempo?->format('d-m-Y') ?? '-' }}</dd>
+            </dl>
+
+            @if ($manualPayment?->status === \App\Models\HistoryTagihan::STATUS_PENDING)
+                <div class="alert alert-info">
+                    <strong>Menunggu verifikasi petugas.</strong><br>
+                    Pengajuan {{ $manualPayment->code }} dikirim {{ $manualPayment->diajukan_at?->format('d-m-Y H:i') }}.
+                    <a href="{{ route('mahasiswa.home-tagihan-payment-proof', $manualPayment) }}" class="alert-link">Lihat bukti pembayaran</a>.
                 </div>
-
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" class="form-control" id="email" readonly value="{{ !empty(Auth::guard('mahasiswa')->user()->mhs_mail) ? Auth::guard('mahasiswa')->user()->mhs_mail : 'mahasihswaemail@stai.com' }}" name="email">
+            @elseif ($manualPayment?->status === \App\Models\HistoryTagihan::STATUS_PAID || (int) $manualPayment?->stat === 1)
+                <div class="alert alert-success">
+                    Pembayaran telah dikonfirmasi lunas oleh petugas.
+                    <a href="{{ route('mahasiswa.home-tagihan-invoice', $manualPayment->code) }}" class="alert-link">Unduh invoice</a>.
                 </div>
+            @else
+                @if ($manualPayment?->status === \App\Models\HistoryTagihan::STATUS_REJECTED)
+                    <div class="alert alert-warning">
+                        <strong>Konfirmasi sebelumnya ditolak.</strong><br>
+                        Catatan petugas: {{ $manualPayment->catatan_verifikasi ?: 'Tidak ada catatan.' }}
+                    </div>
+                @endif
 
-                <div class="form-group">
-                    <label for="amount">Amount</label>
-                    <input type="number" class="form-control" id="amount" readonly value="{{ $tagihan->price }}" name="amount">
-                </div>
-
-                <div class="form-group">
-                    <label for="note">Note</label>
-                    <textarea class="form-control" id="note" name="note">Pembayaran Tagihan Kuliah {{ $tagihan->code }}</textarea>
-                </div>
-                {{-- <div class="form-group">
-                    <label for="SnapToken">SnapToken</label>
-                    <input class="form-control" id="snap-token" name="snapToken">
-                </div> --}}
-
-                <button type="submit" id="pay-button" class="btn btn-primary">Pay Now</button>
-            </form>
-
+                <form method="POST" action="{{ route('mahasiswa.home-tagihan-payment', $tagihan->code) }}" enctype="multipart/form-data">
+                    @csrf
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="tanggal-transfer">Tanggal transfer</label>
+                            <input id="tanggal-transfer" type="date" name="tanggal_transfer" value="{{ old('tanggal_transfer', now()->toDateString()) }}" max="{{ now()->toDateString() }}" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="nama-pengirim">Nama pemilik rekening/pengirim</label>
+                            <input id="nama-pengirim" name="nama_pengirim" value="{{ old('nama_pengirim', Auth::guard('mahasiswa')->user()->mhs_name) }}" maxlength="255" class="form-control" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="bukti-pembayaran">Bukti pembayaran</label>
+                            <input id="bukti-pembayaran" type="file" name="bukti_pembayaran" accept=".jpg,.jpeg,.png,.pdf" class="form-control" required>
+                            <small class="text-muted">Format JPG, PNG, atau PDF; maksimal 5 MB.</small>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="note">Catatan (opsional)</label>
+                            <textarea id="note" name="note" maxlength="255" class="form-control" rows="3">{{ old('note') }}</textarea>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary" onclick="return confirm('Kirim konfirmasi pembayaran untuk diperiksa petugas?')">Kirim Konfirmasi Pembayaran</button>
+                        </div>
+                    </div>
+                </form>
+            @endif
         </div>
     </div>
-
 </section>
-@endsection
-@section('custom-js')
-<script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="{{ config('services.midtrans.clientKey') }}"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm" crossorigin="anonymous"></script>
-
-<script type="text/javascript">
-    var snapToken = ""; // Inisialisasi snapToken
-
-    // Fungsi untuk melakukan permintaan pembayaran
-    $('#pay-button').click(function(event) {
-        event.preventDefault();
-
-        $.post("{{ route('mahasiswa.home-tagihan-payment', $tagihan->code) }}", {
-                _token: '{{ csrf_token() }}',
-                name: $('#name').val(),
-                email: $('#email').val(),
-                amount: $('#amount').val(),
-                note: $('#note').val()
-            },
-            function(data, status) {
-
-                snapToken = data.snap_token; // Simpan snapToken dari respons server
-                uniqCode = data.code_uniq; // Simpan snapToken dari respons server
-                // $('#snap-token').val(snapToken);
-
-                console.log(data.snap_token); // Tambahkan ini untuk debugging
-                // var snapToken = document.getElementById('snap-token').value;
-                snap.pay(snapToken, {
-                    onSuccess: function(result) {
-                        // location.reload();
-                        window.location.href = "{{ route('mahasiswa.home-tagihan-payment-success', ':uniqCode') }}".replace(':uniqCode', uniqCode);
-
-                    },
-
-                    onPending: function(result) {
-                        location.reload();
-                    },
-
-                    onError: function(result) {
-                        // window.location.href = "{{ route('mahasiswa.home-tagihan-payment-success', ':uniqCode') }}".replace(':uniqCode', uniqCode);
-
-                        location.reload();
-                    }
-                });
-            });
-    });
-</script>
-
-
-
-
 @endsection

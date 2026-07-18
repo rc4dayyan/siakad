@@ -37,10 +37,15 @@ use App\Services\Academic\PeriodReadinessService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class DemoDuaTahunAkademikSeeder extends Seeder
 {
+    private const LATEST_PERIOD_CODE = '252602';
+
+    private const STUDENTS_PER_COHORT = 12;
+
     public function run(): void
     {
         DB::transaction(function (): void {
@@ -49,31 +54,27 @@ class DemoDuaTahunAkademikSeeder extends Seeder
             $curriculum = $this->seedCurriculum();
             $room = $this->seedRoom();
             $periods = $this->seedPeriods();
-            $masters = $this->seedMasterCourses();
-            $students = $this->seedStudents();
+            $masters = $this->seedMasterCourses($studyProgram);
+            $studentCohorts = $this->seedStudents();
             $staff = $this->seedStaff();
+            $classCodePrefix = 'DEMO-KLS-'.strtoupper(Str::slug($studyProgram->code));
 
-            $offeringsByPeriod = [
-                '242501' => [
-                    [$masters['Pengantar Studi Islam'], 'DEMO-PSI-242501', $lecturers[0]],
-                    [$masters['Bahasa Arab Dasar'], 'DEMO-BAD-242501', $lecturers[1]],
-                ],
-                '242502' => [
-                    [$masters['Fikih I'], 'DEMO-FIQ1-242502', $lecturers[0]],
-                    [$masters['Ulumul Quran'], 'DEMO-UQ-242502', $lecturers[1]],
-                ],
-                '252601' => [
-                    [$masters['Fikih II'], 'DEMO-FIQ2-252601', $lecturers[0]],
-                    [$masters['Studi Hadis'], 'DEMO-HDS-252601', $lecturers[1]],
-                ],
-                '252602' => [
-                    [$masters['Metodologi Studi Islam'], 'DEMO-MSI-252602', $lecturers[0]],
-                    [$masters['Pendidikan Islam'], 'DEMO-PI-252602', $lecturers[1]],
-                ],
+            $courseNamesBySemester = [
+                1 => ['Pengantar Studi Islam', 'Bahasa Arab Dasar'],
+                2 => ['Fikih I', 'Ulumul Quran'],
+                3 => ['Fikih II', 'Studi Hadis'],
+                4 => ['Metodologi Studi Islam', 'Pendidikan Islam'],
+                5 => ['Akhlak Tasawuf', 'Sejarah Peradaban Islam'],
+                6 => ['Ushul Fikih', 'Ilmu Kalam'],
+                7 => ['Tafsir Tarbawi', 'Hadis Tarbawi'],
+                8 => ['Filsafat Pendidikan Islam', 'Manajemen Pendidikan Islam'],
+                9 => ['Metodologi Penelitian', 'Statistik Pendidikan'],
+                10 => ['Pengembangan Kurikulum', 'Evaluasi Pembelajaran'],
+                11 => ['Seminar Proposal', 'Praktik Pengalaman Lapangan'],
+                12 => ['Kuliah Kerja Nyata', 'Skripsi'],
             ];
 
             foreach (array_values($periods) as $periodIndex => $period) {
-                $semester = $periodIndex + 1;
                 $program = ProgramKuliah::updateOrCreate(['code' => 'DEMO-REG-'.$period->code], [
                     'taka_id' => $period->id,
                     'pstudi_id' => $studyProgram->id,
@@ -82,70 +83,106 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                     'wave_start' => $period->starts_at,
                     'wave_ended' => $period->ends_at,
                 ]);
-                $class = Kelas::updateOrCreate(['code' => 'DEMO-PAI-S'.$semester], [
-                    'taka_id' => $period->id,
-                    'pstudi_id' => $studyProgram->id,
-                    'proku_id' => $program->id,
-                    'dosen_id' => $lecturers[0]->id,
-                    'capacity' => 30,
-                    'name' => 'Kelas Demo PAI Semester '.$semester,
-                ]);
+                $this->seedAcademicCalendar($period);
+                $activeStudents = [];
 
-                foreach ($students as $student) {
-                    RegistrasiMahasiswa::updateOrCreate([
-                        'mahasiswa_id' => $student->id,
-                        'taka_id' => $period->id,
+                foreach ($studentCohorts as $entryYear => $students) {
+                    if ($entryYear > $period->year_start) {
+                        continue;
+                    }
+
+                    $studentSemester = (($period->year_start - $entryYear) * 2) + (int) $period->raw_semester;
+                    $class = Kelas::updateOrCreate([
+                        'code' => $classCodePrefix.'-A'.$entryYear.'-S'.$studentSemester,
                     ], [
-                        'semester_mahasiswa' => $semester,
-                        'status_akademik' => 'aktif',
-                        'status_registrasi' => 'terdaftar',
-                        'kelas_id' => $class->id,
-                        'dosen_wali_id' => $lecturers[0]->id,
-                        'batas_sks' => 24,
-                    ]);
-                }
-
-                $legacyOfferings = [];
-                foreach ($offeringsByPeriod[$period->code] as [$master, $code, $lecturer]) {
-                    $legacyOffering = MataKuliah::updateOrCreate(['code' => $code], [
-                        'mid' => $master->id,
-                        'kuri_id' => $curriculum->id,
                         'taka_id' => $period->id,
                         'pstudi_id' => $studyProgram->id,
-                        'kelas_id' => $class->id,
-                        'dosen_1' => $lecturer->id,
-                        'name' => $master->name,
-                        'bsks' => $master->sks,
-                        'desc' => 'Penawaran mata kuliah untuk alur demo dua tahun akademik.',
+                        'proku_id' => $program->id,
+                        'dosen_id' => $lecturers[0]->id,
+                        'capacity' => 30,
+                        'name' => 'Kelas Demo Angkatan '.$entryYear.' Semester '.$studentSemester,
                     ]);
-                    $legacyOfferings[] = $legacyOffering;
+
+                    foreach ($students as $student) {
+                        RegistrasiMahasiswa::updateOrCreate([
+                            'mahasiswa_id' => $student->id,
+                            'taka_id' => $period->id,
+                        ], [
+                            'semester_mahasiswa' => $studentSemester,
+                            'status_akademik' => 'aktif',
+                            'status_registrasi' => 'terdaftar',
+                            'kelas_id' => $class->id,
+                            'dosen_wali_id' => $lecturers[0]->id,
+                            'batas_sks' => 24,
+                        ]);
+                        $student->update([
+                            'taka_id' => $period->id,
+                            'class_id' => $class->id,
+                            'years_id' => $entryYear,
+                        ]);
+                    }
+                    $activeStudents = array_merge($activeStudents, $students);
+
+                    $legacyOfferings = [];
+                    foreach ($courseNamesBySemester[$studentSemester] as $courseIndex => $courseName) {
+                        $master = $masters[$courseName];
+                        $lecturer = $lecturers[($studentSemester + $courseIndex - 1) % count($lecturers)];
+                        $legacyOfferings[] = MataKuliah::updateOrCreate([
+                            'code' => 'DEMO-MK-'.$period->code.'-A'.$entryYear.'-'.($courseIndex + 1),
+                        ], [
+                            'mid' => $master->id,
+                            'kuri_id' => $curriculum->id,
+                            'taka_id' => $period->id,
+                            'pstudi_id' => $studyProgram->id,
+                            'kelas_id' => $class->id,
+                            'dosen_1' => $lecturer->id,
+                            'name' => $master->name,
+                            'bsks' => $master->sks,
+                            'desc' => 'Penawaran mata kuliah demo angkatan '.$entryYear.'.',
+                        ]);
+                    }
+
+                    $offerings = $this->seedNormalizedOfferings($period, $studyProgram, $curriculum, $class, $legacyOfferings);
+                    $this->seedAcademicActivities($period, $periodIndex, $studentSemester, $class, $room, $legacyOfferings, $students);
+                    $meetings = $this->seedWeeklySchedulesAndMeetings($period, $class, $room, $offerings);
+                    $krsItems = $this->seedKrs($period, $studentSemester, $lecturers[0], $offerings, $students);
+                    $this->linkNormalizedAcademicData($period, $class, $offerings, $meetings, $krsItems, $students);
                 }
 
-                $offerings = $this->seedNormalizedOfferings($period, $studyProgram, $curriculum, $class, $legacyOfferings);
-                $this->seedAcademicCalendar($period);
-                $this->seedAcademicActivities($period, $periodIndex, $class, $room, $legacyOfferings, $students);
-                $meetings = $this->seedWeeklySchedulesAndMeetings($period, $class, $room, $offerings);
-                $krsItems = $this->seedKrs($period, $periodIndex, $lecturers[0], $offerings, $students);
-                $this->linkNormalizedAcademicData($period, $offerings, $meetings, $krsItems, $students);
-                $this->seedFinance($period, $periodIndex, $studyProgram, $program, $students, $staff['finance']);
+                $this->seedFinance($period, $periodIndex, $studyProgram, $program, $activeStudents, $staff['finance']);
                 $this->seedPublication($period, $staff['academic']);
-            }
-
-            $latestPeriod = $periods['252602'];
-            $latestClass = Kelas::where('code', 'DEMO-PAI-S4')->firstOrFail();
-            foreach ($students as $student) {
-                $student->update([
-                    'taka_id' => $latestPeriod->id,
-                    'class_id' => $latestClass->id,
-                    'years_id' => 2024,
-                ]);
             }
         });
     }
 
     private function seedPeriods(): array
     {
-        $demoCodes = ['242501', '242502', '252601', '252602'];
+        $definitions = [];
+
+        for ($startYear = 2020; $startYear <= 2025; $startYear++) {
+            $endYear = $startYear + 1;
+            $yearCode = substr((string) $startYear, -2).substr((string) $endYear, -2);
+
+            foreach ([1 => TahunAkademik::TERM_GANJIL, 2 => TahunAkademik::TERM_GENAP] as $semester => $term) {
+                $code = $yearCode.'0'.$semester;
+                $isOddSemester = $semester === 1;
+                $status = $code === self::LATEST_PERIOD_CODE
+                    ? TahunAkademik::STATUS_ACTIVE
+                    : ($code === '252601' ? TahunAkademik::STATUS_CLOSED : TahunAkademik::STATUS_ARCHIVED);
+                $definitions[$code] = [
+                    'TA. '.$startYear.'/'.$endYear.' '.($isOddSemester ? 'Ganjil' : 'Genap'),
+                    $startYear,
+                    $endYear,
+                    $semester,
+                    $term,
+                    $isOddSemester ? $startYear.'-08-01' : $endYear.'-02-01',
+                    $isOddSemester ? $endYear.'-01-31' : $endYear.'-07-31',
+                    $status,
+                ];
+            }
+        }
+
+        $demoCodes = array_keys($definitions);
         $hasExternalActivePeriod = TahunAkademik::query()
             ->where('is_active', true)
             ->whereNotIn('code', $demoCodes)
@@ -156,12 +193,6 @@ class DemoDuaTahunAkademikSeeder extends Seeder
             'status' => TahunAkademik::STATUS_CLOSED,
         ]);
 
-        $definitions = [
-            '242501' => ['TA. 2024/2025 Ganjil', 2024, 2025, 1, TahunAkademik::TERM_GANJIL, '2024-08-01', '2025-01-31', TahunAkademik::STATUS_ARCHIVED],
-            '242502' => ['TA. 2024/2025 Genap', 2024, 2025, 2, TahunAkademik::TERM_GENAP, '2025-02-01', '2025-07-31', TahunAkademik::STATUS_ARCHIVED],
-            '252601' => ['TA. 2025/2026 Ganjil', 2025, 2026, 1, TahunAkademik::TERM_GANJIL, '2025-08-01', '2026-01-31', TahunAkademik::STATUS_CLOSED],
-            '252602' => ['TA. 2025/2026 Genap', 2025, 2026, 2, TahunAkademik::TERM_GENAP, '2026-02-01', '2026-07-31', TahunAkademik::STATUS_ACTIVE],
-        ];
         $periods = [];
 
         foreach ($definitions as $code => [$name, $startYear, $endYear, $semester, $term, $startsAt, $endsAt, $status]) {
@@ -220,10 +251,10 @@ class DemoDuaTahunAkademikSeeder extends Seeder
     private function seedCurriculum(): Kurikulum
     {
         return Kurikulum::updateOrCreate(['code' => 'DEMO-KUR-2024'], [
-            'name' => 'Kurikulum Demo 2024',
-            'desc' => 'Kurikulum khusus simulasi alur akademik.',
-            'year_start' => 2024,
-            'year_ended' => 2028,
+            'name' => 'Kurikulum Demo Enam Tahun',
+            'desc' => 'Kurikulum khusus simulasi alur akademik enam tahun.',
+            'year_start' => 2020,
+            'year_ended' => 2026,
         ]);
     }
 
@@ -239,7 +270,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
         ]);
     }
 
-    private function seedMasterCourses(): array
+    private function seedMasterCourses(ProgramStudi $studyProgram): array
     {
         $definitions = [
             ['Pengantar Studi Islam', 1, 3],
@@ -250,15 +281,40 @@ class DemoDuaTahunAkademikSeeder extends Seeder
             ['Studi Hadis', 3, 3],
             ['Metodologi Studi Islam', 4, 3],
             ['Pendidikan Islam', 4, 3],
+            ['Akhlak Tasawuf', 5, 3],
+            ['Sejarah Peradaban Islam', 5, 3],
+            ['Ushul Fikih', 6, 3],
+            ['Ilmu Kalam', 6, 2],
+            ['Tafsir Tarbawi', 7, 3],
+            ['Hadis Tarbawi', 7, 3],
+            ['Filsafat Pendidikan Islam', 8, 3],
+            ['Manajemen Pendidikan Islam', 8, 3],
+            ['Metodologi Penelitian', 9, 3],
+            ['Statistik Pendidikan', 9, 2],
+            ['Pengembangan Kurikulum', 10, 3],
+            ['Evaluasi Pembelajaran', 10, 3],
+            ['Seminar Proposal', 11, 2],
+            ['Praktik Pengalaman Lapangan', 11, 4],
+            ['Kuliah Kerja Nyata', 12, 4],
+            ['Skripsi', 12, 6],
         ];
         $masters = [];
 
         foreach ($definitions as [$name, $semester, $sks]) {
-            $masters[$name] = MasterMataKuliah::updateOrCreate([
-                'program_studi' => 'DEMO-PAI',
+            $master = MasterMataKuliah::query()
+                ->where('program_studi', $studyProgram->code)
+                ->where('semester', $semester)
+                ->where('name', $name)
+                ->first();
+
+            $master ??= new MasterMataKuliah;
+            $master->fill([
+                'program_studi' => $studyProgram->code,
                 'semester' => $semester,
                 'name' => $name,
-            ], ['sks' => $sks]);
+                'sks' => $sks,
+            ])->save();
+            $masters[$name] = $master;
         }
 
         return $masters;
@@ -266,20 +322,54 @@ class DemoDuaTahunAkademikSeeder extends Seeder
 
     private function seedStudents(): array
     {
-        $definitions = [
-            ['DEMO-MHS-01', '24990001', 'Ali Mahasiswa Demo', 'demo.mahasiswa1', 'demo.mahasiswa1@example.test', '089910000001'],
-            ['DEMO-MHS-02', '24990002', 'Siti Mahasiswa Demo', 'demo.mahasiswa2', 'demo.mahasiswa2@example.test', '089910000002'],
+        $names = [
+            'Ali Rahman',
+            'Siti Aisyah',
+            'Ahmad Fauzan',
+            'Nurul Hidayah',
+            'Muhammad Rizki',
+            'Dewi Lestari',
+            'Hasan Basri',
+            'Fitri Handayani',
+            'Abdul Aziz',
+            'Rina Marlina',
+            'Yusuf Maulana',
+            'Nadia Rahmawati',
         ];
+        $cohorts = [];
 
-        return array_map(fn (array $data) => Mahasiswa::updateOrCreate(['mhs_code' => $data[0]], [
-            'mhs_stat' => 1,
-            'mhs_nim' => $data[1],
-            'mhs_name' => $data[2],
-            'mhs_user' => $data[3],
-            'mhs_mail' => $data[4],
-            'mhs_phone' => $data[5],
-            'password' => Hash::make('Demo123!'),
-        ]), $definitions);
+        for ($entryYear = 2020; $entryYear <= 2025; $entryYear++) {
+            $yearSuffix = substr((string) $entryYear, -2);
+            $definitions = [];
+
+            foreach (array_slice($names, 0, self::STUDENTS_PER_COHORT) as $index => $name) {
+                $number = $index + 1;
+                $suffix = str_pad((string) $number, 2, '0', STR_PAD_LEFT);
+                $isFirstCohort = $entryYear === 2020;
+                $definitions[] = [
+                    $isFirstCohort ? 'DEMO-MHS-'.$suffix : 'DEMO-MHS-'.$yearSuffix.'-'.$suffix,
+                    $yearSuffix.'9900'.$suffix,
+                    $name.' (Angkatan '.$entryYear.')',
+                    $isFirstCohort ? 'demo.mahasiswa'.$number : 'demo.mahasiswa'.$yearSuffix.'.'.$number,
+                    $isFirstCohort
+                        ? 'demo.mahasiswa'.$number.'@example.test'
+                        : 'demo.mahasiswa'.$yearSuffix.'.'.$number.'@example.test',
+                    '0899'.$yearSuffix.'00'.$suffix,
+                ];
+            }
+
+            $cohorts[$entryYear] = array_map(fn (array $data) => Mahasiswa::updateOrCreate(['mhs_code' => $data[0]], [
+                'mhs_stat' => 1,
+                'mhs_nim' => $data[1],
+                'mhs_name' => $data[2],
+                'mhs_user' => $data[3],
+                'mhs_mail' => $data[4],
+                'mhs_phone' => $data[5],
+                'password' => Hash::make('Demo123!'),
+            ]), $definitions);
+        }
+
+        return $cohorts;
     }
 
     private function seedStaff(): array
@@ -325,7 +415,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
             'code' => $course->code,
             'sks' => $course->bsks,
             'kapasitas' => 30,
-            'deskripsi' => 'Penawaran normalisasi untuk simulasi dua tahun akademik.',
+            'deskripsi' => 'Penawaran normalisasi untuk simulasi enam tahun akademik.',
         ]), $legacyOfferings);
     }
 
@@ -371,9 +461,9 @@ class DemoDuaTahunAkademikSeeder extends Seeder
             ];
             $fingerprint = JadwalMingguan::fingerprint($attributes);
             $weekly = JadwalMingguan::updateOrCreate(['fingerprint' => $fingerprint], $attributes + [
-                'code' => 'DEMO-JM-'.$period->code.'-'.($courseIndex + 1),
+                'code' => 'DEMO-JM-'.$period->code.'-'.$class->id.'-'.($courseIndex + 1),
             ]);
-            $legacySchedule = JadwalKuliah::where('code', 'DEMO-JDW-'.$period->code.'-'.($courseIndex + 1))->firstOrFail();
+            $legacySchedule = JadwalKuliah::where('code', 'DEMO-JDW-'.$period->code.'-'.$class->id.'-'.($courseIndex + 1))->firstOrFail();
 
             for ($meetingNumber = 1; $meetingNumber <= 4; $meetingNumber++) {
                 $meeting = PertemuanKuliah::updateOrCreate([
@@ -389,7 +479,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                     'metode' => $meetingNumber === 3 ? 'daring' : 'tatap_muka',
                     'materi' => 'Materi demo pertemuan '.$meetingNumber,
                     'status' => $meetingNumber < 4 ? PertemuanKuliah::STATUS_COMPLETED : PertemuanKuliah::STATUS_SCHEDULED,
-                    'code' => 'DEMO-PRT-'.$period->code.'-'.($courseIndex + 1).'-'.$meetingNumber,
+                    'code' => 'DEMO-PRT-'.$period->code.'-'.$class->id.'-'.($courseIndex + 1).'-'.$meetingNumber,
                 ]);
                 $meetings[$offering->id][$meetingNumber] = $meeting;
             }
@@ -400,7 +490,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
 
     private function seedKrs(
         TahunAkademik $period,
-        int $periodIndex,
+        int $studentSemester,
         Dosen $advisor,
         array $offerings,
         array $students
@@ -409,11 +499,13 @@ class DemoDuaTahunAkademikSeeder extends Seeder
 
         foreach ($students as $studentIndex => $student) {
             $registration = RegistrasiMahasiswa::where('mahasiswa_id', $student->id)->where('taka_id', $period->id)->firstOrFail();
-            $finalStatus = $periodIndex < 3 ? Krs::STATUS_LOCKED : ($studentIndex === 0 ? Krs::STATUS_APPROVED : Krs::STATUS_DRAFT);
+            $finalStatus = $period->code !== self::LATEST_PERIOD_CODE
+                ? Krs::STATUS_LOCKED
+                : ($studentIndex === 0 ? Krs::STATUS_APPROVED : Krs::STATUS_DRAFT);
             $krs = Krs::updateOrCreate(['registrasi_mahasiswa_id' => $registration->id], [
                 'status' => Krs::STATUS_DRAFT,
                 'total_sks' => array_sum(array_map(fn ($offering) => (int) $offering->sks, $offerings)),
-                'catatan_mahasiswa' => 'KRS demo semester '.($periodIndex + 1).'.',
+                'catatan_mahasiswa' => 'KRS demo semester '.$studentSemester.'.',
                 'catatan_keputusan' => $finalStatus === Krs::STATUS_DRAFT ? null : 'Disetujui dosen wali untuk simulasi.',
                 'diajukan_at' => $finalStatus === Krs::STATUS_DRAFT ? null : $period->starts_at->copy()->addDays(5),
                 'diputuskan_at' => $finalStatus === Krs::STATUS_DRAFT ? null : $period->starts_at->copy()->addDays(7),
@@ -442,19 +534,20 @@ class DemoDuaTahunAkademikSeeder extends Seeder
 
     private function linkNormalizedAcademicData(
         TahunAkademik $period,
+        Kelas $class,
         array $offerings,
         array $meetings,
         array $krsItems,
         array $students
     ): void {
         foreach ($offerings as $courseIndex => $offering) {
-            JadwalKuliah::where('code', 'DEMO-JDW-'.$period->code.'-'.($courseIndex + 1))
+            JadwalKuliah::where('code', 'DEMO-JDW-'.$period->code.'-'.$class->id.'-'.($courseIndex + 1))
                 ->update(['penawaran_mata_kuliah_id' => $offering->id]);
             NilaiMahasiswa::where('mata_kuliah_id', $offering->legacy_mata_kuliah_id)
                 ->update(['penawaran_mata_kuliah_id' => $offering->id]);
 
-            foreach ($students as $studentIndex => $student) {
-                AbsensiMahasiswa::where('code', 'DEMO-ABS-'.$period->code.'-'.$courseIndex.'-'.$studentIndex)->update([
+            foreach ($students as $student) {
+                AbsensiMahasiswa::where('code', 'DEMO-ABS-'.$period->code.'-'.$class->id.'-'.$courseIndex.'-'.$student->id)->update([
                     'pertemuan_kuliah_id' => $meetings[$offering->id][1]->id,
                     'krs_item_id' => $krsItems[$student->id][$offering->id],
                 ]);
@@ -513,7 +606,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                 'target_proku_id' => null,
                 'kelompok_target' => 'mahasiswa_aktif',
             ]);
-            $paid = $periodIndex < 3 || $studentIndex === 0;
+            $paid = $period->code !== self::LATEST_PERIOD_CODE || $studentIndex === 0;
             HistoryTagihan::updateOrCreate(['code' => 'DEMO-BYR-'.$period->code.'-'.($studentIndex + 1)], [
                 'users_id' => $student->id,
                 'stat' => $paid ? 1 : 0,
@@ -587,18 +680,15 @@ class DemoDuaTahunAkademikSeeder extends Seeder
     private function seedAcademicActivities(
         TahunAkademik $period,
         int $periodIndex,
+        int $studentSemester,
         Kelas $class,
         Ruang $room,
         array $offerings,
         array $students
     ): void {
-        $gradeLetters = [['A', 'B'], ['B', 'A'], ['A', 'A'], ['B', 'A']][$periodIndex];
-        // Kolom nilai_ips dan nilai_ipk pada skema lama masih bertipe integer.
-        $gradePoints = [[3, 3], [3, 4], [4, 4], [4, 4]][$periodIndex];
-
         foreach ($offerings as $courseIndex => $course) {
             $date = $period->starts_at->copy()->addWeeks(2 + $courseIndex)->toDateString();
-            $schedule = JadwalKuliah::updateOrCreate(['code' => 'DEMO-JDW-'.$period->code.'-'.($courseIndex + 1)], [
+            $schedule = JadwalKuliah::updateOrCreate(['code' => 'DEMO-JDW-'.$period->code.'-'.$class->id.'-'.($courseIndex + 1)], [
                 'makul_id' => $course->id,
                 'kelas_id' => $class->id,
                 'dosen_id' => $course->dosen_1,
@@ -613,6 +703,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
             ]);
 
             foreach ($students as $studentIndex => $student) {
+                $gradePoint = 4 - (($periodIndex + $studentIndex + $courseIndex) % 2);
                 NilaiMahasiswa::updateOrCreate([
                     'mahasiswa_id' => $student->id,
                     'mata_kuliah_id' => $course->id,
@@ -620,16 +711,16 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                 ], [
                     'taka_id' => $period->id,
                     'dosen_id' => $course->dosen_1,
-                    'nilai' => $gradeLetters[$studentIndex],
+                    'nilai' => $gradePoint === 4 ? 'A' : 'B',
                     'keterangan' => 'Nilai demo telah dipublikasikan.',
                 ]);
                 AbsensiMahasiswa::updateOrCreate([
                     'jadkul_code' => $schedule->code,
                     'author_id' => $student->id,
                 ], [
-                    'absen_type' => $studentIndex === 0 ? 'H' : 'I',
+                    'absen_type' => $studentIndex % 5 === 4 ? 'I' : 'H',
                     'absen_proof' => 'default/default-profile.jpg',
-                    'code' => 'DEMO-ABS-'.$period->code.'-'.$courseIndex.'-'.$studentIndex,
+                    'code' => 'DEMO-ABS-'.$period->code.'-'.$class->id.'-'.$courseIndex.'-'.$student->id,
                     'absen_date' => $date,
                     'absen_time' => $courseIndex === 0 ? '08:05:00' : '10:05:00',
                     'absen_desc' => 'Presensi contoh untuk simulasi.',
@@ -639,40 +730,44 @@ class DemoDuaTahunAkademikSeeder extends Seeder
             if ($courseIndex === 0) {
                 $task = studentTask::updateOrCreate(['jadkul_id' => $schedule->id], [
                     'dosen_id' => $course->dosen_1,
-                    'code' => 'DEMO-TGS-'.$period->code,
-                    'title' => 'Tugas Refleksi '.$period->code,
+                    'code' => 'DEMO-TGS-'.$period->code.'-'.$class->id,
+                    'title' => 'Tugas Refleksi Semester '.$studentSemester,
                     'detail_task' => 'Tuliskan refleksi pembelajaran pada periode ini.',
                     'exp_date' => $period->starts_at->copy()->addMonth()->toDateString(),
                     'exp_time' => '23:59:00',
                 ]);
                 foreach ($students as $studentIndex => $student) {
+                    $taskScore = 8 + (($periodIndex + $studentIndex) % 3);
                     studentScore::updateOrCreate([
                         'stask_id' => $task->id,
                         'student_id' => $student->id,
                     ], [
-                        'score' => 8 + $studentIndex,
+                        'score' => $taskScore,
                         'desc' => 'Jawaban tugas demo.',
-                        'code' => (int) ('99'.($periodIndex + 1).'0'.($studentIndex + 1)),
+                        'code' => 900000000 + (($periodIndex + 1) * 1000000) + ($studentSemester * 10000) + $studentIndex + 1,
                     ]);
                 }
             }
         }
 
         foreach ($students as $studentIndex => $student) {
+            // Kolom nilai_ips dan nilai_ipk pada skema lama masih bertipe integer.
+            $gradePoint = 4 - (($periodIndex + $studentIndex) % 2);
+            $taskScore = 8 + (($periodIndex + $studentIndex) % 3);
             HasilStudi::updateOrCreate([
                 'student_id' => $student->id,
                 'taka_id' => $period->id,
             ], [
-                'score_absen' => 90 - ($studentIndex * 5),
-                'score_tugas' => 8 + $studentIndex,
-                'score_uts' => 80 + ($periodIndex * 2),
-                'score_uas' => 82 + ($periodIndex * 2),
+                'score_absen' => 90 - (($studentIndex % 5) * 5),
+                'score_tugas' => $taskScore,
+                'score_uts' => min(95, 80 + $periodIndex),
+                'score_uas' => min(97, 82 + $periodIndex),
                 'max_absen' => 2,
                 'max_tugas' => 1,
-                'smt_id' => $periodIndex + 1,
-                'nilai_ips' => $gradePoints[$studentIndex],
-                'nilai_ipk' => $gradePoints[$studentIndex],
-                'code' => 'DEMO-KHS-'.$period->code.'-'.$studentIndex,
+                'smt_id' => $studentSemester,
+                'nilai_ips' => $gradePoint,
+                'nilai_ipk' => $gradePoint,
+                'code' => 'DEMO-KHS-'.$period->code.'-'.$student->id,
             ]);
         }
     }

@@ -23,6 +23,14 @@ Route::group(['prefix' => 'academic', 'middleware' => ['user-access:Departement 
         Route::patch('/data-mahasiswa/{code}/update',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'updateStudent'])->name('workers.student-update');
         Route::patch('/data-mahasiswa/{code}/status-akademik',[App\Http\Controllers\Admin\AcademicStatusController::class, 'update'])->name('workers.student-academic-status-update');
         Route::delete('/data-mahasiswa/{code}/destroy',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'destroyStudent'])->name('workers.student-destroy');
+        Route::get('/krs-management', [App\Http\Controllers\Admin\KrsManagementController::class, 'index'])->name('krs-management.index');
+        Route::get('/krs-management/import/template', [App\Http\Controllers\Admin\KrsManagementController::class, 'importTemplate'])->name('krs-management.import-template');
+        Route::post('/krs-management/import/preview', [App\Http\Controllers\Admin\KrsManagementController::class, 'importPreview'])->name('krs-management.import-preview');
+        Route::post('/krs-management/import/execute', [App\Http\Controllers\Admin\KrsManagementController::class, 'importExecute'])->name('krs-management.import-execute');
+        Route::patch('/krs-management/bulk', [App\Http\Controllers\Admin\KrsManagementController::class, 'bulk'])->name('krs-management.bulk');
+        Route::post('/krs-management/{registration}/items', [App\Http\Controllers\Admin\KrsManagementController::class, 'add'])->name('krs-management.add');
+        Route::delete('/krs-management/items/{item}', [App\Http\Controllers\Admin\KrsManagementController::class, 'remove'])->name('krs-management.remove');
+        Route::patch('/krs-management/{krs}/reopen', [App\Http\Controllers\Admin\KrsManagementController::class, 'reopen'])->name('krs-management.reopen');
 
         // MENU KHUSUS DATA MASTER => DATA KELAS
         Route::get('/master/data-kelas',[App\Http\Controllers\Admin\Pages\Core\KelasController::class, 'index'])->name('master.kelas-index');

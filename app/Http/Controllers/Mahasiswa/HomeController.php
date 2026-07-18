@@ -23,16 +23,17 @@ use App\Models\TagihanKuliah;
 use App\Services\Academic\AcademicPeriodContext;
 use App\Services\Academic\AttendanceEligibilityService;
 use App\Services\Academic\StudentAcademicContext;
+use App\Services\Finance\ManualPaymentService;
 use Auth;
 use Hash;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
 use PDF;
-use Str;
 
 class HomeController extends Controller
 {
@@ -336,6 +337,7 @@ class HomeController extends Controller
 
         $data['tagihan'] = TagihanKuliah::query()->forAcademicPeriod($period)->forStudent($user)->latest()->get();
         $data['history'] = HistoryTagihan::query()->where('users_id', $user->id)->where('taka_id', $period?->id)->where('stat', 1)->latest()->get();
+        $data['payments'] = HistoryTagihan::query()->where('users_id', $user->id)->where('taka_id', $period?->id)->latest()->get();
 
         return response()->json($data);
 
@@ -349,6 +351,7 @@ class HomeController extends Controller
         $data['period'] = $period;
         $data['tagihan'] = TagihanKuliah::query()->forAcademicPeriod($period)->forStudent($user)->latest()->get();
         $data['history'] = HistoryTagihan::query()->where('users_id', $user->id)->where('taka_id', $period?->id)->where('stat', 1)->latest()->get();
+        $data['payments'] = HistoryTagihan::query()->where('users_id', $user->id)->where('taka_id', $period?->id)->latest()->get();
 
         return view('mahasiswa.pages.mhs-tagihan-index', $data);
 
@@ -356,30 +359,29 @@ class HomeController extends Controller
 
     public function tagihanView($code, AcademicPeriodContext $context)
     {
-        // Mencari tagihan berdasarkan `users_id`
         $user = Auth::guard('mahasiswa')->user();
         $data['web'] = webSettings::where('id', 1)->first();
-        $checkData = HistoryTagihan::where('tagihan_code', $code)->where('users_id', $user->id)->where('stat', 1)->first();
-        if ($checkData !== null) {
+        $data['tagihan'] = TagihanKuliah::query()
+            ->forAcademicPeriod($context->published())
+            ->forStudent($user)
+            ->where('status', TagihanKuliah::STATUS_TERBIT)
+            ->where('code', $code)
+            ->firstOrFail();
+        $data['manualPayment'] = HistoryTagihan::query()
+            ->where('tagihan_kuliah_id', $data['tagihan']->id)
+            ->where('users_id', $user->id)
+            ->latest()
+            ->first();
 
-            Alert::error('error', 'Kamu sudah membayar tagihan ini');
-
-            return back();
-        } else {
-            $data['tagihan'] = TagihanKuliah::query()
-                ->forAcademicPeriod($context->published())
-                ->forStudent($user)
-                ->where('status', TagihanKuliah::STATUS_TERBIT)
-                ->where('code', $code)
-                ->firstOrFail();
-
-            return view('mahasiswa.pages.mhs-tagihan-view', $data);
-
-        }
+        return view('mahasiswa.pages.mhs-tagihan-view', $data);
     }
 
-    public function tagihanPayment(Request $request, $code, AcademicPeriodContext $context)
-    {
+    public function tagihanPayment(
+        Request $request,
+        $code,
+        AcademicPeriodContext $context,
+        ManualPaymentService $payments
+    ) {
         $user = Auth::guard('mahasiswa')->user();
         $tagihan = TagihanKuliah::query()
             ->forAcademicPeriod($context->published())
@@ -387,61 +389,25 @@ class HomeController extends Controller
             ->where('status', TagihanKuliah::STATUS_TERBIT)
             ->where('code', $code)
             ->firstOrFail();
-        $request->validate(['note' => ['nullable', 'string', 'max:255']]);
-
-        \Midtrans\Config::$serverKey = config('services.midtrans.serverKey');
-        \Midtrans\Config::$isProduction = config('services.midtrans.isProduction');
-        \Midtrans\Config::$isSanitized = config('services.midtrans.isSanitized');
-        \Midtrans\Config::$is3ds = config('services.midtrans.is3ds');
-
-        DB::transaction(function () use ($request, $tagihan, $user) {
-            $donation = \App\Models\HistoryTagihan::create([
-                'users_id' => $user->id,
-                'tagihan_code' => $tagihan->code,
-                'tagihan_kuliah_id' => $tagihan->id,
-                'taka_id' => $tagihan->taka_id,
-                'nominal' => $tagihan->nominal,
-                'status' => 'pending',
-                'code' => Str::random(9),
-                'desc' => $request->note ?: 'Pembayaran Tagihan Kuliah '.$tagihan->code,
-            ]);
-
-            $payload = [
-                'transaction_details' => [
-                    'order_id' => $donation->code,
-                    'gross_amount' => $tagihan->nominal,
-                ],
-                'customer_details' => [
-                    'first_name' => $user->mhs_name,
-                    'email' => $user->mhs_mail,
-                ],
-                'item_details' => [
-                    [
-                        'id' => $tagihan->code,
-                        'price' => $tagihan->nominal,
-                        'quantity' => 1,
-                        'name' => $tagihan->name,
-                        'brand' => 'Tagihan Kuliah',
-                        'category' => 'Tagihan Kuliah',
-                        'merchant_name' => config('app.name'),
-                    ],
-                ],
-            ];
-            // dd($payload);
-
-            $snapToken = \Midtrans\Snap::getSnapToken($payload);
-            $donation->snap_token = $snapToken;
-            $donation->save();
-
-            $this->response['code_uniq'] = $donation->code;
-            $this->response['snap_token'] = $snapToken;
-        });
-
-        return response()->json([
-            'status' => 'success',
-            'snap_token' => $this->response['snap_token'],
-            'code_uniq' => $this->response['code_uniq'],
+        $data = $request->validate([
+            'tanggal_transfer' => ['required', 'date', 'before_or_equal:today'],
+            'nama_pengirim' => ['required', 'string', 'max:255'],
+            'bukti_pembayaran' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'note' => ['nullable', 'string', 'max:255'],
         ]);
+
+        $payments->submit($tagihan, $user, $request->file('bukti_pembayaran'), $data);
+
+        return redirect()->route('mahasiswa.home-tagihan-index')
+            ->with('success', 'Konfirmasi pembayaran berhasil dikirim dan menunggu pemeriksaan petugas.');
+    }
+
+    public function paymentProof(HistoryTagihan $payment)
+    {
+        abort_unless((int) $payment->users_id === (int) Auth::guard('mahasiswa')->id(), 403);
+        abort_unless($payment->bukti_path && Storage::disk('local')->exists($payment->bukti_path), 404);
+
+        return Storage::disk('local')->download($payment->bukti_path);
     }
 
     public function tagihanSuccess(Request $request, $code)
@@ -511,24 +477,14 @@ class HomeController extends Controller
             ->where('code', $code)
             ->where('users_id', Auth::guard('mahasiswa')->id())
             ->where(fn ($query) => $query->where('status', 'lunas')->orWhere('stat', 1))
+            ->with(['tagihan', 'tagihanKuliah', 'users', 'ditinjauOleh'])
             ->firstOrFail();
+        $billName = $data['history']->tagihanKuliah?->name ?? $data['history']->tagihan?->name ?? 'Tagihan';
+        $safeBillName = trim((string) preg_replace('/[^A-Za-z0-9_-]+/', '-', $billName), '-');
 
-        // Load view into a variable
-
-        // return view('mahasiswa.pages.mhs-tagihan-invoice', $data);
-        $view = view('mahasiswa.pages.mhs-tagihan-invoice', $data);
-
-        // Load the HTML content of the view
-        $html = $view->render();
-
-        // Load HTML content into DOMPDF
-        $pdf = PDF::loadHtml($html)->setPaper('a4');
-
-        // Save the PDF file to storage
-        $pdf->save(storage_path('app/public/invoices/Invoice-Pembayaran-'.$data['history']->tagihan->name.'-'.$data['history']->tagihan_code.'.pdf'));
-
-        // Or you can return the PDF to be downloaded
-        return $pdf->download('Invoice-Pembayaran-'.$data['history']->tagihan->name.'-'.$data['history']->tagihan_code.'.pdf');
+        return PDF::loadView('mahasiswa.pages.mhs-tagihan-invoice', $data)
+            ->setPaper('a4')
+            ->download('Invoice-Pembayaran-'.$safeBillName.'-'.$data['history']->tagihan_code.'.pdf');
     }
 
     public function storeFBPerkuliahan(

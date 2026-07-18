@@ -36,8 +36,22 @@ class KrsService
 
     public function add(Krs $krs, PenawaranMataKuliah $offering): Krs
     {
-        $registration = $krs->registrasiMahasiswa;
         $this->assertEditableAndEligible($krs);
+
+        return $this->addValidated($krs, $offering);
+    }
+
+    public function addForAdministration(Krs $krs, PenawaranMataKuliah $offering): Krs
+    {
+        $this->assertEditablePeriod($krs);
+        $this->eligibility->ensureEligible($krs->registrasiMahasiswa);
+
+        return $this->addValidated($krs, $offering);
+    }
+
+    private function addValidated(Krs $krs, PenawaranMataKuliah $offering): Krs
+    {
+        $registration = $krs->registrasiMahasiswa;
 
         if ($offering->taka_id !== $registration->taka_id || $offering->pstudi_id !== $registration->kelas?->pstudi_id) {
             $this->reject('penawaran', 'Penawaran mata kuliah tidak sesuai dengan periode atau program studi mahasiswa.');
@@ -69,6 +83,19 @@ class KrsService
     public function remove(Krs $krs, int $itemId): Krs
     {
         $this->assertEditableAndEligible($krs);
+
+        return $this->removeValidated($krs, $itemId);
+    }
+
+    public function removeForAdministration(Krs $krs, int $itemId): Krs
+    {
+        $this->assertEditablePeriod($krs);
+
+        return $this->removeValidated($krs, $itemId);
+    }
+
+    private function removeValidated(Krs $krs, int $itemId): Krs
+    {
 
         return DB::transaction(function () use ($krs, $itemId): Krs {
             $krs->items()->whereKey($itemId)->firstOrFail()->delete();
@@ -146,14 +173,19 @@ class KrsService
 
     private function assertEditableAndEligible(Krs $krs): void
     {
+        $this->assertEditablePeriod($krs);
+        $this->assertWindowOpen($krs->registrasiMahasiswa);
+        $this->eligibility->ensureEligible($krs->registrasiMahasiswa);
+    }
+
+    private function assertEditablePeriod(Krs $krs): void
+    {
         if (! $krs->isEditable()) {
             $this->reject('krs', 'KRS yang telah diajukan atau disetujui tidak dapat diubah.');
         }
         if (! $krs->registrasiMahasiswa->taka?->isWritable()) {
             $this->reject('academic_period', 'KRS pada periode yang telah ditutup atau diarsipkan tidak dapat diubah.');
         }
-        $this->assertWindowOpen($krs->registrasiMahasiswa);
-        $this->eligibility->ensureEligible($krs->registrasiMahasiswa);
     }
 
     private function participantCount(PenawaranMataKuliah $offering): int

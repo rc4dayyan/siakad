@@ -47,6 +47,15 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::patch('/workers/data-mahasiswa/{code}/update',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'updateStudent'])->name('workers.student-update');
         Route::patch('/workers/data-mahasiswa/{code}/status-akademik',[App\Http\Controllers\Admin\AcademicStatusController::class, 'update'])->name('workers.student-academic-status-update');
         Route::delete('/workers/data-mahasiswa/{code}/destroy',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'destroyStudent'])->name('workers.student-destroy');
+        Route::get('/academic/krs-management', [App\Http\Controllers\Admin\KrsManagementController::class, 'index'])->name('krs-management.index');
+        Route::get('/academic/krs-management/import/template', [App\Http\Controllers\Admin\KrsManagementController::class, 'importTemplate'])->name('krs-management.import-template');
+        Route::post('/academic/krs-management/import/preview', [App\Http\Controllers\Admin\KrsManagementController::class, 'importPreview'])->name('krs-management.import-preview');
+        Route::post('/academic/krs-management/import/execute', [App\Http\Controllers\Admin\KrsManagementController::class, 'importExecute'])->name('krs-management.import-execute');
+        Route::patch('/academic/krs-management/bulk', [App\Http\Controllers\Admin\KrsManagementController::class, 'bulk'])->name('krs-management.bulk');
+        Route::post('/academic/krs-management/{registration}/items', [App\Http\Controllers\Admin\KrsManagementController::class, 'add'])->name('krs-management.add');
+        Route::delete('/academic/krs-management/items/{item}', [App\Http\Controllers\Admin\KrsManagementController::class, 'remove'])->name('krs-management.remove');
+        Route::patch('/academic/krs-management/{krs}/reopen', [App\Http\Controllers\Admin\KrsManagementController::class, 'reopen'])->name('krs-management.reopen');
+        Route::patch('/academic/krs-management/{krs}/approve', [App\Http\Controllers\Admin\KrsManagementController::class, 'approve'])->name('krs-management.approve');
 
         // MENU KHUSUS DATA MASTER => DATA FAKULTAS
         Route::get('/master/data-fakultas',[App\Http\Controllers\Admin\Pages\Core\FakultasController::class, 'index'])->name('master.fakultas-index');
@@ -154,15 +163,13 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::delete('/finance/data-tagihan/{code}/destroy',[App\Http\Controllers\Admin\Pages\Finance\GenerateTagihanController::class, 'destroy'])->name('finance.tagihan-destroy');
         Route::get('/finance/billing-period', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'index'])->name('billing-period.index');
         Route::post('/finance/billing-period/templates', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'store'])->name('billing-period.store');
-        Route::post('/finance/billing-period/templates/{template}/preview', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'preview'])->name('billing-period.preview');
+        Route::get('/finance/billing-period/templates/{template}/preview', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'preview'])->name('billing-period.preview');
         Route::post('/finance/billing-period/templates/{template}/issue', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'issue'])->name('billing-period.issue');
         Route::post('/finance/billing-period/override/{registration}', [App\Http\Controllers\Admin\Pages\Finance\PeriodBillingController::class, 'override'])->name('billing-period.override');
         // MENU KHUSUS FINANCE DEPARTEMENT => DATA PEMBAYARAN
         Route::get('/finance/data-pembayaran',[App\Http\Controllers\Admin\Pages\Finance\PembayaranController::class, 'index'])->name('finance.pembayaran-index');
-        Route::get('/finance/data-pembayaran/create',[App\Http\Controllers\Admin\Pages\Finance\PembayaranController::class, 'create'])->name('finance.pembayaran-create');
-        Route::post('/finance/data-pembayaran/store',[App\Http\Controllers\Admin\Pages\Finance\PembayaranController::class, 'store'])->name('finance.pembayaran-store');
-        Route::patch('/finance/data-pembayaran/{code}/update',[App\Http\Controllers\Admin\Pages\Finance\PembayaranController::class, 'update'])->name('finance.pembayaran-update');
-        Route::delete('/finance/data-pembayaran/{code}/destroy',[App\Http\Controllers\Admin\Pages\Finance\PembayaranController::class, 'destroy'])->name('finance.pembayaran-destroy');
+        Route::get('/finance/data-pembayaran/{payment}/bukti',[App\Http\Controllers\Admin\Pages\Finance\PembayaranController::class, 'proof'])->name('finance.pembayaran-proof');
+        Route::patch('/finance/data-pembayaran/{payment}/decision',[App\Http\Controllers\Admin\Pages\Finance\PembayaranController::class, 'decision'])->name('finance.pembayaran-decision');
         // MENU KHUSUS FINANCE DEPARTEMENT => DATA KEUANGAN
         Route::get('/finance/data-keuangan',[App\Http\Controllers\Admin\Pages\Finance\BalanceController::class, 'index'])->name('finance.keuangan-index');
         Route::post('/finance/data-keuangan/store',[App\Http\Controllers\Admin\Pages\Finance\BalanceController::class, 'store'])->name('finance.keuangan-store');

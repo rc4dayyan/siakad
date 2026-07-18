@@ -13,7 +13,10 @@ use App\Services\Finance\BillingTargetService;
 use App\Services\Finance\BulkBillingService;
 use App\Services\Finance\FinancialEligibilityService;
 use App\Services\Finance\FinancialReportService;
+use App\Services\Finance\ManualPaymentService;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -36,9 +39,11 @@ class FinanceAcademicPeriodTest extends TestCase
             '2024_04_27_041303_create_kelas_table.php',
             '2024_05_10_080721_create_tagihan_kuliahs_table.php',
             '2024_05_10_081438_create_history_tagihans_table.php',
+            '2024_05_14_092028_create_balances_table.php',
             '2026_07_17_000003_extend_tahun_akademiks_for_period_lifecycle.php',
             '2026_07_17_000005_create_registrasi_mahasiswas_table.php',
             '2026_07_17_000010_normalize_period_billing_and_financial_krs_policy.php',
+            '2026_07_18_000001_add_manual_verification_to_history_tagihans.php',
         ] as $migration) {
             (require database_path('migrations/'.$migration))->up();
         }
@@ -120,6 +125,92 @@ class FinanceAcademicPeriodTest extends TestCase
 
         $this->assertTrue(app(FinancialEligibilityService::class)->isEligible($data['registration']));
         $this->assertTrue(app(KrsEligibilityService::class)->isEligible($data['registration']));
+    }
+
+    public function test_manual_payment_can_be_rejected_resubmitted_and_approved(): void
+    {
+        Storage::fake('local');
+        $data = $this->academicData();
+        $template = $this->template($data, [
+            'target_type' => 'mahasiswa',
+            'target_mahasiswa_id' => $data['student']->id,
+            'wajib_lunas_krs' => true,
+        ]);
+        app(BulkBillingService::class)->issue($template, $data['actor']);
+        $bill = TagihanKuliah::firstOrFail();
+        $service = app(ManualPaymentService::class);
+
+        $first = $service->submit($bill, $data['student'], UploadedFile::fake()->image('bukti.jpg'), [
+            'tanggal_transfer' => '2026-07-10',
+            'nama_pengirim' => 'Mahasiswa Pengirim',
+            'note' => 'Transfer melalui bank.',
+        ]);
+
+        $this->assertSame(HistoryTagihan::STATUS_PENDING, $first->status);
+        $this->assertSame(0, $first->stat);
+        Storage::disk('local')->assertExists($first->bukti_path);
+        $this->assertFalse(app(FinancialEligibilityService::class)->isEligible($data['registration']));
+
+        $rejected = $service->decide($first, $data['actor'], HistoryTagihan::STATUS_REJECTED, 'Bukti transfer tidak terbaca.');
+        $this->assertSame(HistoryTagihan::STATUS_REJECTED, $rejected->status);
+
+        $second = $service->submit($bill, $data['student'], UploadedFile::fake()->image('bukti-baru.jpg'), [
+            'tanggal_transfer' => '2026-07-10',
+            'nama_pengirim' => 'Mahasiswa Pengirim',
+        ]);
+        $paid = $service->decide($second, $data['actor'], HistoryTagihan::STATUS_PAID, 'Pembayaran sesuai mutasi rekening.');
+
+        $this->assertSame(HistoryTagihan::STATUS_PAID, $paid->status);
+        $this->assertSame(1, $paid->stat);
+        $this->assertNotNull($paid->dibayar_at);
+        $this->assertSame($data['actor']->id, $paid->ditinjau_oleh);
+        $this->assertDatabaseCount('balances', 1);
+        $this->assertTrue(app(FinancialEligibilityService::class)->isEligible($data['registration']));
+    }
+
+    public function test_manual_payment_rejects_duplicate_pending_submission(): void
+    {
+        Storage::fake('local');
+        $data = $this->academicData();
+        $template = $this->template($data, [
+            'target_type' => 'mahasiswa',
+            'target_mahasiswa_id' => $data['student']->id,
+        ]);
+        app(BulkBillingService::class)->issue($template, $data['actor']);
+        $bill = TagihanKuliah::firstOrFail();
+        $service = app(ManualPaymentService::class);
+        $submission = [
+            'tanggal_transfer' => '2026-07-10',
+            'nama_pengirim' => 'Mahasiswa Pengirim',
+        ];
+        $service->submit($bill, $data['student'], UploadedFile::fake()->image('bukti.jpg'), $submission);
+
+        $this->expectException(ValidationException::class);
+        $service->submit($bill, $data['student'], UploadedFile::fake()->image('duplikat.jpg'), $submission);
+    }
+
+    public function test_manual_payment_rejects_a_bill_owned_by_another_student(): void
+    {
+        Storage::fake('local');
+        $data = $this->academicData();
+        $template = $this->template($data, [
+            'target_type' => 'mahasiswa',
+            'target_mahasiswa_id' => $data['student']->id,
+        ]);
+        app(BulkBillingService::class)->issue($template, $data['actor']);
+        $otherStudent = Mahasiswa::create([
+            'mhs_nim' => 'NIM-LAIN', 'mhs_name' => 'Mahasiswa Lain', 'mhs_code' => 'MHS-LAIN',
+            'mhs_user' => 'mhs-lain', 'password' => 'secret', 'mhs_mail' => 'lain@example.test',
+            'mhs_phone' => '081299999999',
+        ]);
+
+        $this->expectException(ValidationException::class);
+        app(ManualPaymentService::class)->submit(
+            TagihanKuliah::firstOrFail(),
+            $otherStudent,
+            UploadedFile::fake()->image('bukti.jpg'),
+            ['tanggal_transfer' => '2026-07-10', 'nama_pengirim' => 'Mahasiswa Lain']
+        );
     }
 
     public function test_report_is_isolated_and_old_period_total_does_not_change(): void

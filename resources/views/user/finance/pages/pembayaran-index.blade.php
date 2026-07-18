@@ -1,122 +1,75 @@
 @extends('base.base-dash-index')
-@section('title')
-    Data Riwayat Pembayaran - Siakad By Internal Developer
-@endsection
-@section('menu')
-    Data Riwayat Pembayaran
-@endsection
-@section('submenu')
-    Lihat
-@endsection
-@section('urlmenu')
-    #
-@endsection
-@section('subdesc')
-    Halaman untuk melihat data riwayat pembayaran
-@endsection
-@section('custom-css')
-    <style>
-        @media (max-width: 768px) {
-            .card-body {
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-            }
 
-            .icon {
-                margin: 10px 0;
-            }
+@section('title', 'Verifikasi Pembayaran Manual')
+@section('menu', 'Verifikasi Pembayaran Manual')
+@section('submenu', 'Pembayaran')
+@section('urlmenu', '#')
+@section('subdesc', 'Periksa bukti pembayaran mahasiswa dan tentukan hasil verifikasi')
 
-            .text-putih {
-                margin-left: 0px !important;
-                /* Mengatur margin-left menjadi 0 */
-                margin-top: 10px;
-                margin-bottom: 10px;
-            }
-        }
-    </style>
-@endsection
 @section('content')
-    <section class="section">
-        <div class="row">
-            <div class="col-lg-12 col-12">
-                <div class="row">
-                    <div class="col-lg-3 col-6 mb-2">
-                        <a href="{{ route($prefix . 'finance.tagihan-index') }}">
-                            <div class="card btn btn-outline-success">
-                                <div class="card-body d-flex justify-content-around align-items-center p-1">
-                                    <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-file-invoice" style="font-size: 32px"></i></span>
-                                    <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\TagihanKuliah::all()->count() }}<br> Tagihan</span>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-lg-3 col-6 mb-2">
-                        <a href="{{ route($prefix . 'finance.pembayaran-index') }}">
-                            <div class="card btn btn-outline-success">
-                                <div class="card-body d-flex justify-content-around align-items-center p-1">
-                                    <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-file-invoice-dollar" style="font-size: 32px"></i></span>
-                                    <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\HistoryTagihan::where('stat', 1)->count() }}<br> Pembayaran</span>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="col-lg-3 col-6 mb-2">
-                        <a href="{{ route('web-admin.workers.student-index') }}">
-                            <div class="card btn btn-outline-success">
-                                <div class="card-body d-flex justify-content-around align-items-center p-1">
-                                    <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-dollar" style="font-size: 32px"></i></span>
-                                    <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ number_format($income, 0, ',', '.') }}<br> Income ( IDR )</span>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-12 col-12">
-                <div class="card">
-                    <div class="card-header d-flex align-items-center justify-content-between">
-                        <h5 class="card-title">@yield('menu')</h5>
-                        <div class="">
-                            {{-- <a href="{{ route($prefix.'finance.tagihan-create') }}" class="btn btn-primary"><i class="fa-solid fa-plus"></i></a> --}}
+<section class="section">
+    @if (session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
+    @if ($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
+
+    <div class="alert alert-info">
+        Periode: <strong>{{ $period->name }}</strong> · Pendapatan terverifikasi: <strong>Rp {{ number_format($income, 0, ',', '.') }}</strong>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h5 class="mb-0">Menunggu Verifikasi ({{ $pendingPayments->count() }})</h5></div>
+        <div class="card-body">
+            @forelse ($pendingPayments as $payment)
+                <div class="border rounded p-3 mb-3">
+                    <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
+                        <div>
+                            <strong>{{ $payment->users?->mhs_name ?? 'Mahasiswa tidak ditemukan' }}</strong>
+                            <div class="text-muted">{{ $payment->users?->mhs_nim }} · {{ $payment->code }}</div>
                         </div>
-
+                        <span class="badge bg-warning text-dark align-self-start">MENUNGGU</span>
                     </div>
-                    <div class="card-body">
-                        <table class="table table-striped" id="table1">
-                            <thead>
-                                <tr>
-                                    <th class="text-center">#</th>
-                                    <th class="text-center">Nama Mahasiswa</th>
-                                    <th class="text-center">Kode Pembayaran</th>
-                                    <th class="text-center">Kode Tagihan</th>
-                                    <th class="text-center">Nominal Bayar</th>
-                                    <th class="text-center">Status Tagihan</th>
-                                    {{-- <th class="text-center">Button</th> --}}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($history as $key => $item)
-                                    <tr>
-                                        <td data-label="Number">{{ ++$key }}</td>
-                                        <td data-label="Nama Mahasiswa">{{ $item->users->mhs_name }}</td>
-                                        <td data-label="Kode Pembayaran"><span style="text-transform: uppercase">{{ $item->code }}</span></td>
-                                        <td data-label="Kode Tagihan"><span style="text-transform: uppercase">{{ $item->tagihan_code }}</span></td>
-                                        <td data-label="Nominal Bayar">Rp. {{ number_format($item->tagihan->price, 0, ',', '.') }}</td>
-                                        <td data-label="Status">{{ $item->stat === 1 ? 'PAID' : 'UN-PAID' }}</td>
-                                        {{-- <td class="d-flex justify-content-center align-items-center">
-                                        <a href="{{ route('mahasiswa.home-tagihan-view', $item->code) }}" class="btn btn-outline-success"><i class="fa-solid fa-money-bill-transfer"></i> Bayar Sekarang</a>
-
-
-                                    </td> --}}
-                                    </tr>
-                                @endforeach
-
-                            </tbody>
-                        </table>
+                    <div class="row mb-3">
+                        <div class="col-md-3"><small>Tagihan</small><div>{{ $payment->tagihanKuliah?->name ?? $payment->tagihan_code }}</div></div>
+                        <div class="col-md-3"><small>Nominal</small><div>Rp {{ number_format($payment->nominal, 0, ',', '.') }}</div></div>
+                        <div class="col-md-3"><small>Tanggal transfer</small><div>{{ $payment->tanggal_transfer?->format('d-m-Y') ?? '-' }}</div></div>
+                        <div class="col-md-3"><small>Nama pengirim</small><div>{{ $payment->nama_pengirim ?? '-' }}</div></div>
                     </div>
+                    @if ($payment->desc)<p><small>Catatan mahasiswa:</small><br>{{ $payment->desc }}</p>@endif
+                    <div class="mb-3"><a href="{{ route($prefix.'finance.pembayaran-proof', $payment) }}" class="btn btn-sm btn-outline-primary">Buka Bukti Pembayaran</a></div>
+                    <form method="POST" action="{{ route($prefix.'finance.pembayaran-decision', $payment) }}">
+                        @csrf @method('PATCH')
+                        <textarea name="catatan_verifikasi" class="form-control mb-2" maxlength="2000" placeholder="Catatan verifikasi; wajib jika ditolak"></textarea>
+                        <button name="status" value="{{ \App\Models\HistoryTagihan::STATUS_PAID }}" class="btn btn-success" onclick="return confirm('Konfirmasi pembayaran ini sebagai lunas?')">Konfirmasi Lunas</button>
+                        <button name="status" value="{{ \App\Models\HistoryTagihan::STATUS_REJECTED }}" class="btn btn-danger" onclick="return confirm('Tolak konfirmasi pembayaran ini?')">Tolak</button>
+                    </form>
                 </div>
-            </div>
+            @empty
+                <div class="text-center text-muted py-3">Tidak ada konfirmasi pembayaran yang menunggu.</div>
+            @endforelse
         </div>
-    </section>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h5 class="mb-0">Riwayat Verifikasi</h5></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped">
+                <thead><tr><th>Mahasiswa</th><th>Tagihan</th><th>Nominal</th><th>Status</th><th>Petugas</th><th>Ditinjau</th><th>Bukti</th></tr></thead>
+                <tbody>
+                    @forelse ($reviewedPayments as $payment)
+                        <tr>
+                            <td>{{ $payment->users?->mhs_name }}<br><small>{{ $payment->users?->mhs_nim }}</small></td>
+                            <td>{{ $payment->tagihanKuliah?->name ?? $payment->tagihan_code }}</td>
+                            <td>Rp {{ number_format($payment->nominal, 0, ',', '.') }}</td>
+                            <td><span class="badge bg-{{ $payment->status === \App\Models\HistoryTagihan::STATUS_PAID ? 'success' : 'danger' }}">{{ strtoupper($payment->status) }}</span></td>
+                            <td>{{ $payment->ditinjauOleh?->name ?? '-' }}</td>
+                            <td>{{ $payment->ditinjau_at?->format('d-m-Y H:i') ?? '-' }}</td>
+                            <td>@if($payment->bukti_path)<a href="{{ route($prefix.'finance.pembayaran-proof', $payment) }}" class="btn btn-sm btn-outline-secondary">Lihat</a>@else - @endif</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="7" class="text-center text-muted">Belum ada riwayat verifikasi.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
 @endsection

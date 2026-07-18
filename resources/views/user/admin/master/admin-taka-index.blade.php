@@ -8,7 +8,7 @@
 @section('subdesc', 'Halaman untuk mengelola Data Tahun Akademik')
 
 @section('content')
-    <div class="mb-3"><a class="btn btn-outline-primary" href="{{ route($prefix.'period-opening.index') }}">Dashboard Pembukaan Periode</a></div>
+    <div class="mb-3 d-flex gap-2"><a class="btn btn-primary" href="{{ route($prefix.'period-opening.wizard') }}">Wizard Periode Baru</a><a class="btn btn-outline-primary" href="{{ route($prefix.'period-opening.index') }}">Dashboard Pembukaan Periode</a></div>
 <section class="section row">
     <div class="col-lg-4 col-12">
         <form action="{{ route($prefix.'master.taka-store') }}" method="POST">

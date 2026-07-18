@@ -54,7 +54,7 @@
         <div class="card-header"><h5>Template dan Penerbitan</h5></div>
         <div class="card-body table-responsive"><table class="table"><thead><tr><th>Template</th><th>Nominal</th><th>Target</th><th>Aksi</th></tr></thead><tbody>
             @forelse ($templates as $template)
-                <tr><td>{{ $template->name }}<br><small>{{ $template->jenis }}{{ $template->wajib_lunas_krs ? ' · wajib KRS' : '' }}</small></td><td>Rp {{ number_format($template->nominal, 0, ',', '.') }}</td><td>{{ $template->target_type }}</td><td class="d-flex gap-2"><form method="POST" action="{{ route($prefix.'billing-period.preview', $template) }}">@csrf<button class="btn btn-sm btn-outline-primary">Pratinjau</button></form><form method="POST" action="{{ route($prefix.'billing-period.issue', $template) }}" onsubmit="return confirm('Terbitkan tagihan kepada seluruh calon?')">@csrf<button class="btn btn-sm btn-success">Terbitkan</button></form></td></tr>
+                <tr><td>{{ $template->name }}<br><small>{{ $template->jenis }}{{ $template->wajib_lunas_krs ? ' · wajib KRS' : '' }}</small></td><td>Rp {{ number_format($template->nominal, 0, ',', '.') }}</td><td>{{ $template->target_type }}</td><td class="d-flex gap-2"><a href="{{ route($prefix.'billing-period.preview', $template) }}" class="btn btn-sm btn-outline-primary">Pratinjau</a><form method="POST" action="{{ route($prefix.'billing-period.issue', $template) }}" onsubmit="return confirm('Terbitkan tagihan kepada seluruh calon?')">@csrf<button class="btn btn-sm btn-success">Terbitkan</button></form></td></tr>
             @empty<tr><td colspan="4" class="text-center text-muted">Belum ada template.</td></tr>@endforelse
         </tbody></table></div>
     </div>

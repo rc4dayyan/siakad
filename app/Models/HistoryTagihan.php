@@ -10,12 +10,21 @@ class HistoryTagihan extends Model
 {
     use HasFactory;
 
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_PAID = 'lunas';
+
+    public const STATUS_REJECTED = 'ditolak';
+
     protected $guarded = [];
 
     protected function casts(): array
     {
         return [
             'nominal' => 'integer',
+            'tanggal_transfer' => 'date',
+            'diajukan_at' => 'datetime',
+            'ditinjau_at' => 'datetime',
             'dibayar_at' => 'datetime',
         ];
     }
@@ -38,6 +47,11 @@ class HistoryTagihan extends Model
     public function taka(): BelongsTo
     {
         return $this->belongsTo(TahunAkademik::class, 'taka_id');
+    }
+
+    public function ditinjauOleh(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'ditinjau_oleh');
     }
 
     public function getPriceAttribute($value)

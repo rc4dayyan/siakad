@@ -6,6 +6,7 @@
 @section('subdesc', 'Pemeriksaan terpadu sebelum periode akademik dipublikasikan')
 
 @section('content')
+    @if ($canPublish)<div class="mb-3"><a class="btn btn-primary" href="{{ route($prefix.'period-opening.wizard') }}"><i class="fa-solid fa-list-check me-1"></i> Buka Wizard Periode Baru</a></div>@endif
     @if (session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
     @if ($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
 

@@ -6,10 +6,17 @@
                 <span>Home</span>
             </a>
         </li>
+        @if ((int) Auth::user()->raw_type === 4)
+            <li class="sidebar-item {{ Route::is('admin.krs-management.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.krs-management.index') }}" class="sidebar-link">
+                    <i class="fa-solid fa-file-signature"></i>
+                    <span>Persetujuan KRS</span>
+                </a>
+            </li>
+        @endif
         <!-- <li class="sidebar-item {{ Route::is($prefix . 'home-profile', request()->path()) ? 'active' : '' }}">
             <a href="{{ route($prefix . 'home-profile') }}" class='sidebar-link'>
                 <i class="fa-solid fa-user-edit"></i>
                 <span>Profile User</span>
             </a>
         </li> -->
-

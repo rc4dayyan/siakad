@@ -9,6 +9,7 @@ use App\Models\KalenderAkademik;
 use App\Models\Krs;
 use App\Models\Mahasiswa;
 use App\Models\MasterMataKuliah;
+use App\Models\Notification;
 use App\Models\PenawaranMataKuliah;
 use App\Models\RegistrasiMahasiswa;
 use App\Models\TahunAkademik;
@@ -16,6 +17,7 @@ use App\Models\TemplateTagihan;
 use App\Models\User;
 use App\Services\Academic\AcademicPeriodContext;
 use App\Services\Academic\AcademicStatusService;
+use App\Services\Academic\AdminKrsManagementService;
 use App\Services\Academic\KrsService;
 use App\Services\Academic\PeriodConfigurationCopyService;
 use App\Services\Academic\PeriodPublicationService;
@@ -23,6 +25,7 @@ use App\Services\Academic\PeriodReadinessService;
 use App\Services\Finance\BulkBillingService;
 use App\Services\Finance\FinancialEligibilityService;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -201,6 +204,324 @@ class PeriodOpeningWorkflowTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_period_opening_wizard_is_available_only_to_web_administrator(): void
+    {
+        $period = $this->period('WIZARD', TahunAkademik::STATUS_DRAFT);
+        $admin = $this->actor();
+
+        $this->actingAs($admin)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $period->id])
+            ->get(route('web-admin.period-opening.wizard'))
+            ->assertOk()
+            ->assertSee('Wizard Aktivasi Periode Baru')
+            ->assertSee('Akademik: registrasi dan kelas')
+            ->assertSee('Keuangan: tagihan periode');
+
+        $finance = User::create([
+            'type' => 1, 'code' => 'FIN-WIZ', 'name' => 'Finance', 'user' => 'finance-wiz', 'phone' => '08112',
+            'email' => 'finance-wiz@example.test', 'password' => 'secret', 'status' => 1,
+        ]);
+
+        $this->actingAs($finance)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $period->id])
+            ->get(route('finance.period-opening.wizard'))
+            ->assertForbidden();
+    }
+
+    public function test_administrator_can_reopen_and_change_krs_with_audit_and_notifications(): void
+    {
+        $data = $this->readyPeriod();
+        $service = app(KrsService::class);
+        $management = app(AdminKrsManagementService::class);
+        $krs = $service->forRegistration($data['registration']);
+        $management->add($krs, $data['offering'], $data['actor'], 'Penyesuaian rencana studi mahasiswa.');
+        $service->submit($krs->fresh());
+        $service->decide($krs->fresh(), $data['advisor'], Krs::STATUS_APPROVED, 'Disetujui dosen wali.');
+
+        $reopened = $management->reopen($krs->fresh(), $data['actor'], 'Koreksi mata kuliah berdasarkan hasil konsultasi.');
+        $this->assertSame(Krs::STATUS_REJECTED, $reopened->status);
+        $item = $reopened->items()->firstOrFail();
+        $updated = $management->remove($reopened, $item->id, $data['actor'], 'Mata kuliah tidak sesuai rencana semester.');
+
+        $this->assertSame(0, $updated->total_sks);
+        $this->assertDatabaseHas('academic_workflow_audits', ['event' => 'krs.admin_item_added', 'actor_id' => $data['actor']->id]);
+        $this->assertDatabaseHas('academic_workflow_audits', ['event' => 'krs.admin_reopened', 'actor_id' => $data['actor']->id]);
+        $this->assertDatabaseHas('academic_workflow_audits', ['event' => 'krs.admin_item_removed', 'actor_id' => $data['actor']->id]);
+        $this->assertSame(6, Notification::query()->where('auth_id', $data['actor']->id)->where('type', 'krs')->count());
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('web-admin.krs-management.index', ['registration' => $data['registration']->id]))
+            ->assertOk()
+            ->assertSee($data['student']->mhs_name)
+            ->assertSee('Tambahkan mata kuliah');
+    }
+
+    public function test_krs_management_rejects_unauthorized_role(): void
+    {
+        $data = $this->readyPeriod();
+        $finance = User::create([
+            'type' => 1, 'code' => 'FIN-KRS', 'name' => 'Finance KRS', 'user' => 'finance-krs', 'phone' => '08113',
+            'email' => 'finance-krs@example.test', 'password' => 'secret', 'status' => 1,
+        ]);
+
+        $this->actingAs($finance)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('web-admin.krs-management.index'))
+            ->assertRedirect();
+    }
+
+    public function test_academic_department_can_open_krs_management(): void
+    {
+        $data = $this->readyPeriod();
+        $academic = User::create([
+            'type' => 3, 'code' => 'ACA-KRS', 'name' => 'Academic KRS', 'user' => 'academic-krs', 'phone' => '08114',
+            'email' => 'academic-krs@example.test', 'password' => 'secret', 'status' => 1,
+        ]);
+
+        $this->actingAs($academic)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('academic.krs-management.index', ['registration' => $data['registration']->id]))
+            ->assertOk()
+            ->assertSee($data['student']->mhs_name);
+    }
+
+    public function test_department_admin_can_approve_submitted_krs_with_audit_and_notifications(): void
+    {
+        $data = $this->readyPeriod();
+        $service = app(KrsService::class);
+        $krs = $service->forRegistration($data['registration']);
+        app(AdminKrsManagementService::class)->add($krs, $data['offering'], $data['actor'], 'Persiapan KRS untuk pengujian persetujuan.');
+        $service->submit($krs->fresh(), 'Mohon persetujuan administrator.');
+        $admin = User::create([
+            'type' => 4, 'code' => 'ADM-KRS', 'name' => 'Admin KRS', 'user' => 'admin-krs', 'phone' => '08115',
+            'email' => 'admin-krs@example.test', 'password' => 'secret', 'status' => 1,
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('admin.krs-management.index', ['registration' => $data['registration']->id]))
+            ->assertOk()
+            ->assertSee('Setujui KRS')
+            ->assertDontSee('Tambahkan mata kuliah');
+
+        $this->actingAs($admin)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->patch(route('admin.krs-management.approve', $krs), ['catatan' => 'Disetujui setelah pemeriksaan administrasi.'])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(Krs::STATUS_APPROVED, $krs->fresh()->status);
+        $this->assertNull($krs->fresh()->diputuskan_oleh);
+        $this->assertDatabaseHas('academic_workflow_audits', [
+            'event' => 'krs.admin_approved',
+            'actor_id' => $admin->id,
+            'subject_id' => $krs->id,
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'auth_id' => $admin->id,
+            'student_id' => $data['student']->id,
+            'type' => 'krs',
+            'name' => 'KRS disetujui oleh administrator',
+        ]);
+    }
+
+    public function test_department_admin_cannot_approve_krs_that_has_not_been_submitted(): void
+    {
+        $data = $this->readyPeriod();
+        $krs = app(KrsService::class)->forRegistration($data['registration']);
+        $admin = User::create([
+            'type' => 4, 'code' => 'ADM-DRAFT', 'name' => 'Admin Draft', 'user' => 'admin-draft', 'phone' => '08116',
+            'email' => 'admin-draft@example.test', 'password' => 'secret', 'status' => 1,
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->from(route('admin.krs-management.index', ['registration' => $data['registration']->id]))
+            ->patch(route('admin.krs-management.approve', $krs))
+            ->assertRedirect(route('admin.krs-management.index', ['registration' => $data['registration']->id]))
+            ->assertSessionHasErrors('krs');
+
+        $this->assertSame(Krs::STATUS_DRAFT, $krs->fresh()->status);
+        $this->assertDatabaseMissing('academic_workflow_audits', [
+            'event' => 'krs.admin_approved',
+            'actor_id' => $admin->id,
+            'subject_id' => $krs->id,
+        ]);
+    }
+
+    public function test_department_admin_can_bulk_approve_selected_submitted_krs(): void
+    {
+        $data = $this->readyPeriod();
+        $service = app(KrsService::class);
+        $firstKrs = $service->forRegistration($data['registration']);
+        app(AdminKrsManagementService::class)->add($firstKrs, $data['offering'], $data['actor'], 'Persiapan persetujuan KRS massal.');
+        $service->submit($firstKrs->fresh());
+        $secondKrs = $this->additionalKrs($data, 'BULK-APPROVE', Krs::STATUS_SUBMITTED);
+        $admin = User::create([
+            'type' => 4, 'code' => 'ADM-BULK', 'name' => 'Admin Bulk', 'user' => 'admin-bulk', 'phone' => '08117',
+            'email' => 'admin-bulk@example.test', 'password' => 'secret', 'status' => 1,
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->patch(route('admin.krs-management.bulk'), [
+                'action' => 'approve',
+                'krs_ids' => [$firstKrs->id, $secondKrs->id],
+                'catatan' => 'Disetujui melalui pemeriksaan KRS massal.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', '2 KRS berhasil disetujui dan dikunci.');
+
+        $this->assertSame(Krs::STATUS_APPROVED, $firstKrs->fresh()->status);
+        $this->assertSame(Krs::STATUS_APPROVED, $secondKrs->fresh()->status);
+        $this->assertSame(2, DB::table('academic_workflow_audits')
+            ->where('event', 'krs.admin_approved')->where('actor_id', $admin->id)->count());
+        $this->assertSame(2, Notification::query()
+            ->where('name', 'KRS disetujui oleh administrator')->where('auth_id', $admin->id)
+            ->whereNotNull('student_id')->count());
+    }
+
+    public function test_bulk_approval_is_atomic_when_a_selected_krs_is_not_submitted(): void
+    {
+        $data = $this->readyPeriod();
+        $submittedKrs = $this->additionalKrs($data, 'BULK-SUBMITTED', Krs::STATUS_SUBMITTED);
+        $draftKrs = app(KrsService::class)->forRegistration($data['registration']);
+        $admin = User::create([
+            'type' => 4, 'code' => 'ADM-ATOMIC', 'name' => 'Admin Atomic', 'user' => 'admin-atomic', 'phone' => '08118',
+            'email' => 'admin-atomic@example.test', 'password' => 'secret', 'status' => 1,
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->patch(route('admin.krs-management.bulk'), [
+                'action' => 'approve',
+                'krs_ids' => [$submittedKrs->id, $draftKrs->id],
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('krs');
+
+        $this->assertSame(Krs::STATUS_SUBMITTED, $submittedKrs->fresh()->status);
+        $this->assertSame(Krs::STATUS_DRAFT, $draftKrs->fresh()->status);
+        $this->assertDatabaseMissing('academic_workflow_audits', [
+            'event' => 'krs.admin_approved',
+            'actor_id' => $admin->id,
+        ]);
+    }
+
+    public function test_web_administrator_can_bulk_reopen_locked_krs(): void
+    {
+        $data = $this->readyPeriod();
+        $firstKrs = $this->additionalKrs($data, 'BULK-REOPEN-1', Krs::STATUS_APPROVED);
+        $secondKrs = $this->additionalKrs($data, 'BULK-REOPEN-2', Krs::STATUS_LOCKED);
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->patch(route('web-admin.krs-management.bulk'), [
+                'action' => 'reopen',
+                'krs_ids' => [$firstKrs->id, $secondKrs->id],
+                'catatan' => 'Koreksi kurikulum untuk seluruh mahasiswa terpilih.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', '2 KRS berhasil dibuka kembali.');
+
+        $this->assertSame(Krs::STATUS_REJECTED, $firstKrs->fresh()->status);
+        $this->assertSame(Krs::STATUS_REJECTED, $secondKrs->fresh()->status);
+        $this->assertSame(2, DB::table('academic_workflow_audits')
+            ->where('event', 'krs.admin_reopened')->where('actor_id', $data['actor']->id)->count());
+    }
+
+    public function test_department_admin_can_preview_and_execute_krs_excel_import(): void
+    {
+        $data = $this->readyPeriod();
+        $service = app(KrsService::class);
+        $firstKrs = $service->forRegistration($data['registration']);
+        app(AdminKrsManagementService::class)->add($firstKrs, $data['offering'], $data['actor'], 'Persiapan import Excel KRS.');
+        $service->submit($firstKrs->fresh());
+        $secondKrs = $this->additionalKrs($data, 'EXCEL-APPROVE', Krs::STATUS_SUBMITTED);
+        $secondStudent = $secondKrs->registrasiMahasiswa->mahasiswa;
+        $admin = User::create([
+            'type' => 4, 'code' => 'ADM-EXCEL', 'name' => 'Admin Excel', 'user' => 'admin-excel', 'phone' => '08119',
+            'email' => 'admin-excel@example.test', 'password' => 'secret', 'status' => 1,
+        ]);
+        $file = UploadedFile::fake()->createWithContent('update-krs.csv', implode("\n", [
+            'NIM,Nama,Aksi,Keterangan Aksi',
+            "{$data['student']->mhs_nim},{$data['student']->mhs_name},setujui,Menyetujui KRS",
+            "{$secondStudent->mhs_nim},{$secondStudent->mhs_name},setujui,Menyetujui KRS",
+            'NIM-DIABAIKAN,Nama Diabaikan,,Baris kosong diabaikan',
+        ]));
+
+        $filteredTemplateUrl = route('admin.krs-management.import-template', [
+            'q' => $secondStudent->mhs_nim,
+            'status' => Krs::STATUS_SUBMITTED,
+        ]);
+        $this->actingAs($admin)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('admin.krs-management.index', [
+                'q' => $secondStudent->mhs_nim,
+                'status' => Krs::STATUS_SUBMITTED,
+            ]))
+            ->assertOk()
+            ->assertSee($filteredTemplateUrl)
+            ->assertSee('Menyetujui dan mengunci KRS');
+
+        $this->actingAs($admin)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get($filteredTemplateUrl)
+            ->assertOk()
+            ->assertDownload('template-update-krs-'.$data['period']->code.'.xlsx');
+
+        $previewResponse = $this->actingAs($admin)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('admin.krs-management.import-preview'), ['import' => $file])
+            ->assertRedirect()
+            ->assertSessionHas('success')
+            ->assertSessionHas('krs_bulk_import');
+        $preview = $previewResponse->getSession()->get('krs_bulk_import');
+
+        $this->actingAs($admin)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('admin.krs-management.import-execute'), [
+                'token' => $preview['token'],
+                'catatan' => 'Disetujui melalui import Excel.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Import selesai: 2 KRS disetujui dan 0 KRS dibuka kembali.');
+
+        $this->assertSame(Krs::STATUS_APPROVED, $firstKrs->fresh()->status);
+        $this->assertSame(Krs::STATUS_APPROVED, $secondKrs->fresh()->status);
+        $this->assertSame(2, DB::table('academic_workflow_audits')
+            ->where('event', 'krs.admin_approved')->where('actor_id', $admin->id)->count());
+    }
+
+    public function test_krs_excel_preview_rejects_name_that_does_not_match_nim(): void
+    {
+        $data = $this->readyPeriod();
+        $krs = $this->additionalKrs($data, 'EXCEL-MISMATCH', Krs::STATUS_SUBMITTED);
+        $student = $krs->registrasiMahasiswa->mahasiswa;
+        $admin = User::create([
+            'type' => 4, 'code' => 'ADM-MISMATCH', 'name' => 'Admin Mismatch', 'user' => 'admin-mismatch', 'phone' => '08120',
+            'email' => 'admin-mismatch@example.test', 'password' => 'secret', 'status' => 1,
+        ]);
+        $file = UploadedFile::fake()->createWithContent('update-krs.csv', implode("\n", [
+            'nim,nama,aksi',
+            "{$student->mhs_nim},Nama Mahasiswa Lain,setujui",
+        ]));
+
+        $this->actingAs($admin)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('admin.krs-management.import-preview'), ['import' => $file])
+            ->assertRedirect()
+            ->assertSessionHasErrors('import')
+            ->assertSessionMissing('krs_bulk_import');
+
+        $this->assertSame(Krs::STATUS_SUBMITTED, $krs->fresh()->status);
+        $this->assertDatabaseMissing('academic_workflow_audits', [
+            'event' => 'krs.admin_approved',
+            'actor_id' => $admin->id,
+        ]);
+    }
+
     private function readyPeriod(): array
     {
         $actor = $this->actor();
@@ -254,6 +575,36 @@ class PeriodOpeningWorkflowTest extends TestCase
         ]);
 
         return compact('actor', 'period', 'advisor', 'classId', 'student', 'registration', 'offering');
+    }
+
+    private function additionalKrs(array $data, string $suffix, string $status): Krs
+    {
+        $student = $this->student($suffix);
+        $registration = RegistrasiMahasiswa::create([
+            'mahasiswa_id' => $student->id,
+            'taka_id' => $data['period']->id,
+            'semester_mahasiswa' => 1,
+            'status_akademik' => 'aktif',
+            'status_registrasi' => 'terdaftar',
+            'kelas_id' => $data['classId'],
+            'dosen_wali_id' => $data['advisor']->id,
+            'batas_sks' => 24,
+        ]);
+        $krs = Krs::create([
+            'registrasi_mahasiswa_id' => $registration->id,
+            'status' => Krs::STATUS_DRAFT,
+            'total_sks' => $data['offering']->sks,
+        ]);
+        $krs->items()->create([
+            'penawaran_mata_kuliah_id' => $data['offering']->id,
+            'sks' => $data['offering']->sks,
+        ]);
+        $krs->update([
+            'status' => $status,
+            'diajukan_at' => in_array($status, [Krs::STATUS_SUBMITTED, Krs::STATUS_APPROVED, Krs::STATUS_LOCKED], true) ? now() : null,
+        ]);
+
+        return $krs->load('registrasiMahasiswa.taka');
     }
 
     private function actor(): User

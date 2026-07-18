@@ -59,6 +59,34 @@ class PeriodOpeningController extends Controller
         return back()->with('success', "Pemeriksaan disimpan: {$snapshot->ready_count} siap, {$snapshot->warning_count} peringatan, {$snapshot->failed_count} gagal.");
     }
 
+    public function wizard(Request $request, AcademicPeriodContext $periods, PeriodReadinessService $readiness): View
+    {
+        abort_unless((int) $request->user()->raw_type === 0, 403);
+
+        $period = $periods->requireCurrent($request->user());
+        $result = $readiness->check($period);
+        $checks = collect($result['checks'])->keyBy('key');
+        $step = max(1, min(6, $request->integer('step', 1)));
+
+        return view('user.admin.period-opening-wizard', [
+            'web' => webSettings::find(1),
+            'prefix' => $this->setPrefix(),
+            'period' => $period,
+            'periods' => $periods->availableFor($request->user()),
+            'result' => $result,
+            'checks' => $checks,
+            'step' => $step,
+            'steps' => [
+                ['number' => 1, 'label' => 'Periode', 'status' => $checks['identitas']['status']],
+                ['number' => 2, 'label' => 'Registrasi', 'status' => $checks['registrasi_kelas']['status']],
+                ['number' => 3, 'label' => 'Penawaran', 'status' => $this->combinedStatus($checks, ['kurikulum_prodi', 'penawaran_dosen'])],
+                ['number' => 4, 'label' => 'Jadwal', 'status' => $checks['jadwal']['status']],
+                ['number' => 5, 'label' => 'Keuangan', 'status' => $checks['tagihan']['status']],
+                ['number' => 6, 'label' => 'Publikasi', 'status' => $period->is_published ? PeriodReadinessService::READY : $result['status']],
+            ],
+        ]);
+    }
+
     public function publish(Request $request, AcademicPeriodContext $periods, PeriodPublicationService $publication): RedirectResponse
     {
         $period = $periods->requireCurrent($request->user());
@@ -99,5 +127,18 @@ class PeriodOpeningController extends Controller
             'selections' => ['required', 'array', 'min:1'],
             'selections.*' => ['string', Rule::in(PeriodConfigurationCopyService::SELECTIONS)],
         ]);
+    }
+
+    private function combinedStatus(\Illuminate\Support\Collection $checks, array $keys): string
+    {
+        $statuses = $checks->only($keys)->pluck('status');
+
+        if ($statuses->contains(PeriodReadinessService::FAILED)) {
+            return PeriodReadinessService::FAILED;
+        }
+
+        return $statuses->contains(PeriodReadinessService::WARNING)
+            ? PeriodReadinessService::WARNING
+            : PeriodReadinessService::READY;
     }
 }

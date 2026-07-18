@@ -32,6 +32,12 @@
 
         {{-- MENU KHUSUS UNTUK WEB ADMINISTRATOR --}}
         <li class="sidebar-title">Menu Pusat Informasi</li>
+        <li class="sidebar-item {{ Route::is('web-admin.period-opening.wizard') ? 'active' : '' }}">
+            <a href="{{ route('web-admin.period-opening.wizard') }}" class="sidebar-link">
+                <i class="fa-solid fa-list-check"></i>
+                <span>Wizard Periode Baru</span>
+            </a>
+        </li>
         <li class="sidebar-item has-sub {{ Route::is('web-admin.workers.*', request()->path()) ? 'active' : '' }}">
             <a href="#" class='sidebar-link'>
                 <i class="fa-solid fa-users"></i>
@@ -52,6 +58,12 @@
                 </li>
             </ul>
         </li>
+        <li class="sidebar-item {{ Route::is('web-admin.krs-management.*') ? 'active' : '' }}">
+            <a href="{{ route('web-admin.krs-management.index') }}" class="sidebar-link">
+                <i class="fa-solid fa-file-pen"></i>
+                <span>Kelola KRS Mahasiswa</span>
+            </a>
+        </li>
         <li class="sidebar-item has-sub {{ Route::is('web-admin.master.taka-*', 'web-admin.master.fakultas-*', 'web-admin.master.pstudi-*') ? 'active' : '' }}">
             <a href="#" class='sidebar-link'>
                 <i class="fa-solid fa-school"></i>
@@ -69,17 +81,17 @@
                 </li>
             </ul>
         </li>
-        <!-- <li class="sidebar-item has-sub {{ Route::is('web-admin.master.proku-*') ? 'active' : '' }}">
+        <li class="sidebar-item has-sub {{ Route::is('web-admin.master.proku-*') ? 'active' : '' }}">
             <a href="#" class='sidebar-link'>
                 <i class="fa-solid fa-school"></i>
-                <span>Data PMB</span>
+                <span>Program Kuliah</span>
             </a>
             <ul class="submenu">
                 <li class="submenu-item {{ Route::is('web-admin.master.proku-*') ? 'active' : '' }}">
                     <a href="{{ route('web-admin.master.proku-index') }}" class="submenu-link">Data Program Kuliah</a>
                 </li>
             </ul>
-        </li> -->
+        </li>
         <li class="sidebar-item has-sub {{ Route::is('web-admin.master.kurikulum-*', 'web-admin.master.kelas-*', 'web-admin.master.master-matkul-*', 'web-admin.master.matkul-*', 'web-admin.master.jadkul-*') ? 'active' : '' }}">
             <a href="#" class='sidebar-link'>
                 <i class="fa-solid fa-school"></i>

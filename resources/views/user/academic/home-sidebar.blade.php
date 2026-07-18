@@ -5,6 +5,12 @@
                 <span>Data Mahasiswa</span>
             </a>
         </li>
+        <li class="sidebar-item {{ Route::is($prefix.'krs-management.*') ? 'active' : '' }}">
+            <a href="{{ route($prefix.'krs-management.index') }}" class="sidebar-link">
+                <i class="fa-solid fa-file-pen"></i>
+                <span>Kelola KRS Mahasiswa</span>
+            </a>
+        </li>
         <li class="sidebar-item has-sub {{ Route::is($prefix.'master.*', request()->path()) ? 'active' : '' }}">
             <a href="#" class='sidebar-link'>
                 <i class="fa-solid fa-school"></i>

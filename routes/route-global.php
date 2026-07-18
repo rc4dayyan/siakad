@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Route;
         Route::post('/period-opening/inspect', [App\Http\Controllers\Admin\PeriodOpeningController::class, 'inspect'])->name('period-opening.inspect');
     });
     Route::middleware('academic-workflow-role:0')->group(function (): void {
+        Route::get('/period-opening/wizard', [App\Http\Controllers\Admin\PeriodOpeningController::class, 'wizard'])->name('period-opening.wizard');
         Route::post('/period-opening/publish', [App\Http\Controllers\Admin\PeriodOpeningController::class, 'publish'])->name('period-opening.publish');
     });
     Route::middleware('academic-workflow-role:0,3')->group(function (): void {
