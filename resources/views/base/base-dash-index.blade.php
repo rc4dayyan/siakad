@@ -6,7 +6,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="csrf-token" content="{{ csrf_token() }}">
         @php
-            $web = \App\Models\Settings\WebSettings::where('id', 1)->first();
+            $web = \App\Models\Settings\webSettings::where('id', 1)->first();
         @endphp
         <title>@yield('menu') - {{ $web->school_name }}</title>
 
