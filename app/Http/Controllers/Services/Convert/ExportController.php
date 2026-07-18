@@ -9,10 +9,13 @@ use App\Models\Gedung;
 // SECTION MODELS
 use App\Models\JadwalKuliah;
 use App\Models\Kelas;
+use App\Models\Mahasiswa;
 use App\Models\MataKuliah;
+use App\Models\RegistrasiMahasiswa;
 use App\Models\Ruang;
 use App\Models\User;
 use App\Services\Academic\AcademicPeriodContext;
+use Illuminate\Http\Request;
 use Rap2hpoutre\FastExcel\FastExcel;
 
 class ExportController extends Controller
@@ -40,11 +43,31 @@ class ExportController extends Controller
 
     }
 
-    public function exportStudent(AcademicPeriodContext $context)
+    public function exportStudent(Request $request, AcademicPeriodContext $context)
     {
+        $filters = $request->validate([
+            'angkatan' => ['nullable', 'integer', 'min:1900', 'max:'.(now()->year + 1)],
+            'kelas_id' => ['nullable', 'integer', 'exists:kelas,id'],
+        ]);
+
         $period = $context->requireCurrent(auth()->user());
-        $registrations = \App\Models\RegistrasiMahasiswa::query()
-            ->forAcademicPeriod($period)->with(['mahasiswa', 'kelas', 'taka'])->get();
+        $studentIds = null;
+
+        if ($filters['angkatan'] ?? null) {
+            $studentIds = Mahasiswa::query()
+                ->with('registrasiAwal.taka')
+                ->get(['id', 'years_id'])
+                ->filter(fn (Mahasiswa $student) => ($student->registrasiAwal?->taka?->year_start
+                    ?: ((int) $student->years_id ?: null)) === (int) $filters['angkatan'])
+                ->modelKeys();
+        }
+
+        $registrations = RegistrasiMahasiswa::query()
+            ->forAcademicPeriod($period)
+            ->when($studentIds !== null, fn ($query) => $query->whereIn('mahasiswa_id', $studentIds))
+            ->when($filters['kelas_id'] ?? null, fn ($query, $kelasId) => $query->where('kelas_id', $kelasId))
+            ->with(['mahasiswa', 'kelas', 'taka'])
+            ->get();
 
         return (new FastExcel($registrations))->download('export-student-'.$period->code.'-'.uniqid().'.csv', function ($registration) {
             return [

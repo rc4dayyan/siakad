@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
 /**
@@ -103,6 +104,11 @@ class Mahasiswa extends Authenticatable
     public function registrasiAkademik()
     {
         return $this->hasMany(RegistrasiMahasiswa::class);
+    }
+
+    public function registrasiAwal(): HasOne
+    {
+        return $this->hasOne(RegistrasiMahasiswa::class)->oldestOfMany();
     }
 
     public function scopeForAcademicClass(

@@ -519,12 +519,36 @@ class WorkersController extends Controller
         return back();
     }
     // KHUSUS KELOLA DATA ROLE MAHASISWA
-    public function indexStudent(AcademicPeriodContext $periodContext)
+    public function indexStudent(Request $request, AcademicPeriodContext $periodContext)
     {
+        $filters = $request->validate([
+            'angkatan' => ['nullable', 'integer', 'min:1900', 'max:'.(now()->year + 1)],
+            'kelas_id' => ['nullable', 'integer', 'exists:kelas,id'],
+        ]);
+
         $data['prefix'] = $this->setPrefix();
         $data['web'] = webSettings::where('id', 1)->first();
         $data['academicPeriod'] = $periodContext->current(auth()->user());
+        $studentAngkatan = Mahasiswa::query()
+            ->with('registrasiAwal.taka')
+            ->get(['id', 'years_id'])
+            ->mapWithKeys(fn (Mahasiswa $student) => [
+                $student->id => $student->registrasiAwal?->taka?->year_start
+                    ?: ((int) $student->years_id ?: null),
+            ]);
+
         $data['student'] = Mahasiswa::query()
+            ->when($filters['angkatan'] ?? null, fn ($query, $angkatan) => $query
+                ->whereKey($studentAngkatan->filter(fn ($tahun) => $tahun === (int) $angkatan)->keys()))
+            ->when($filters['kelas_id'] ?? null, function ($query, $kelasId) use ($data): void {
+                if ($data['academicPeriod']) {
+                    $query->forAcademicClass($data['academicPeriod'], (int) $kelasId);
+
+                    return;
+                }
+
+                $query->where('class_id', $kelasId);
+            })
             ->with([
                 'kelas',
                 'registrasiAkademik' => fn ($query) => $query
@@ -532,7 +556,12 @@ class WorkersController extends Controller
                     ->with('kelas'),
             ])
             ->get();
-        $data['kelas'] = Kelas::all();
+        $data['kelas'] = Kelas::query()->orderBy('name')->get();
+        $data['filterKelas'] = $data['academicPeriod']
+            ? Kelas::query()->forAcademicPeriod($data['academicPeriod'])->orderBy('name')->get()
+            : $data['kelas'];
+        $data['angkatan'] = $studentAngkatan->filter()->unique()->sortDesc()->values();
+        $data['filters'] = $filters;
 
         return view('user.admin.pages.workers-student-index', $data);
 

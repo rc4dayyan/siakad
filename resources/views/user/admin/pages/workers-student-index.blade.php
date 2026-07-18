@@ -23,12 +23,44 @@ Halaman untuk melihat data pengguna Mahasiswa
                 <div class="">
                     <a href="{{ route($prefix.'workers.student-promotion-index') }}" class="btn btn-outline-warning" title="Kenaikan semester massal"><i class="fa-solid fa-users-gear"></i></a>
                     <a href="{{ route($prefix.'workers.student-create') }}" class="btn btn-outline-primary"><i class="fa-solid fa-plus"></i></a>
-                    <a href="{{ route($prefix.'services.convert.export-student') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
+                    <a href="{{ route($prefix.'services.convert.export-student', array_filter($filters ?? [])) }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
                     <a href="#" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importStudent"><i class="fa-solid fa-file-import"></i></a>
                 </div>
             </h5>
         </div>
         <div class="card-body">
+            <form action="{{ route($prefix.'workers.student-index') }}" method="GET" class="row g-2 mb-4 align-items-end">
+                <div class="col-md-4">
+                    <label for="filter_angkatan" class="form-label">Angkatan</label>
+                    <select name="angkatan" id="filter_angkatan" class="form-select">
+                        <option value="">Semua Angkatan</option>
+                        @foreach ($angkatan as $tahun)
+                            <option value="{{ $tahun }}" @selected(($filters['angkatan'] ?? null) == $tahun)>
+                                Angkatan {{ $tahun }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="filter_kelas_id" class="form-label">Kelas</label>
+                    <select name="kelas_id" id="filter_kelas_id" class="form-select">
+                        <option value="">Semua Kelas</option>
+                        @foreach ($filterKelas as $item)
+                            <option value="{{ $item->id }}" @selected(($filters['kelas_id'] ?? null) == $item->id)>
+                                {{ $item->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-filter me-1"></i> Filter
+                    </button>
+                    @if (filled($filters['angkatan'] ?? null) || filled($filters['kelas_id'] ?? null))
+                        <a href="{{ route($prefix.'workers.student-index') }}" class="btn btn-outline-secondary">Reset</a>
+                    @endif
+                </div>
+            </form>
             <table class="table table-striped" id="table1">
                 <thead>
                     <tr>
