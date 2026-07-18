@@ -1,22 +1,14 @@
-        <!-- Bagian menu untuk pengguna yang telah login -->
-        {{-- HAK AKSES WEB ADMINISTRATOR --}}
-        <li class="sidebar-item {{ Route::is($prefix . 'home-index', request()->path()) ? 'active' : '' }}">
+        <li class="sidebar-item {{ Route::is($prefix.'home-index') ? 'active' : '' }}">
             <a href="{{ route($prefix . 'home-index') }}" class='sidebar-link'>
                 <i class="fa-solid fa-home"></i>
-                <span>Home</span>
+                <span>Beranda</span>
             </a>
         </li>
         @if ((int) Auth::user()->raw_type === 4)
             <li class="sidebar-item {{ Route::is('admin.krs-management.*') ? 'active' : '' }}">
                 <a href="{{ route('admin.krs-management.index') }}" class="sidebar-link">
                     <i class="fa-solid fa-file-signature"></i>
-                    <span>Persetujuan KRS</span>
+                    <span>KRS Mahasiswa</span>
                 </a>
             </li>
         @endif
-        <!-- <li class="sidebar-item {{ Route::is($prefix . 'home-profile', request()->path()) ? 'active' : '' }}">
-            <a href="{{ route($prefix . 'home-profile') }}" class='sidebar-link'>
-                <i class="fa-solid fa-user-edit"></i>
-                <span>Profile User</span>
-            </a>
-        </li> -->

@@ -1,57 +1,35 @@
-        <!-- Bagian menu untuk pengguna yang telah login -->
-        {{-- HAK AKSES WEB ADMINISTRATOR --}}
-        <!-- <li class="sidebar-title">Menu Rutinitas</li>
-        <li class="sidebar-item  {{ Route::is($prefix . 'presensi.absen-harian', request()->path()) ? 'active' : '' }}">
-            <a href="{{ route($prefix . 'presensi.absen-harian') }}" class='sidebar-link'>
-                <i class="fa-solid fa-calendar-check"></i>
-                <span>Absen Harian</span>
-            </a>
-        </li>
-        <li class="sidebar-item  {{ Route::is($prefix . 'presensi.absen-izin-cuti', request()->path()) ? 'active' : '' }}">
-            <a href="{{ route($prefix . 'presensi.absen-izin-cuti') }}" class='sidebar-link'>
-                <i class="fa-solid fa-calendar-xmark"></i>
-                <span>Absen Izin & Cuti</span>
-            </a>
-        </li>
-        <li class="sidebar-item  {{ Route::is($prefix . 'support.ticket-index', request()->path()) ? 'active' : '' }}">
-            <a href="{{ route($prefix . 'support.ticket-index') }}" class='sidebar-link'>
-                <i class="fa-solid fa-ticket"></i>
-                <span>Support Ticket</span>
-            </a>
-        </li> -->
-
-        <li class="sidebar-title">Menu Publikasi</li>
-        <li class="sidebar-item  {{ Route::is($prefix . 'system.notify-index', request()->path()) ? 'active' : '' }}">
+        <li class="sidebar-title">Publikasi</li>
+        <li class="sidebar-item {{ Route::is($prefix.'system.notify-*') ? 'active' : '' }}">
             <a href="{{ route($prefix . 'system.notify-index') }}" class='sidebar-link'>
                 <i class="fa-solid fa-bell"></i>
-                <span>Data Pemberitahuan</span>
+                <span>Pemberitahuan</span>
             </a>
         </li>
 
 
-        <li class="sidebar-item has-sub {{ Route::is($prefix.'news.*', request()->path()) ? 'active' : '' }}">
+        <li class="sidebar-item has-sub {{ Route::is($prefix.'news.*') ? 'active' : '' }}">
             <a href="#" class='sidebar-link'>
                 <i class="fa-solid fa-newspaper"></i>
-                <span>Data Berita</span>
+                <span>Berita</span>
             </a>
             <ul class="submenu">
-                <li class="submenu-item {{ Route::is($prefix . 'news.post-*', request()->path()) ? 'active' : '' }}">
-                    <a href="{{ route($prefix . 'news.post-index') }}" class="submenu-link">Berita</a>
+                <li class="submenu-item {{ Route::is($prefix.'news.post-*') ? 'active' : '' }}">
+                    <a href="{{ route($prefix . 'news.post-index') }}" class="submenu-link">Daftar Berita</a>
                 </li>
-                <li class="submenu-item {{ Route::is($prefix . 'news.category-*', request()->path()) ? 'active' : '' }}">
-                    <a href="{{ route($prefix . 'news.category-index') }}" class="submenu-link">Kategori Berita</a>
+                <li class="submenu-item {{ Route::is($prefix.'news.category-*') ? 'active' : '' }}">
+                    <a href="{{ route($prefix . 'news.category-index') }}" class="submenu-link">Kategori</a>
                 </li>
             </ul>
         </li>
-        <li class="sidebar-item  {{ Route::is($prefix . 'publish.album-index', request()->path()) ? 'active' : '' }}">
+        <li class="sidebar-item {{ Route::is($prefix.'publish.album-*') ? 'active' : '' }}">
             <a href="{{ route($prefix . 'publish.album-index') }}" class='sidebar-link'>
                 <i class="fa-solid fa-images"></i>
-                <span>Data Album Foto</span>
+                <span>Album Foto</span>
             </a>
         </li>
-        <li class="sidebar-item  {{ Route::is($prefix . 'document-index', request()->path()) ? 'active' : '' }}">
+        <li class="sidebar-item {{ Route::is($prefix.'document-*') ? 'active' : '' }}">
             <a href="{{ route($prefix . 'document-index') }}" class='sidebar-link'>
                 <i class="fa-solid fa-file-pdf"></i>
-                <span>Data Document</span>
+                <span>Dokumen</span>
             </a>
         </li>

@@ -1,33 +1,27 @@
-        <li class="sidebar-item {{ Route::is('dosen.home-index*', request()->path()) ? 'active' : '' }}">
+        <li class="sidebar-item {{ Route::is('dosen.home-index') ? 'active' : '' }}">
             <a href="{{ route('dosen.home-index') }}" class='sidebar-link'>
                 <i class="fa-solid fa-home"></i>
-                <span>Home</span>
+                <span>Beranda</span>
             </a>
         </li>
-        <!-- <li class="sidebar-item {{ Route::is('dosen.home-profile*', request()->path()) ? 'active' : '' }}">
-            <a href="{{ route('dosen.home-profile') }}" class='sidebar-link'>
-                <i class="fa-solid fa-user-edit"></i>
-                <span>Profile User</span>
-            </a>
-        </li> -->
-        <li class="sidebar-title">Data Akademik</li>
-
-        <li class="sidebar-item {{ Route::is('dosen.akademik.krs-*', request()->path()) ? 'active' : '' }}">
-            <a href="{{ route('dosen.akademik.krs-index') }}" class='sidebar-link'>
-                <i class="fa-solid fa-file-signature"></i>
-                <span>Persetujuan KRS</span>
-            </a>
-        </li>
-
-        <li class="sidebar-item {{ Route::is('dosen.akademik.jadwal-*', request()->path()) ? 'active' : '' }}">
+        <li class="sidebar-title">Perkuliahan</li>
+        <li class="sidebar-item {{ Route::is('dosen.akademik.jadwal-*') ? 'active' : '' }}">
             <a href="{{ route('dosen.akademik.jadwal-index') }}" class='sidebar-link'>
                 <i class="fa-solid fa-calendar"></i>
-                <span>Jadwal Perkuliahan</span>
+                <span>Jadwal Mengajar</span>
             </a>
         </li>
-        <li class="sidebar-item {{ Route::is('dosen.akademik.stask-*', request()->path()) ? 'active' : '' }}">
+        <li class="sidebar-item {{ Route::is('dosen.akademik.stask-*') ? 'active' : '' }}">
             <a href="{{ route('dosen.akademik.stask-index') }}" class='sidebar-link'>
                 <i class="fa-solid fa-tasks"></i>
-                <span>Kelola Tugas</span>
+                <span>Tugas &amp; Penilaian</span>
+            </a>
+        </li>
+
+        <li class="sidebar-title">Bimbingan Akademik</li>
+        <li class="sidebar-item {{ Route::is('dosen.akademik.krs-*') ? 'active' : '' }}">
+            <a href="{{ route('dosen.akademik.krs-index') }}" class="sidebar-link">
+                <i class="fa-solid fa-file-signature"></i>
+                <span>Persetujuan KRS</span>
             </a>
         </li>

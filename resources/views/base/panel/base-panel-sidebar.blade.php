@@ -2,7 +2,7 @@
     @guest
         <!-- Bagian menu ini akan disembunyikan ketika pengguna adalah "guest" -->
     @else
-    @include('user.sidebar-index-main')
+        @include('user.sidebar-index-main')
         @if ((int)Auth::user()->raw_type === 0)
             {{-- MENU KHUSUS UNTUK WEB ADMINISTRATOR --}}
             @include('user.admin.admin-sidebar-index')
@@ -43,12 +43,12 @@
     @else
 
         @if ((int)Auth::user()->raw_type === 0)
-            <li class="sidebar-title">Special Menu</li>
+            <li class="sidebar-title">Sistem</li>
 
-            <li class="sidebar-item  {{ Route::is($prefix . 'system.setting-index', request()->path()) ? 'active' : '' }}">
+            <li class="sidebar-item {{ Route::is($prefix.'system.setting-*') ? 'active' : '' }}">
                 <a href="{{ route($prefix . 'system.setting-index') }}" class='sidebar-link'>
                     <i class="fa-solid fa-gear"></i>
-                    <span>Web Settings</span>
+                    <span>Pengaturan</span>
                 </a>
             </li>
         @endif
