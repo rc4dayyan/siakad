@@ -49,7 +49,43 @@
     </div>
 
     <div class="row">
-        <div class="col-lg-5">
+        <div class="col-lg-12">
+            @if (! $selected)
+                <div class="card"><div class="card-body text-center text-muted py-5">Pilih mahasiswa untuk mengelola KRS.</div></div>
+            @else
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-start"><div><h5 class="mb-1">{{ $selected->mahasiswa->mhs_name }}</h5><small>{{ $selected->mahasiswa->mhs_nim }} · {{ $selected->kelas?->name }} · Dosen wali: {{ $selected->dosenWali?->dsn_name ?? '-' }}</small></div><span class="badge bg-{{ $krs->isEditable() ? 'warning' : 'success' }}">{{ strtoupper($krs->status) }}</span></div>
+                    <div class="card-body">
+                        @if ($canApproveKrs && $krs->status === \App\Models\Krs::STATUS_SUBMITTED)
+                            <div class="alert alert-primary">KRS menunggu keputusan. Persetujuan administrator akan mengunci KRS dan dicatat dalam audit.</div>
+                            <form method="POST" action="{{ route($prefix.'krs-management.approve', $krs) }}" class="row g-2 mb-3">@csrf @method('PATCH')<div class="col-md-9"><textarea class="form-control" name="catatan" maxlength="2000" rows="2" placeholder="Catatan persetujuan (opsional)">{{ old('catatan') }}</textarea></div><div class="col-md-3"><button class="btn btn-success w-100" onclick="return confirm('Setujui dan kunci KRS ini?')">Setujui KRS</button></div></form>
+                        @endif
+
+                        @if ($canManageKrs && ! $krs->isEditable())
+                            <div class="alert alert-warning">KRS telah diajukan atau disetujui. Buka kembali sebelum mengubah isinya; mahasiswa harus mengajukan ulang kepada dosen wali.</div>
+                            <form method="POST" action="{{ route($prefix.'krs-management.reopen', $krs) }}" class="row g-2 mb-3">@csrf @method('PATCH')<div class="col-md-9"><input class="form-control" name="alasan" minlength="10" maxlength="1000" placeholder="Alasan membuka kembali KRS (minimal 10 karakter)" required></div><div class="col-md-3"><button class="btn btn-warning w-100" onclick="return confirm('Buka kembali KRS ini?')">Buka kembali</button></div></form>
+                        @endif
+
+                        <h6>Mata kuliah dalam KRS</h6>
+                        <div class="table-responsive"><table class="table table-striped"><thead><tr><th>Mata kuliah</th><th>SKS</th><th>Aksi</th></tr></thead><tbody>
+                            @forelse ($krs->items as $item)
+                                <tr><td>{{ $item->penawaranMataKuliah->masterMataKuliah->name }}</td><td>{{ $item->sks }}</td><td>@if ($canManageKrs && $krs->isEditable())<form method="POST" action="{{ route($prefix.'krs-management.remove', $item) }}" class="d-flex gap-1">@csrf @method('DELETE')<input class="form-control form-control-sm" name="alasan" minlength="10" maxlength="1000" placeholder="Alasan penghapusan" required><button class="btn btn-sm btn-outline-danger" onclick="return confirm('Hapus mata kuliah dari KRS?')">Hapus</button></form>@else<span class="text-muted">{{ $krs->isEditable() ? 'Hanya lihat' : 'Dikunci' }}</span>@endif</td></tr>
+                            @empty<tr><td colspan="3" class="text-center text-muted">KRS belum memiliki mata kuliah.</td></tr>@endforelse
+                        </tbody><tfoot><tr><th>Total</th><th>{{ $krs->total_sks }} SKS</th><th>Batas {{ $selected->batas_sks }} SKS</th></tr></tfoot></table></div>
+
+                        @if ($canManageKrs && $krs->isEditable())
+                            <hr><h6>Tambahkan mata kuliah</h6>
+                            <form method="POST" action="{{ route($prefix.'krs-management.add', $selected) }}" class="row g-2">@csrf
+                                <div class="col-md-6"><select class="form-select" name="penawaran_mata_kuliah_id" required><option value="">Pilih penawaran</option>@foreach ($offerings as $offering)<option value="{{ $offering->id }}">{{ $offering->masterMataKuliah->name }} · {{ $offering->sks }} SKS · {{ $offering->dosenUtama?->dsn_name }}</option>@endforeach</select></div>
+                                <div class="col-md-4"><input class="form-control" name="alasan" minlength="10" maxlength="1000" placeholder="Alasan penambahan" required></div>
+                                <div class="col-md-2"><button class="btn btn-primary w-100">Tambahkan</button></div>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            @endif
+        </div>
+        <div class="col-lg-12">
             <div class="card">
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2"><h5 class="mb-0">Pilih mahasiswa</h5><a href="{{ route($prefix.'krs-management.import-template', ['q' => $search, 'status' => $status]) }}" class="btn btn-sm btn-outline-success"><i class="fa-solid fa-file-excel"></i> Unduh daftar Excel</a></div>
                 <div class="card-body">
@@ -85,43 +121,6 @@
                     {{ $registrations->links() }}
                 </div>
             </div>
-        </div>
-
-        <div class="col-lg-7">
-            @if (! $selected)
-                <div class="card"><div class="card-body text-center text-muted py-5">Pilih mahasiswa untuk mengelola KRS.</div></div>
-            @else
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-start"><div><h5 class="mb-1">{{ $selected->mahasiswa->mhs_name }}</h5><small>{{ $selected->mahasiswa->mhs_nim }} · {{ $selected->kelas?->name }} · Dosen wali: {{ $selected->dosenWali?->dsn_name ?? '-' }}</small></div><span class="badge bg-{{ $krs->isEditable() ? 'warning' : 'success' }}">{{ strtoupper($krs->status) }}</span></div>
-                    <div class="card-body">
-                        @if ($canApproveKrs && $krs->status === \App\Models\Krs::STATUS_SUBMITTED)
-                            <div class="alert alert-primary">KRS menunggu keputusan. Persetujuan administrator akan mengunci KRS dan dicatat dalam audit.</div>
-                            <form method="POST" action="{{ route($prefix.'krs-management.approve', $krs) }}" class="row g-2 mb-3">@csrf @method('PATCH')<div class="col-md-9"><textarea class="form-control" name="catatan" maxlength="2000" rows="2" placeholder="Catatan persetujuan (opsional)">{{ old('catatan') }}</textarea></div><div class="col-md-3"><button class="btn btn-success w-100" onclick="return confirm('Setujui dan kunci KRS ini?')">Setujui KRS</button></div></form>
-                        @endif
-
-                        @if ($canManageKrs && ! $krs->isEditable())
-                            <div class="alert alert-warning">KRS telah diajukan atau disetujui. Buka kembali sebelum mengubah isinya; mahasiswa harus mengajukan ulang kepada dosen wali.</div>
-                            <form method="POST" action="{{ route($prefix.'krs-management.reopen', $krs) }}" class="row g-2 mb-3">@csrf @method('PATCH')<div class="col-md-9"><input class="form-control" name="alasan" minlength="10" maxlength="1000" placeholder="Alasan membuka kembali KRS (minimal 10 karakter)" required></div><div class="col-md-3"><button class="btn btn-warning w-100" onclick="return confirm('Buka kembali KRS ini?')">Buka kembali</button></div></form>
-                        @endif
-
-                        <h6>Mata kuliah dalam KRS</h6>
-                        <div class="table-responsive"><table class="table table-striped"><thead><tr><th>Mata kuliah</th><th>SKS</th><th>Aksi</th></tr></thead><tbody>
-                            @forelse ($krs->items as $item)
-                                <tr><td>{{ $item->penawaranMataKuliah->masterMataKuliah->name }}</td><td>{{ $item->sks }}</td><td>@if ($canManageKrs && $krs->isEditable())<form method="POST" action="{{ route($prefix.'krs-management.remove', $item) }}" class="d-flex gap-1">@csrf @method('DELETE')<input class="form-control form-control-sm" name="alasan" minlength="10" maxlength="1000" placeholder="Alasan penghapusan" required><button class="btn btn-sm btn-outline-danger" onclick="return confirm('Hapus mata kuliah dari KRS?')">Hapus</button></form>@else<span class="text-muted">{{ $krs->isEditable() ? 'Hanya lihat' : 'Dikunci' }}</span>@endif</td></tr>
-                            @empty<tr><td colspan="3" class="text-center text-muted">KRS belum memiliki mata kuliah.</td></tr>@endforelse
-                        </tbody><tfoot><tr><th>Total</th><th>{{ $krs->total_sks }} SKS</th><th>Batas {{ $selected->batas_sks }} SKS</th></tr></tfoot></table></div>
-
-                        @if ($canManageKrs && $krs->isEditable())
-                            <hr><h6>Tambahkan mata kuliah</h6>
-                            <form method="POST" action="{{ route($prefix.'krs-management.add', $selected) }}" class="row g-2">@csrf
-                                <div class="col-md-6"><select class="form-select" name="penawaran_mata_kuliah_id" required><option value="">Pilih penawaran</option>@foreach ($offerings as $offering)<option value="{{ $offering->id }}">{{ $offering->masterMataKuliah->name }} · {{ $offering->sks }} SKS · {{ $offering->dosenUtama?->dsn_name }}</option>@endforeach</select></div>
-                                <div class="col-md-4"><input class="form-control" name="alasan" minlength="10" maxlength="1000" placeholder="Alasan penambahan" required></div>
-                                <div class="col-md-2"><button class="btn btn-primary w-100">Tambahkan</button></div>
-                            </form>
-                        @endif
-                    </div>
-                </div>
-            @endif
         </div>
     </div>
 

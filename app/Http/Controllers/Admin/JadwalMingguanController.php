@@ -9,7 +9,9 @@ use App\Models\JadwalMingguan;
 use App\Models\KalenderAkademik;
 use App\Models\PenawaranMataKuliah;
 use App\Models\PertemuanKuliah;
+use App\Models\ProgramStudi;
 use App\Models\Ruang;
+use App\Models\Settings\webSettings;
 use App\Services\Academic\AcademicPeriodContext;
 use App\Services\Academic\MeetingGeneratorService;
 use App\Services\Academic\ScheduleConflictService;
@@ -39,6 +41,81 @@ class JadwalMingguanController extends Controller
             ->orderBy('tanggal')->orderBy('pertemuan_ke')->get();
 
         return view('base.cetak.cetak-rekap-presensi-periode', compact('period', 'meetings'));
+    }
+
+    public function printTimetable(Request $request, AcademicPeriodContext $context): View
+    {
+        $period = $context->requireCurrent($request->user());
+        $validated = $request->validate([
+            'pstudi_id' => ['nullable', 'integer', 'exists:program_studis,id'],
+        ]);
+        $program = isset($validated['pstudi_id'])
+            ? ProgramStudi::findOrFail($validated['pstudi_id'])
+            : ProgramStudi::query()->orderBy('name')->first();
+
+        $schedules = JadwalMingguan::query()
+            ->forAcademicPeriod($period)
+            ->when($program, fn ($query) => $query->whereHas(
+                'penawaranMataKuliah',
+                fn ($offering) => $offering->where('pstudi_id', $program->id)
+            ))
+            ->with(['penawaranMataKuliah.masterMataKuliah', 'kelas', 'dosen'])
+            ->orderBy('hari')
+            ->orderBy('mulai')
+            ->get();
+
+        $semesters = $schedules
+            ->pluck('penawaranMataKuliah.masterMataKuliah.semester')
+            ->filter()
+            ->map(fn ($semester) => (int) $semester)
+            ->unique()
+            ->sort()
+            ->values();
+
+        $days = $schedules->groupBy('hari')->map(function ($daySchedules, $day) use ($semesters): array {
+            $slots = $daySchedules
+                ->groupBy(fn (JadwalMingguan $schedule) => substr($schedule->mulai, 0, 5).'|'.substr($schedule->selesai, 0, 5))
+                ->sortKeys()
+                ->values();
+            $rows = [];
+
+            foreach ($slots as $index => $slotSchedules) {
+                $first = $slotSchedules->first();
+                $rows[] = [
+                    'type' => 'schedule',
+                    'start' => substr($first->mulai, 0, 5),
+                    'end' => substr($first->selesai, 0, 5),
+                    'cells' => $semesters->mapWithKeys(fn (int $semester) => [
+                        $semester => $slotSchedules->filter(
+                            fn (JadwalMingguan $schedule) => (int) $schedule->penawaranMataKuliah?->masterMataKuliah?->semester === $semester
+                        )->values(),
+                    ]),
+                ];
+
+                $next = $slots->get($index + 1)?->first();
+                if ($next && substr($next->mulai, 0, 5) > substr($first->selesai, 0, 5)) {
+                    $rows[] = [
+                        'type' => 'break',
+                        'start' => substr($first->selesai, 0, 5),
+                        'end' => substr($next->mulai, 0, 5),
+                    ];
+                }
+            }
+
+            return [
+                'day' => (int) $day,
+                'label' => ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', "JUM'AT", 'SABTU'][(int) $day] ?? '-',
+                'rows' => $rows,
+            ];
+        })->values();
+
+        return view('base.cetak.cetak-jadwal-perkuliahan', [
+            'period' => $period,
+            'program' => $program,
+            'semesters' => $semesters,
+            'days' => $days,
+            'web' => webSettings::query()->first(),
+        ]);
     }
 
     public function store(Request $request, AcademicPeriodContext $context, ScheduleConflictService $conflicts): RedirectResponse
@@ -127,6 +204,11 @@ class JadwalMingguanController extends Controller
     {
         $period = $context->requireCurrent($request->user());
         abort_unless((int) $jadwal->penawaranMataKuliah?->taka_id === $period->id, 404);
+        $request->mergeIfMissing([
+            'mulai_tanggal' => $period->starts_at?->toDateString(),
+            'selesai_tanggal' => $period->ends_at?->toDateString(),
+            'jumlah_pertemuan' => 16,
+        ]);
         $data = $this->validateGeneration($request, $period->id);
         $viewData = $this->formData($context);
         $viewData['preview'] = $generator->preview($jadwal, $data['mulai_tanggal'], $data['selesai_tanggal'], $data['jumlah_pertemuan']);
@@ -161,6 +243,7 @@ class JadwalMingguanController extends Controller
                 ->with(['masterMataKuliah', 'kelas', 'dosenUtama'])->orderBy('code')->get(),
             'lecturers' => Dosen::query()->orderBy('dsn_name')->get(),
             'rooms' => Ruang::query()->orderBy('name')->get(),
+            'studyPrograms' => ProgramStudi::query()->orderBy('name')->get(),
             'holidays' => $period ? KalenderAkademik::query()->where('taka_id', $period->id)
                 ->where('kategori', 'libur')->orderBy('mulai_at')->get() : collect(),
             'preview' => null,

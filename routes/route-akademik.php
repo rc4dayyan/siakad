@@ -77,12 +77,13 @@ Route::group(['prefix' => 'academic', 'middleware' => ['user-access:Departement 
         Route::get('/services/convert/export-jadkul', [App\Http\Controllers\Services\Convert\ExportController::class, 'exportJadwalKuliah'])->name('services.convert.export-jadkul');
         Route::post('/services/convert/import-jadkul', [App\Http\Controllers\Services\Convert\ImportController::class, 'importJadwalKuliah'])->name('services.convert.import-jadkul');
         Route::get('/master/jadwal-mingguan', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'index'])->name('master.jadwal-mingguan-index');
+        Route::get('/master/jadwal-mingguan/cetak', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'printTimetable'])->name('master.jadwal-mingguan-print');
         Route::get('/master/jadwal-mingguan/rekap-presensi', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'recap'])->name('master.jadwal-mingguan-recap');
         Route::post('/master/jadwal-mingguan', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'store'])->name('master.jadwal-mingguan-store');
         Route::post('/master/jadwal-mingguan/kalender-libur', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'storeHoliday'])->name('master.jadwal-mingguan-holiday-store');
         Route::patch('/master/jadwal-mingguan/{jadwal}', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'update'])->name('master.jadwal-mingguan-update');
         Route::delete('/master/jadwal-mingguan/{jadwal}', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'destroy'])->name('master.jadwal-mingguan-destroy');
-        Route::post('/master/jadwal-mingguan/{jadwal}/pertemuan/pratinjau', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'preview'])->name('master.jadwal-mingguan-preview');
+        Route::get('/master/jadwal-mingguan/{jadwal}/pertemuan/pratinjau', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'preview'])->name('master.jadwal-mingguan-preview');
         Route::post('/master/jadwal-mingguan/{jadwal}/pertemuan/generate', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'generate'])->name('master.jadwal-mingguan-generate');
 
         // SERVICE CONVERT EXPORT - IMPORT

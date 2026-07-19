@@ -37,6 +37,7 @@ use App\Services\Academic\PeriodReadinessService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -46,9 +47,14 @@ class DemoDuaTahunAkademikSeeder extends Seeder
 
     private const STUDENTS_PER_COHORT = 12;
 
+    private const MAX_SCHEDULE_SEMESTER = 6;
+
+    private const MAX_ACTIVE_STUDENT_SEMESTER = 8;
+
     public function run(): void
     {
         DB::transaction(function (): void {
+            $this->resetDemoTransactions();
             $lecturers = $this->seedLecturers();
             $studyProgram = $this->seedStudyProgram();
             $curriculum = $this->seedCurriculum();
@@ -66,12 +72,6 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                 4 => ['Metodologi Studi Islam', 'Pendidikan Islam'],
                 5 => ['Akhlak Tasawuf', 'Sejarah Peradaban Islam'],
                 6 => ['Ushul Fikih', 'Ilmu Kalam'],
-                7 => ['Tafsir Tarbawi', 'Hadis Tarbawi'],
-                8 => ['Filsafat Pendidikan Islam', 'Manajemen Pendidikan Islam'],
-                9 => ['Metodologi Penelitian', 'Statistik Pendidikan'],
-                10 => ['Pengembangan Kurikulum', 'Evaluasi Pembelajaran'],
-                11 => ['Seminar Proposal', 'Praktik Pengalaman Lapangan'],
-                12 => ['Kuliah Kerja Nyata', 'Skripsi'],
             ];
 
             foreach (array_values($periods) as $periodIndex => $period) {
@@ -92,6 +92,15 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                     }
 
                     $studentSemester = (($period->year_start - $entryYear) * 2) + (int) $period->raw_semester;
+
+                    if ($studentSemester > self::MAX_ACTIVE_STUDENT_SEMESTER) {
+                        if ($studentSemester === self::MAX_ACTIVE_STUDENT_SEMESTER + 1) {
+                            $this->seedDropOutRegistrations($period, $studentSemester, $entryYear, $students, $lecturers[0]);
+                        }
+
+                        continue;
+                    }
+
                     $class = Kelas::updateOrCreate([
                         'code' => $classCodePrefix.'-A'.$entryYear.'-S'.$studentSemester,
                     ], [
@@ -119,9 +128,14 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                             'taka_id' => $period->id,
                             'class_id' => $class->id,
                             'years_id' => $entryYear,
+                            'mhs_stat' => 1,
                         ]);
                     }
                     $activeStudents = array_merge($activeStudents, $students);
+
+                    if ($studentSemester > self::MAX_SCHEDULE_SEMESTER) {
+                        continue;
+                    }
 
                     $legacyOfferings = [];
                     foreach ($courseNamesBySemester[$studentSemester] as $courseIndex => $courseName) {
@@ -153,6 +167,91 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                 $this->seedPublication($period, $staff['academic']);
             }
         });
+    }
+
+    private function seedDropOutRegistrations(
+        TahunAkademik $period,
+        int $studentSemester,
+        int $entryYear,
+        array $students,
+        Dosen $advisor
+    ): void {
+        foreach ($students as $student) {
+            $hasGraduated = RegistrasiMahasiswa::query()
+                ->where('mahasiswa_id', $student->id)
+                ->where('status_akademik', RegistrasiMahasiswa::STATUS_AKADEMIK_LULUS)
+                ->exists();
+
+            if ($hasGraduated) {
+                continue;
+            }
+
+            RegistrasiMahasiswa::updateOrCreate([
+                'mahasiswa_id' => $student->id,
+                'taka_id' => $period->id,
+            ], [
+                'semester_mahasiswa' => $studentSemester,
+                'status_akademik' => RegistrasiMahasiswa::STATUS_AKADEMIK_DROP_OUT,
+                'status_registrasi' => RegistrasiMahasiswa::STATUS_REGISTRASI_TERDAFTAR,
+                'kelas_id' => null,
+                'dosen_wali_id' => $advisor->id,
+                'batas_sks' => 0,
+            ]);
+            $student->update([
+                'taka_id' => $period->id,
+                'class_id' => 0,
+                'years_id' => $entryYear,
+                'mhs_stat' => 2,
+            ]);
+        }
+    }
+
+    private function resetDemoTransactions(): void
+    {
+        $studentIds = Mahasiswa::query()->where('mhs_code', 'like', 'DEMO-%')->pluck('id');
+        $registrationIds = RegistrasiMahasiswa::query()->whereIn('mahasiswa_id', $studentIds)->pluck('id');
+        $krsIds = Krs::query()->whereIn('registrasi_mahasiswa_id', $registrationIds)->pluck('id');
+        $taskIds = studentTask::query()->where('code', 'like', 'DEMO-%')->pluck('id');
+        $templateIds = TemplateTagihan::query()->where('name', 'like', 'UKT Demo %')->pluck('id');
+        $periodCodes = [];
+
+        foreach (range(2020, 2025) as $startYear) {
+            $yearCode = substr((string) $startYear, -2).substr((string) ($startYear + 1), -2);
+            $periodCodes[] = $yearCode.'01';
+            $periodCodes[] = $yearCode.'02';
+        }
+
+        $periodIds = TahunAkademik::query()->whereIn('code', $periodCodes)->pluck('id');
+
+        AcademicWorkflowAudit::query()->where('event', 'period.demo_seeded')->whereIn('taka_id', $periodIds)->delete();
+        PeriodPublication::query()->whereIn('taka_id', $periodIds)->delete();
+        PeriodReadinessSnapshot::query()->where('purpose', 'demo_seed')->whereIn('taka_id', $periodIds)->delete();
+        HistoryTagihan::query()->where('code', 'like', 'DEMO-%')->delete();
+        PenerbitanTagihanBatch::query()->whereIn('template_tagihan_id', $templateIds)->delete();
+        TagihanKuliah::query()->where('code', 'like', 'DEMO-%')->delete();
+        TemplateTagihan::query()->whereIn('id', $templateIds)->delete();
+        AbsensiMahasiswa::query()->where('code', 'like', 'DEMO-%')->delete();
+        PertemuanKuliah::query()->where('code', 'like', 'DEMO-%')->delete();
+        JadwalMingguan::query()->where('code', 'like', 'DEMO-%')->delete();
+        studentScore::query()->whereIn('student_id', $studentIds)->delete();
+        studentTask::query()->whereIn('id', $taskIds)->delete();
+        NilaiMahasiswa::query()->whereIn('mahasiswa_id', $studentIds)->delete();
+        HasilStudi::query()->where('code', 'like', 'DEMO-%')->delete();
+        DB::table('krs_items')->whereIn('krs_id', $krsIds)->delete();
+        Krs::query()->whereIn('id', $krsIds)->delete();
+
+        if (Schema::hasTable('riwayat_status_akademik_mahasiswas')) {
+            DB::table('riwayat_status_akademik_mahasiswas')->whereIn('registrasi_mahasiswa_id', $registrationIds)->delete();
+        }
+
+        JadwalKuliah::query()->where('code', 'like', 'DEMO-%')->delete();
+        PenawaranMataKuliah::query()->where('code', 'like', 'DEMO-%')->delete();
+        RegistrasiMahasiswa::query()->whereIn('id', $registrationIds)->delete();
+        MataKuliah::query()->where('code', 'like', 'DEMO-%')->delete();
+        KalenderAkademik::query()->where('nama', 'like', '% Demo')->whereIn('taka_id', $periodIds)->delete();
+        Mahasiswa::query()->whereIn('id', $studentIds)->update(['taka_id' => 0, 'class_id' => 0]);
+        Kelas::query()->where('code', 'like', 'DEMO-%')->delete();
+        ProgramKuliah::query()->where('code', 'like', 'DEMO-%')->delete();
     }
 
     private function seedPeriods(): array
