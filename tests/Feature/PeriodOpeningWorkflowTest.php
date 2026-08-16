@@ -522,6 +522,133 @@ class PeriodOpeningWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_offering_import_accepts_legacy_master_code_for_matching_feeder_study_program(): void
+    {
+        $actor = $this->actor();
+        $period = $this->period('LEGACY-MASTER', TahunAkademik::STATUS_DRAFT);
+        $advisor = $this->advisor();
+        $programId = DB::table('program_studis')->insertGetId([
+            'faku_id' => 1,
+            'name' => 'Pendidikan Guru Pendidikan Agama Islam',
+            'cnim' => '86208',
+            'code' => '86208',
+            'slug' => 'pendidikan-guru-pendidikan-agama-islam',
+            'head_id' => 0,
+            'title' => 'S.Pd',
+            'level' => 'S1',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $programKuliahId = $this->programKuliah($period, $programId, 'Reguler');
+        $classId = DB::table('kelas')->insertGetId([
+            'taka_id' => $period->id,
+            'pstudi_id' => $programId,
+            'proku_id' => $programKuliahId,
+            'dosen_id' => $advisor->id,
+            'capacity' => 30,
+            'name' => 'PAI A',
+            'code' => 'PAI-LEGACY-A',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $curriculumId = DB::table('kurikulums')->insertGetId([
+            'name' => 'Kurikulum 2020',
+            'code' => 'K20-LEGACY',
+            'desc' => '-',
+            'year_start' => 2020,
+            'year_ended' => 2028,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $master = MasterMataKuliah::create([
+            'program_studi' => 'PGPAI',
+            'semester' => 1,
+            'name' => 'Bahasa Arab 1',
+            'sks' => 2,
+        ]);
+
+        $headers = [
+            'Kode Penawaran', 'Kode Periode', 'Kode Program Studi', 'Kode Kurikulum', 'Kode Kelas',
+            'Semester Mata Kuliah', 'Nama Mata Kuliah', 'NIDN Dosen Utama', 'NIDN Dosen Pendamping 1',
+            'NIDN Dosen Pendamping 2', 'Semester Prasyarat', 'Nama Mata Kuliah Prasyarat',
+            'Kapasitas', 'Deskripsi',
+        ];
+        $values = [
+            'OFF-IMPORT-PAI', $period->code, '86208', 'K20-LEGACY', 'PAI-LEGACY-A',
+            '1', 'Bahasa Arab 1', $advisor->dsn_nidn, '', '', '', '', '40', 'Hasil import',
+        ];
+        $file = UploadedFile::fake()->createWithContent(
+            'penawaran.csv',
+            implode(',', $headers)."\n".implode(',', $values)
+        );
+
+        $response = $this->actingAs($actor)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $period->id])
+            ->post(route('web-admin.master.penawaran-import'), [
+                '_form' => 'import-offerings',
+                'import' => $file,
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('penawaran_mata_kuliahs', [
+            'master_mata_kuliah_id' => $master->id,
+            'pstudi_id' => $programId,
+            'kelas_id' => $classId,
+        ]);
+
+        PenawaranMataKuliah::query()->delete();
+        $invalidValues = $values;
+        $invalidValues[0] = 'OFF-IMPORT-INVALID';
+        $invalidValues[4] = 'KELAS-TIDAK-ADA';
+        $invalidFile = UploadedFile::fake()->createWithContent(
+            'penawaran-invalid.csv',
+            implode(',', $headers)."\n".implode(',', $values)."\n".implode(',', $invalidValues)
+        );
+
+        $this->actingAs($actor)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $period->id])
+            ->post(route('web-admin.master.penawaran-import'), [
+                '_form' => 'import-offerings',
+                'import' => $invalidFile,
+            ])
+            ->assertSessionHasErrors('import');
+
+        $this->assertDatabaseCount('penawaran_mata_kuliahs', 0);
+    }
+
+    public function test_offerings_can_be_exported_for_the_selected_period(): void
+    {
+        $data = $this->readyPeriod();
+
+        $response = $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('web-admin.master.penawaran-export'));
+
+        $response->assertOk();
+        $this->assertStringContainsString(
+            'penawaran-mata-kuliah-'.$data['period']->code,
+            (string) $response->headers->get('content-disposition')
+        );
+        $content = $response->streamedContent();
+        $this->assertNotEmpty($content);
+
+        $file = UploadedFile::fake()->createWithContent('penawaran.xlsx', $content);
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('web-admin.master.penawaran-import'), [
+                '_form' => 'import-offerings',
+                'import' => $file,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('penawaran_mata_kuliahs', [
+            'code' => 'OFF-READY',
+            'taka_id' => $data['period']->id,
+        ]);
+        $this->assertDatabaseCount('penawaran_mata_kuliahs', 1);
+    }
+
     private function readyPeriod(): array
     {
         $actor = $this->actor();
@@ -538,7 +665,12 @@ class PeriodOpeningWorkflowTest extends TestCase
             'name' => 'Kurikulum Siap', 'code' => 'KUR-READY', 'desc' => '-', 'year_start' => 2026,
             'year_ended' => 2030, 'created_at' => now(), 'updated_at' => now(),
         ]);
-        $master = MasterMataKuliah::create(['program_studi' => 'PAI', 'semester' => 1, 'name' => 'Mata Kuliah Siap', 'sks' => 3]);
+        $master = MasterMataKuliah::create([
+            'program_studi' => DB::table('program_studis')->where('id', $programId)->value('code'),
+            'semester' => 1,
+            'name' => 'Mata Kuliah Siap',
+            'sks' => 3,
+        ]);
         $student = $this->student('READY');
         $registration = RegistrasiMahasiswa::create([
             'mahasiswa_id' => $student->id, 'taka_id' => $period->id, 'semester_mahasiswa' => 1,

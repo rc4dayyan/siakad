@@ -16,10 +16,12 @@ use App\Services\Academic\AcademicPeriodContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Rap2hpoutre\FastExcel\FastExcel;
 
 class PenawaranMataKuliahController extends Controller
 {
@@ -28,6 +30,16 @@ class PenawaranMataKuliahController extends Controller
     public function index(Request $request, AcademicPeriodContext $context): View
     {
         $period = $context->current(auth()->user());
+        $selectedProgramId = $request->integer('pstudi_id') ?: null;
+        $programs = ProgramStudi::query()->orderBy('name')->get();
+        $selectedProgram = $programs->firstWhere('id', $selectedProgramId);
+        $masterProgramNames = [];
+
+        foreach ($programs as $program) {
+            foreach ($program->masterMataKuliahCodes() as $code) {
+                $masterProgramNames[$code] = $program->name;
+            }
+        }
 
         return view('user.admin.master.penawaran-matkul-index', [
             'prefix' => $this->setPrefix(),
@@ -37,10 +49,22 @@ class PenawaranMataKuliahController extends Controller
                 ->when($request->integer('pstudi_id'), fn ($query, $programId) => $query->where('pstudi_id', $programId))
                 ->when($request->integer('kuri_id'), fn ($query, $curriculumId) => $query->where('kuri_id', $curriculumId))
                 ->with(['masterMataKuliah', 'kelas', 'pstudi', 'kurikulum', 'dosenUtama'])->orderBy('code')->get(),
-            'masters' => MasterMataKuliah::query()->orderBy('name')->get(),
-            'programs' => ProgramStudi::query()->orderBy('name')->get(),
+            'masters' => MasterMataKuliah::query()
+                ->when($selectedProgram, fn ($query, $program) => $query->whereIn(
+                    'program_studi',
+                    $program->masterMataKuliahCodes()
+                ))
+                ->orderBy('semester')
+                ->orderBy('name')
+                ->get(),
+            'masterProgramNames' => $masterProgramNames,
+            'programs' => $programs,
             'curricula' => Kurikulum::query()->orderBy('name')->get(),
-            'classes' => Kelas::query()->forAcademicPeriod($period)->orderBy('name')->get(),
+            'classes' => Kelas::query()
+                ->forAcademicPeriod($period)
+                ->when($selectedProgramId, fn ($query, $programId) => $query->where('pstudi_id', $programId))
+                ->orderBy('name')
+                ->get(),
             'lecturers' => Dosen::query()->orderBy('dsn_name')->get(),
             'canManage' => $period?->isWritable() ?? false,
             'filters' => $request->only(['pstudi_id', 'kuri_id']),
@@ -120,6 +144,160 @@ class PenawaranMataKuliahController extends Controller
         $penawaran->delete();
 
         return back()->with('success', 'Penawaran mata kuliah berhasil dihapus.');
+    }
+
+    public function export(Request $request, AcademicPeriodContext $context)
+    {
+        $period = $context->requireCurrent($request->user());
+        $offerings = PenawaranMataKuliah::query()
+            ->forAcademicPeriod($period)
+            ->when($request->integer('pstudi_id'), fn ($query, $programId) => $query->where('pstudi_id', $programId))
+            ->when($request->integer('kuri_id'), fn ($query, $curriculumId) => $query->where('kuri_id', $curriculumId))
+            ->with([
+                'masterMataKuliah',
+                'pstudi',
+                'kurikulum',
+                'kelas',
+                'dosenUtama',
+                'dosenPendamping1',
+                'dosenPendamping2',
+                'prasyaratMaster',
+            ])
+            ->orderBy('code')
+            ->get();
+
+        return (new FastExcel($offerings))->download(
+            'penawaran-mata-kuliah-'.$period->code.'-'.now()->format('Ymd-His').'.xlsx',
+            fn (PenawaranMataKuliah $offering) => [
+                'Kode Penawaran' => $offering->code,
+                'Kode Periode' => $period->code,
+                'Kode Program Studi' => $offering->pstudi?->code,
+                'Kode Kurikulum' => $offering->kurikulum?->code,
+                'Kode Kelas' => $offering->kelas?->code,
+                'Semester Mata Kuliah' => $offering->masterMataKuliah?->semester,
+                'Nama Mata Kuliah' => $offering->masterMataKuliah?->name,
+                'NIDN Dosen Utama' => $offering->dosenUtama?->dsn_nidn,
+                'NIDN Dosen Pendamping 1' => $offering->dosenPendamping1?->dsn_nidn,
+                'NIDN Dosen Pendamping 2' => $offering->dosenPendamping2?->dsn_nidn,
+                'Semester Prasyarat' => $offering->prasyaratMaster?->semester,
+                'Nama Mata Kuliah Prasyarat' => $offering->prasyaratMaster?->name,
+                'Kapasitas' => $offering->kapasitas,
+                'Deskripsi' => $offering->deskripsi,
+            ]
+        );
+    }
+
+    public function import(Request $request, AcademicPeriodContext $context): RedirectResponse
+    {
+        $period = $context->requireWritableCurrent($request->user());
+        $request->validate([
+            '_form' => ['required', 'in:import-offerings'],
+            'import' => [
+                'required',
+                'file',
+                'extensions:xlsx,csv',
+                'mimetypes:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-zip-compressed,text/csv,text/plain,application/csv',
+                'max:5120',
+            ],
+        ], [
+            'import.required' => 'File penawaran mata kuliah wajib diunggah.',
+            'import.extensions' => 'File harus berformat XLSX atau CSV.',
+            'import.mimetypes' => 'Isi file harus berupa XLSX atau CSV yang valid.',
+            'import.max' => 'Ukuran file tidak boleh melebihi 5 MB.',
+        ]);
+
+        $path = $request->file('import')->store('excel-files', 'local');
+
+        try {
+            $rows = (new FastExcel)->import(storage_path('app/'.$path));
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                'import' => 'File tidak dapat dibaca. Gunakan hasil ekspor penawaran berformat XLSX atau CSV.',
+            ]);
+        } finally {
+            Storage::disk('local')->delete($path);
+        }
+
+        $headers = [
+            'Kode Penawaran',
+            'Kode Periode',
+            'Kode Program Studi',
+            'Kode Kurikulum',
+            'Kode Kelas',
+            'Semester Mata Kuliah',
+            'Nama Mata Kuliah',
+            'NIDN Dosen Utama',
+            'NIDN Dosen Pendamping 1',
+            'NIDN Dosen Pendamping 2',
+            'Semester Prasyarat',
+            'Nama Mata Kuliah Prasyarat',
+            'Kapasitas',
+            'Deskripsi',
+        ];
+
+        if ($rows->isEmpty()) {
+            throw ValidationException::withMessages(['import' => 'File import tidak berisi data penawaran.']);
+        }
+
+        $missingHeaders = array_diff($headers, array_keys($rows->first()));
+
+        if ($missingHeaders !== []) {
+            throw ValidationException::withMessages([
+                'import' => 'Kolom wajib tidak ditemukan: '.implode(', ', $missingHeaders).'.',
+            ]);
+        }
+
+        $prepared = [];
+
+        foreach ($rows as $index => $row) {
+            $rowNumber = $index + 2;
+            $prepared[] = $this->prepareImportedOffering($row, $rowNumber, $period);
+        }
+
+        $result = DB::transaction(function () use ($prepared, $period): array {
+            $created = 0;
+            $skipped = 0;
+            $seen = [];
+
+            foreach ($prepared as $attributes) {
+                $combination = implode(':', [
+                    $attributes['master_mata_kuliah_id'],
+                    $attributes['pstudi_id'],
+                    $attributes['kuri_id'],
+                    $attributes['kelas_id'],
+                ]);
+
+                $exists = isset($seen[$combination]) || PenawaranMataKuliah::query()
+                    ->where('taka_id', $period->id)
+                    ->where('master_mata_kuliah_id', $attributes['master_mata_kuliah_id'])
+                    ->where('pstudi_id', $attributes['pstudi_id'])
+                    ->where('kuri_id', $attributes['kuri_id'])
+                    ->where('kelas_id', $attributes['kelas_id'])
+                    ->exists();
+
+                if ($exists || ($attributes['code'] && PenawaranMataKuliah::where('code', $attributes['code'])->exists())) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $seen[$combination] = true;
+                $attributes['code'] ??= $this->newCode(
+                    $period->id,
+                    $attributes['master_mata_kuliah_id'],
+                    $attributes['kelas_id']
+                );
+                PenawaranMataKuliah::create(['taka_id' => $period->id, ...$attributes]);
+                $created++;
+            }
+
+            return compact('created', 'skipped');
+        });
+
+        return back()->with(
+            'success',
+            "Import selesai: {$result['created']} penawaran dibuat dan {$result['skipped']} duplikat dilewati."
+        );
     }
 
     public function copyPreview(Request $request): View
@@ -204,27 +382,220 @@ class PenawaranMataKuliahController extends Controller
         ]);
     }
 
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function prepareImportedOffering(array $row, int $rowNumber, TahunAkademik $period): array
+    {
+        $periodCode = $this->importedText($row['Kode Periode'] ?? null);
+
+        if ($periodCode !== $period->code) {
+            $this->rejectImportRow($rowNumber, "Kode Periode harus {$period->code}.");
+        }
+
+        $programCode = $this->importedText($row['Kode Program Studi'] ?? null);
+        $program = ProgramStudi::query()->where('code', $programCode)->first();
+
+        if (! $program) {
+            $this->rejectImportRow($rowNumber, "Kode Program Studi {$programCode} tidak ditemukan.");
+        }
+
+        $curriculumCode = $this->importedText($row['Kode Kurikulum'] ?? null);
+        $curriculum = Kurikulum::query()->where('code', $curriculumCode)->first();
+
+        if (! $curriculum) {
+            $this->rejectImportRow($rowNumber, "Kode Kurikulum {$curriculumCode} tidak ditemukan.");
+        }
+
+        $classCode = $this->importedText($row['Kode Kelas'] ?? null);
+        $class = Kelas::query()
+            ->forAcademicPeriod($period)
+            ->where('pstudi_id', $program->id)
+            ->where('code', $classCode)
+            ->first();
+
+        if (! $class) {
+            $this->rejectImportRow(
+                $rowNumber,
+                "Kelas {$classCode} tidak ditemukan pada periode dan program studi tersebut."
+            );
+        }
+
+        $semester = $this->importedInteger(
+            $row['Semester Mata Kuliah'] ?? null,
+            $rowNumber,
+            'Semester Mata Kuliah',
+            1,
+            14
+        );
+        $courseName = $this->importedText($row['Nama Mata Kuliah'] ?? null);
+        $master = MasterMataKuliah::query()
+            ->whereIn('program_studi', $program->masterMataKuliahCodes())
+            ->where('semester', $semester)
+            ->where('name', $courseName)
+            ->get();
+
+        if ($courseName === '' || $master->count() !== 1) {
+            $this->rejectImportRow(
+                $rowNumber,
+                "Mata kuliah {$courseName} semester {$semester} harus cocok tepat dengan satu data master."
+            );
+        }
+
+        $mainLecturer = $this->importedLecturer($row['NIDN Dosen Utama'] ?? null, $rowNumber, 'Dosen Utama');
+        $assistant1 = $this->importedLecturer(
+            $row['NIDN Dosen Pendamping 1'] ?? null,
+            $rowNumber,
+            'Dosen Pendamping 1',
+            required: false
+        );
+        $assistant2 = $this->importedLecturer(
+            $row['NIDN Dosen Pendamping 2'] ?? null,
+            $rowNumber,
+            'Dosen Pendamping 2',
+            required: false
+        );
+        $prerequisiteSemesterValue = $this->importedText($row['Semester Prasyarat'] ?? null);
+        $prerequisiteName = $this->importedText($row['Nama Mata Kuliah Prasyarat'] ?? null);
+        $prerequisite = null;
+
+        if ($prerequisiteSemesterValue !== '' || $prerequisiteName !== '') {
+            if ($prerequisiteSemesterValue === '' || $prerequisiteName === '') {
+                $this->rejectImportRow(
+                    $rowNumber,
+                    'Semester dan Nama Mata Kuliah Prasyarat harus diisi bersama-sama.'
+                );
+            }
+
+            $prerequisiteSemester = $this->importedInteger(
+                $prerequisiteSemesterValue,
+                $rowNumber,
+                'Semester Prasyarat',
+                1,
+                14
+            );
+            $prerequisites = MasterMataKuliah::query()
+                ->whereIn('program_studi', $program->masterMataKuliahCodes())
+                ->where('semester', $prerequisiteSemester)
+                ->where('name', $prerequisiteName)
+                ->get();
+
+            if ($prerequisites->count() !== 1) {
+                $this->rejectImportRow(
+                    $rowNumber,
+                    "Prasyarat {$prerequisiteName} semester {$prerequisiteSemester} tidak ditemukan secara unik."
+                );
+            }
+
+            $prerequisite = $prerequisites->first();
+
+            if ($prerequisite->is($master->first())) {
+                $this->rejectImportRow($rowNumber, 'Mata kuliah tidak dapat menjadi prasyarat bagi dirinya sendiri.');
+            }
+        }
+
+        $capacity = $this->importedInteger($row['Kapasitas'] ?? null, $rowNumber, 'Kapasitas', 1, 1000);
+        $code = $this->importedText($row['Kode Penawaran'] ?? null);
+
+        if (mb_strlen($code) > 255) {
+            $this->rejectImportRow($rowNumber, 'Kode Penawaran maksimal 255 karakter.');
+        }
+
+        return [
+            'master_mata_kuliah_id' => $master->first()->id,
+            'pstudi_id' => $program->id,
+            'kuri_id' => $curriculum->id,
+            'kelas_id' => $class->id,
+            'dosen_utama_id' => $mainLecturer->id,
+            'dosen_pendamping_1_id' => $assistant1?->id,
+            'dosen_pendamping_2_id' => $assistant2?->id,
+            'prasyarat_master_id' => $prerequisite?->id,
+            'code' => $code === '' ? null : $code,
+            'sks' => $master->first()->sks,
+            'kapasitas' => $capacity,
+            'deskripsi' => $this->importedText($row['Deskripsi'] ?? null) ?: null,
+        ];
+    }
+
+    private function importedLecturer(
+        mixed $value,
+        int $rowNumber,
+        string $column,
+        bool $required = true
+    ): ?Dosen {
+        $nidn = $this->importedText($value);
+
+        if ($nidn === '' && ! $required) {
+            return null;
+        }
+
+        $lecturer = Dosen::query()->where('dsn_nidn', $nidn)->first();
+
+        if (! $lecturer) {
+            $this->rejectImportRow($rowNumber, "NIDN {$column} {$nidn} tidak ditemukan.");
+        }
+
+        return $lecturer;
+    }
+
+    private function importedInteger(
+        mixed $value,
+        int $rowNumber,
+        string $column,
+        int $minimum,
+        int $maximum
+    ): int {
+        $integer = filter_var($value, FILTER_VALIDATE_INT);
+
+        if ($integer === false || $integer < $minimum || $integer > $maximum) {
+            $this->rejectImportRow(
+                $rowNumber,
+                "{$column} harus berupa angka antara {$minimum} sampai {$maximum}."
+            );
+        }
+
+        return $integer;
+    }
+
+    private function importedText(mixed $value): string
+    {
+        return trim((string) ($value ?? ''));
+    }
+
+    private function rejectImportRow(int $rowNumber, string $message): never
+    {
+        throw ValidationException::withMessages([
+            'import' => "Baris {$rowNumber}: {$message}",
+        ]);
+    }
+
     private function validateOffering(Request $request, int $periodId, PenawaranMataKuliah|bool|null $offering = null, bool $multipleClasses = false): array
     {
         if (is_bool($offering)) {
             $multipleClasses = $offering;
             $offering = null;
         }
+        $programStudi = ProgramStudi::query()->find($request->integer('pstudi_id'));
+        $masterProgramCodes = $programStudi?->masterMataKuliahCodes() ?? [];
         $classRule = Rule::exists('kelas', 'id')->where(fn ($query) => $query->where('taka_id', $periodId)->where('pstudi_id', $request->integer('pstudi_id')));
         $rules = [
             'master_mata_kuliah_id' => [
                 'required',
-                Rule::exists('master_mata_kuliahs', 'id')->where(fn ($query) => $query->where(
-                    'program_studi',
-                    ProgramStudi::query()->whereKey($request->integer('pstudi_id'))->value('code')
-                )),
+                Rule::exists('master_mata_kuliahs', 'id')->where(fn ($query) => $query
+                    ->whereIn('program_studi', $masterProgramCodes)),
             ],
             'pstudi_id' => ['required', 'exists:program_studis,id'],
             'kuri_id' => ['required', 'exists:kurikulums,id'],
             'dosen_utama_id' => ['required', 'exists:dosens,id'],
             'dosen_pendamping_1_id' => ['nullable', 'exists:dosens,id'],
             'dosen_pendamping_2_id' => ['nullable', 'exists:dosens,id'],
-            'prasyarat_master_id' => ['nullable', 'different:master_mata_kuliah_id', 'exists:master_mata_kuliahs,id'],
+            'prasyarat_master_id' => [
+                'nullable',
+                'different:master_mata_kuliah_id',
+                Rule::exists('master_mata_kuliahs', 'id')->where(fn ($query) => $query
+                    ->whereIn('program_studi', $masterProgramCodes)),
+            ],
             'kapasitas' => ['required', 'integer', 'min:1', 'max:1000'],
             'deskripsi' => ['nullable', 'string'],
         ];
@@ -234,7 +605,10 @@ class PenawaranMataKuliahController extends Controller
             $rules['kelas_ids.*'] = ['required', 'distinct', $classRule];
         }
 
-        return $request->validate($rules);
+        return $request->validate($rules, [
+            'master_mata_kuliah_id.exists' => 'Master mata kuliah tidak sesuai dengan program studi yang dipilih.',
+            'kelas_ids.*.exists' => 'Kelas tidak sesuai dengan periode atau program studi yang dipilih.',
+        ]);
     }
 
     private function newCode(int $periodId, int $masterId, int $classId): string

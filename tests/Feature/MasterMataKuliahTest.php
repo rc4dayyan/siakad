@@ -92,7 +92,7 @@ class MasterMataKuliahTest extends TestCase
             'year_start' => 2026, 'year_end' => 2027, 'term' => 'ganjil', 'is_active' => 1,
             'status' => 'active', 'activated_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
-        DB::table('program_studis')->insert(['id' => 1, 'name' => 'PAI', 'code' => 'PAI', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('program_studis')->insert(['id' => 1, 'name' => 'PAI', 'code' => '86208', 'created_at' => now(), 'updated_at' => now()]);
         DB::table('kurikulums')->insert(['id' => 1, 'name' => 'Kurikulum', 'created_at' => now(), 'updated_at' => now()]);
         DB::table('dosens')->insert(['id' => 1, 'dsn_name' => 'Dosen', 'created_at' => now(), 'updated_at' => now()]);
 
@@ -105,16 +105,16 @@ class MasterMataKuliahTest extends TestCase
         $this->seed(MasterMataKuliahSeeder::class);
 
         $this->assertDatabaseCount('master_mata_kuliahs', 246);
-        $this->assertSame(62, MasterMataKuliah::where('program_studi', 'PAI')->count());
-        $this->assertSame(62, MasterMataKuliah::where('program_studi', 'RA')->count());
+        $this->assertSame(62, MasterMataKuliah::where('program_studi', '86208')->count());
+        $this->assertSame(62, MasterMataKuliah::where('program_studi', '86233')->count());
         $this->assertSame(62, MasterMataKuliah::where('program_studi', 'MI')->count());
-        $this->assertSame(60, MasterMataKuliah::where('program_studi', 'PBA')->count());
+        $this->assertSame(60, MasterMataKuliah::where('program_studi', '88204')->count());
     }
 
     public function test_mata_kuliah_and_master_mata_kuliah_have_bidirectional_relations(): void
     {
         $master = MasterMataKuliah::create([
-            'program_studi' => 'PAI',
+            'program_studi' => '86208',
             'semester' => 1,
             'name' => 'Pend. Kewarganegaraan',
             'sks' => 2,
@@ -156,7 +156,7 @@ class MasterMataKuliahTest extends TestCase
     public function test_store_uses_the_selected_master_id_and_name(): void
     {
         $master = MasterMataKuliah::create([
-            'program_studi' => 'PAI',
+            'program_studi' => '86208',
             'semester' => 1,
             'name' => 'Pend. Kewarganegaraan',
             'sks' => 2,
@@ -181,13 +181,13 @@ class MasterMataKuliahTest extends TestCase
     public function test_update_changes_mid_and_name_to_the_selected_master(): void
     {
         $firstMaster = MasterMataKuliah::create([
-            'program_studi' => 'PAI',
+            'program_studi' => '86208',
             'semester' => 1,
             'name' => 'Pend. Kewarganegaraan',
             'sks' => 2,
         ]);
         $secondMaster = MasterMataKuliah::create([
-            'program_studi' => 'PAI',
+            'program_studi' => '86208',
             'semester' => 2,
             'name' => 'Bahasa Indonesia',
             'sks' => 2,

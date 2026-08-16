@@ -30,7 +30,7 @@ class DatabaseSeeder extends Seeder
         ]);
         \App\Models\ProgramStudi::create([
             'name'       => 'Pendidikan Guru Pendidikan Agama Islam',
-            'code'       => 'PGPAI',
+            'code'       => '86208',
             'cnim'       => '4210',
             'title'      => ', S.Pd',
             'level'      => 'S1',
@@ -40,7 +40,7 @@ class DatabaseSeeder extends Seeder
         ]);
         \App\Models\ProgramStudi::create([
             'name'       => 'Pendidikan Guru Bahasa Arab',
-            'code'       => 'PGBA',
+            'code'       => '88204',
             'cnim'       => '4211',
             'title'      => ', S.Pd',
             'level'      => 'S1',

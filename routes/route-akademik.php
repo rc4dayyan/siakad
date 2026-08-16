@@ -57,6 +57,8 @@ Route::group(['prefix' => 'academic', 'middleware' => ['user-access:Departement 
         Route::delete('/master/data-matkul/{code}/destroy',[App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'destroy'])->name('master.matkul-destroy');
         Route::get('/master/penawaran-matkul', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'index'])->name('master.penawaran-index');
         Route::post('/master/penawaran-matkul', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'store'])->name('master.penawaran-store');
+        Route::get('/master/penawaran-matkul/export', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'export'])->name('master.penawaran-export');
+        Route::post('/master/penawaran-matkul/import', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'import'])->name('master.penawaran-import');
         Route::patch('/master/penawaran-matkul/jadwal-krs', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'updateKrsWindow'])->name('master.penawaran-krs-window');
         Route::patch('/master/penawaran-matkul/{penawaran}', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'update'])->name('master.penawaran-update');
         Route::delete('/master/penawaran-matkul/{penawaran}', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'destroy'])->name('master.penawaran-destroy');

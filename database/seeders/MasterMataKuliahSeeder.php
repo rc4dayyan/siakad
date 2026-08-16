@@ -10,7 +10,7 @@ class MasterMataKuliahSeeder extends Seeder
     public function run(): void
     {
         $curricula = [
-            'PAI' => [
+            '86208' => [
                 1 => [
                     ['Pend. Kewarganegaraan', 2], ['Bahasa Inggris 1', 2], ['Bahasa Arab 1', 2],
                     ['Pengantar Studi Islam', 2], ['Akhlak Tasawuf', 2], ['ISD/IAD/IBD', 3],
@@ -45,7 +45,7 @@ class MasterMataKuliahSeeder extends Seeder
                 7 => self::semesterTujuh(),
                 8 => self::semesterDelapan(),
             ],
-            'RA' => [
+            '86233' => [
                 1 => [
                     ['Pend. Kewarganegaraan', 2], ['Bahasa Inggris 1', 2], ['Bahasa Arab 1', 2],
                     ['Pengantar Studi Islam', 2], ['Akhlak Tasawuf', 2], ['ISD/IAD/IBD', 3],
@@ -119,7 +119,7 @@ class MasterMataKuliahSeeder extends Seeder
                 7 => self::semesterTujuh(),
                 8 => self::semesterDelapan(),
             ],
-            'PBA' => [
+            '88204' => [
                 1 => [
                     ['Pend. Kewarganegaraan', 2], ['Bahasa Inggris 1', 2], ['Nahwu 1', 2],
                     ['Pengantar Studi Islam', 2], ['Akhlak Tasawuf', 2], ['ISD/IAD/IBD', 3],
