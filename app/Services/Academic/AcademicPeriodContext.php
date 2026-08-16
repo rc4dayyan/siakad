@@ -51,6 +51,14 @@ class AcademicPeriodContext
 
         $active = $this->active();
 
+        if (! $active && $this->canBrowseHistory($user)) {
+            $active = TahunAkademik::query()
+                ->where('status', TahunAkademik::STATUS_DRAFT)
+                ->orderByDesc('year_start')
+                ->orderByDesc('starts_at')
+                ->first();
+        }
+
         if ($active) {
             session()->put(self::SESSION_KEY, $active->getKey());
         }

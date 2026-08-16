@@ -63,7 +63,7 @@
                                     @foreach ($academicPeriods as $period)
                                         <option value="{{ $period->code }}"
                                             @selected($selectedAcademicPeriod?->is($period))>
-                                            {{ $period->code }}{{ $activeAcademicPeriod?->is($period) ? ' (Aktif)' : '' }}
+                                            {{ $period->code }} ({{ $period->status_label }})
                                         </option>
                                     @endforeach
                                 </select>

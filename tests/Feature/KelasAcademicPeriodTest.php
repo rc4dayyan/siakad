@@ -71,6 +71,34 @@ class KelasAcademicPeriodTest extends TestCase
         ]);
     }
 
+    public function test_class_can_be_created_in_a_draft_period_when_no_period_is_active(): void
+    {
+        $this->activePeriod->update([
+            'status' => TahunAkademik::STATUS_CLOSED,
+            'is_active' => false,
+        ]);
+        $draftPeriod = $this->period('2027-GANJIL', TahunAkademik::STATUS_DRAFT);
+        $programStudiId = DB::table('program_studis')->insertGetId([
+            'name' => 'Pendidikan Agama Islam',
+            'code' => 'PAI-DRAFT',
+        ]);
+
+        $response = $this
+            ->actingAs($this->academicUser())
+            ->post(route('academic.master.kelas-store'), [
+                'name' => 'Kelas Draft A',
+                'code' => 'PAI-2027-A',
+                'capacity' => 30,
+                'pstudi_id' => $programStudiId,
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('kelas', [
+            'code' => 'PAI-2027-A',
+            'taka_id' => $draftPeriod->id,
+        ]);
+    }
+
     public function test_class_capacity_accepts_100_and_rejects_values_above_100(): void
     {
         $programStudiId = DB::table('program_studis')->insertGetId([
