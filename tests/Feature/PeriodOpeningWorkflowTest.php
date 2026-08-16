@@ -562,8 +562,14 @@ class PeriodOpeningWorkflowTest extends TestCase
         ]);
         $master = MasterMataKuliah::create([
             'program_studi' => 'PGPAI',
-            'semester' => 1,
+            'semester' => 2,
             'name' => 'Bahasa Arab 1',
+            'sks' => 2,
+        ]);
+        $prerequisite = MasterMataKuliah::create([
+            'program_studi' => 'PGPAI',
+            'semester' => 1,
+            'name' => 'Pengantar Studi Islam',
             'sks' => 2,
         ]);
 
@@ -575,7 +581,7 @@ class PeriodOpeningWorkflowTest extends TestCase
         ];
         $values = [
             'OFF-IMPORT-PAI', $period->code, '86208', 'K20-LEGACY', 'PAI-LEGACY-A',
-            '1', 'Bahasa Arab 1', $advisor->dsn_nidn, '', '', '', '', '40', 'Hasil import',
+            'II', 'Bahasa Arab 1', $advisor->dsn_nidn, '', '', 'I', 'Pengantar Studi Islam', '40', 'Hasil import',
         ];
         $file = UploadedFile::fake()->createWithContent(
             'penawaran.csv',
@@ -592,6 +598,7 @@ class PeriodOpeningWorkflowTest extends TestCase
         $response->assertSessionHasNoErrors();
         $this->assertDatabaseHas('penawaran_mata_kuliahs', [
             'master_mata_kuliah_id' => $master->id,
+            'prasyarat_master_id' => $prerequisite->id,
             'pstudi_id' => $programId,
             'kelas_id' => $classId,
         ]);

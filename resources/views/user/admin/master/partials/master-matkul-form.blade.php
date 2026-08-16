@@ -1,11 +1,16 @@
 @php($current = $item ?? null)
 <div class="row">
-    <div class="form-group col-md-6">
+    <div class="form-group col-md-4">
         <label for="program_studi_{{ $formId }}">Program Studi</label>
         <input type="text" name="program_studi" id="program_studi_{{ $formId }}" class="form-control" maxlength="10" value="{{ old('program_studi', $current?->program_studi) }}" placeholder="Contoh: PAI" required>
         @error('program_studi')<small class="text-danger">{{ $message }}</small>@enderror
     </div>
-    <div class="form-group col-md-6">
+    <div class="form-group col-md-4">
+        <label for="code_{{ $formId }}">Kode Mata Kuliah</label>
+        <input type="text" name="code" id="code_{{ $formId }}" class="form-control" maxlength="50" value="{{ old('code', $current?->code) }}" placeholder="Contoh: PAI.01" required>
+        @error('code')<small class="text-danger">{{ $message }}</small>@enderror
+    </div>
+    <div class="form-group col-md-4">
         <label for="semester_{{ $formId }}">Semester</label>
         <input type="number" name="semester" id="semester_{{ $formId }}" class="form-control" min="1" max="14" value="{{ old('semester', $current?->semester) }}" required>
         @error('semester')<small class="text-danger">{{ $message }}</small>@enderror

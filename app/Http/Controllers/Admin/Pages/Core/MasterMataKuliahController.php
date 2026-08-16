@@ -69,7 +69,7 @@ class MasterMataKuliahController extends Controller
                 throw ValidationException::withMessages(['import' => 'File import tidak berisi data.']);
             }
 
-            $requiredHeaders = ['Program Studi', 'Semester', 'Nama Mata Kuliah', 'SKS'];
+            $requiredHeaders = ['Program Studi', 'Kode', 'Nama Mata Kuliah', 'SKS', 'Semester'];
             $missingHeaders = array_diff($requiredHeaders, array_keys($rows->first()));
 
             if ($missingHeaders !== []) {
@@ -78,36 +78,71 @@ class MasterMataKuliahController extends Controller
                 ]);
             }
 
-            $now = now();
             $data = [];
+            $codes = [];
+            $naturalKeys = [];
 
             foreach ($rows as $index => $row) {
+                $rowNumber = $index + 2;
                 $programStudi = strtoupper(trim((string) $row['Program Studi']));
-                $semester = filter_var($row['Semester'], FILTER_VALIDATE_INT);
+                $code = strtoupper(trim((string) $row['Kode']));
                 $name = trim((string) $row['Nama Mata Kuliah']);
                 $sks = filter_var($row['SKS'], FILTER_VALIDATE_INT);
+                $semester = $this->parseSemester($row['Semester']);
 
-                if ($programStudi === '' || strlen($programStudi) > 10 || $semester === false || $semester < 1 || $semester > 14 || $name === '' || $sks === false || $sks < 1 || $sks > 24) {
+                if ($programStudi === '' || mb_strlen($programStudi) > 10 || $code === '' || mb_strlen($code) > 50 || $semester === null || $name === '' || mb_strlen($name) > 255 || $sks === false || $sks < 1 || $sks > 24) {
                     throw ValidationException::withMessages([
-                        'import' => 'Baris '.($index + 2).': data program studi, semester, nama, atau SKS tidak valid.',
+                        'import' => "Baris {$rowNumber}: data program studi, kode, nama mata kuliah, SKS, atau semester tidak valid.",
                     ]);
                 }
 
+                $naturalKey = $programStudi.'|'.$semester.'|'.mb_strtolower($name);
+
+                if (isset($codes[$code])) {
+                    throw ValidationException::withMessages([
+                        'import' => "Baris {$rowNumber}: kode {$code} juga digunakan pada baris {$codes[$code]}.",
+                    ]);
+                }
+
+                if (isset($naturalKeys[$naturalKey])) {
+                    throw ValidationException::withMessages([
+                        'import' => "Baris {$rowNumber}: mata kuliah yang sama juga terdapat pada baris {$naturalKeys[$naturalKey]}.",
+                    ]);
+                }
+
+                $codes[$code] = $rowNumber;
+                $naturalKeys[$naturalKey] = $rowNumber;
                 $data[] = [
                     'program_studi' => $programStudi,
+                    'code' => $code,
                     'semester' => $semester,
                     'name' => $name,
                     'sks' => $sks,
-                    'created_at' => $now,
-                    'updated_at' => $now,
+                    'row_number' => $rowNumber,
                 ];
             }
 
-            DB::transaction(fn () => MasterMataKuliah::upsert(
-                $data,
-                ['program_studi', 'semester', 'name'],
-                ['sks', 'updated_at'],
-            ));
+            DB::transaction(function () use ($data) {
+                foreach ($data as $attributes) {
+                    $rowNumber = $attributes['row_number'];
+                    unset($attributes['row_number']);
+
+                    $byCode = MasterMataKuliah::where('code', $attributes['code'])->first();
+                    $byNaturalKey = MasterMataKuliah::query()
+                        ->where('program_studi', $attributes['program_studi'])
+                        ->where('semester', $attributes['semester'])
+                        ->where('name', $attributes['name'])
+                        ->first();
+
+                    if ($byCode && $byNaturalKey && ! $byCode->is($byNaturalKey)) {
+                        throw ValidationException::withMessages([
+                            'import' => "Baris {$rowNumber}: kode {$attributes['code']} dan mata kuliah {$attributes['name']} mengarah ke dua data yang berbeda.",
+                        ]);
+                    }
+
+                    ($byCode ?? $byNaturalKey ?? new MasterMataKuliah)->fill($attributes)->save();
+                }
+            });
         } finally {
             unlink(storage_path('app/'.$path));
         }
@@ -128,17 +163,29 @@ class MasterMataKuliahController extends Controller
         return (new FastExcel($items))->download('master-mata-kuliah-'.now()->format('Ymd-His').'.xlsx', function (MasterMataKuliah $item) {
             return [
                 'Program Studi' => $item->program_studi,
-                'Semester' => $item->semester,
+                'Kode' => $item->code,
                 'Nama Mata Kuliah' => $item->name,
                 'SKS' => $item->sks,
+                'Semester' => $this->semesterToRoman($item->semester),
             ];
         });
     }
 
     private function validateData(Request $request, ?MasterMataKuliah $masterMataKuliah = null): array
     {
+        $request->merge([
+            'program_studi' => strtoupper(trim((string) $request->input('program_studi'))),
+            'code' => strtoupper(trim((string) $request->input('code'))),
+        ]);
+
         $data = $request->validate([
             'program_studi' => ['required', 'string', 'max:10'],
+            'code' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('master_mata_kuliahs', 'code')->ignore($masterMataKuliah),
+            ],
             'semester' => ['required', 'integer', 'between:1,14'],
             'name' => [
                 'required',
@@ -151,11 +198,37 @@ class MasterMataKuliahController extends Controller
             ],
             'sks' => ['required', 'integer', 'between:1,24'],
         ], [
+            'code.required' => 'Kode mata kuliah wajib diisi.',
+            'code.unique' => 'Kode mata kuliah sudah digunakan.',
             'name.unique' => 'Mata kuliah tersebut sudah ada pada program studi dan semester yang dipilih.',
         ]);
 
-        $data['program_studi'] = strtoupper(trim($data['program_studi']));
-
         return $data;
+    }
+
+    private function parseSemester(mixed $value): ?int
+    {
+        $semester = strtoupper(trim((string) $value));
+
+        if (ctype_digit($semester)) {
+            $number = (int) $semester;
+
+            return $number >= 1 && $number <= 14 ? $number : null;
+        }
+
+        $romanSemesters = array_flip([
+            1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI', 7 => 'VII',
+            8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII', 13 => 'XIII', 14 => 'XIV',
+        ]);
+
+        return $romanSemesters[$semester] ?? null;
+    }
+
+    private function semesterToRoman(int $semester): string
+    {
+        return [
+            1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI', 7 => 'VII',
+            8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII', 13 => 'XIII', 14 => 'XIV',
+        ][$semester] ?? (string) $semester;
     }
 }

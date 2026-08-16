@@ -29,6 +29,7 @@
                     <tr>
                         <th class="text-center">#</th>
                         <th>Program Studi</th>
+                        <th>Kode</th>
                         <th class="text-center">Semester</th>
                         <th>Nama Mata Kuliah</th>
                         <th class="text-center">SKS</th>
@@ -40,6 +41,7 @@
                         <tr>
                             <td class="text-center">{{ $loop->iteration }}</td>
                             <td>{{ $item->program_studi }}</td>
+                            <td>{{ $item->code ?? '-' }}</td>
                             <td class="text-center">{{ $item->semester }}</td>
                             <td>{{ $item->name }}</td>
                             <td class="text-center">{{ $item->sks }}</td>
@@ -104,6 +106,7 @@
 
 <form action="{{ route($prefix.'master.master-matkul-import') }}" method="POST" enctype="multipart/form-data">
     @csrf
+    <input type="hidden" name="_form" value="import-master-matkul">
     <div class="modal fade" id="importMasterMatkul" tabindex="-1" aria-labelledby="importMasterMatkulLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -112,7 +115,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted">Gunakan hasil export sebagai template. Data yang sudah ada akan diperbarui berdasarkan program studi, semester, dan nama mata kuliah.</p>
+                    <p class="text-muted">Gunakan hasil export sebagai template dengan kolom Program Studi, Kode, Nama Mata Kuliah, SKS, dan Semester. Semester dapat ditulis dengan angka Romawi (contoh: I, II, VIII).</p>
                     <label for="import_master_matkul" class="form-label">File (xlsx atau csv)</label>
                     <input type="file" name="import" id="import_master_matkul" class="form-control" accept=".xlsx,.csv" required>
                     @error('import')
@@ -131,5 +134,8 @@
 @section('custom-js')
     @if ($errors->any() && old('_form') === 'create-master-matkul')
         <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('createMasterMatkul')).show());</script>
+    @endif
+    @if ($errors->has('import') && old('_form') === 'import-master-matkul')
+        <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('importMasterMatkul')).show());</script>
     @endif
 @endsection

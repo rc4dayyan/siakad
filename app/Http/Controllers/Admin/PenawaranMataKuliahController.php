@@ -422,12 +422,10 @@ class PenawaranMataKuliahController extends Controller
             );
         }
 
-        $semester = $this->importedInteger(
+        $semester = $this->importedSemester(
             $row['Semester Mata Kuliah'] ?? null,
             $rowNumber,
-            'Semester Mata Kuliah',
-            1,
-            14
+            'Semester Mata Kuliah'
         );
         $courseName = $this->importedText($row['Nama Mata Kuliah'] ?? null);
         $master = MasterMataKuliah::query()
@@ -468,12 +466,10 @@ class PenawaranMataKuliahController extends Controller
                 );
             }
 
-            $prerequisiteSemester = $this->importedInteger(
+            $prerequisiteSemester = $this->importedSemester(
                 $prerequisiteSemesterValue,
                 $rowNumber,
-                'Semester Prasyarat',
-                1,
-                14
+                'Semester Prasyarat'
             );
             $prerequisites = MasterMataKuliah::query()
                 ->whereIn('program_studi', $program->masterMataKuliahCodes())
@@ -552,6 +548,30 @@ class PenawaranMataKuliahController extends Controller
             $this->rejectImportRow(
                 $rowNumber,
                 "{$column} harus berupa angka antara {$minimum} sampai {$maximum}."
+            );
+        }
+
+        return $integer;
+    }
+
+    private function importedSemester(mixed $value, int $rowNumber, string $column): int
+    {
+        $semester = strtoupper($this->importedText($value));
+        $romanSemesters = array_flip([
+            1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI', 7 => 'VII',
+            8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII', 13 => 'XIII', 14 => 'XIV',
+        ]);
+
+        if (isset($romanSemesters[$semester])) {
+            return $romanSemesters[$semester];
+        }
+
+        $integer = filter_var($semester, FILTER_VALIDATE_INT);
+
+        if ($integer === false || $integer < 1 || $integer > 14) {
+            $this->rejectImportRow(
+                $rowNumber,
+                "{$column} harus berupa angka 1 sampai 14 atau Romawi I sampai XIV."
             );
         }
 

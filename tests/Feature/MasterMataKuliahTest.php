@@ -8,8 +8,11 @@ use App\Models\User;
 use Database\Seeders\MasterMataKuliahSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use Tests\TestCase;
 
 class MasterMataKuliahTest extends TestCase
@@ -97,6 +100,7 @@ class MasterMataKuliahTest extends TestCase
         DB::table('dosens')->insert(['id' => 1, 'dsn_name' => 'Dosen', 'created_at' => now(), 'updated_at' => now()]);
 
         (require database_path('migrations/2026_07_17_000001_create_master_mata_kuliahs_table.php'))->up();
+        (require database_path('migrations/2026_08_17_000001_add_code_to_master_mata_kuliahs_table.php'))->up();
         (require database_path('migrations/2026_07_17_000002_add_mid_to_mata_kuliahs_table.php'))->up();
     }
 
@@ -109,6 +113,96 @@ class MasterMataKuliahTest extends TestCase
         $this->assertSame(62, MasterMataKuliah::where('program_studi', '86233')->count());
         $this->assertSame(62, MasterMataKuliah::where('program_studi', 'MI')->count());
         $this->assertSame(60, MasterMataKuliah::where('program_studi', '88204')->count());
+    }
+
+    public function test_import_accepts_reference_headers_and_roman_semesters(): void
+    {
+        MasterMataKuliah::create([
+            'program_studi' => '86208',
+            'semester' => 1,
+            'name' => 'PPKN',
+            'sks' => 3,
+        ]);
+
+        $file = $this->masterMataKuliahFile([
+            ['86208', 'PAI.01', 'PPKN', 2, 'I'],
+            ['86208', 'PAI.10', 'Bahasa Indonesia', 2, 'II'],
+        ]);
+
+        try {
+            $response = $this->actingAs($this->webAdministrator())->post(
+                route('web-admin.master.master-matkul-import'),
+                ['_form' => 'import-master-matkul', 'import' => $file],
+            );
+        } finally {
+            @unlink($file->getPathname());
+        }
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('master_mata_kuliahs', 2);
+        $this->assertDatabaseHas('master_mata_kuliahs', [
+            'program_studi' => '86208',
+            'code' => 'PAI.01',
+            'semester' => 1,
+            'name' => 'PPKN',
+            'sks' => 2,
+        ]);
+        $this->assertDatabaseHas('master_mata_kuliahs', [
+            'code' => 'PAI.10',
+            'semester' => 2,
+            'name' => 'Bahasa Indonesia',
+        ]);
+    }
+
+    public function test_import_rejects_duplicate_codes_without_saving_partial_data(): void
+    {
+        $file = $this->masterMataKuliahFile([
+            ['86208', 'PAI.01', 'PPKN', 2, 'I'],
+            ['86208', 'PAI.01', 'Bahasa Inggris', 2, 'I'],
+        ]);
+
+        try {
+            $response = $this->actingAs($this->webAdministrator())->from('/web-admin/master/master-matkul')->post(
+                route('web-admin.master.master-matkul-import'),
+                ['_form' => 'import-master-matkul', 'import' => $file],
+            );
+        } finally {
+            @unlink($file->getPathname());
+        }
+
+        $response->assertRedirect('/web-admin/master/master-matkul');
+        $response->assertSessionHasErrors('import');
+        $this->assertDatabaseCount('master_mata_kuliahs', 0);
+    }
+
+    public function test_export_uses_reference_column_order_and_roman_semester(): void
+    {
+        MasterMataKuliah::create([
+            'program_studi' => '86208',
+            'code' => 'PAI.19',
+            'semester' => 3,
+            'name' => 'Bahasa Inggris 3',
+            'sks' => 2,
+        ]);
+
+        $response = $this->actingAs($this->webAdministrator())->get(
+            route('web-admin.master.master-matkul-export'),
+        );
+
+        $response->assertOk();
+        $this->assertStringContainsString('master-mata-kuliah-', (string) $response->headers->get('content-disposition'));
+
+        $path = tempnam(sys_get_temp_dir(), 'master-matkul-export-').'.xlsx';
+
+        try {
+            file_put_contents($path, $response->streamedContent());
+            $rows = IOFactory::load($path)->getActiveSheet()->rangeToArray('A1:E2');
+        } finally {
+            @unlink($path);
+        }
+
+        $this->assertSame(['Program Studi', 'Kode', 'Nama Mata Kuliah', 'SKS', 'Semester'], $rows[0]);
+        $this->assertSame(['86208', 'PAI.19', 'Bahasa Inggris 3', '2', 'III'], $rows[1]);
     }
 
     public function test_mata_kuliah_and_master_mata_kuliah_have_bidirectional_relations(): void
@@ -232,6 +326,26 @@ class MasterMataKuliahTest extends TestCase
             'password' => 'password',
             'status' => 1,
         ]);
+    }
+
+    private function masterMataKuliahFile(array $rows): UploadedFile
+    {
+        $spreadsheet = new Spreadsheet;
+        $spreadsheet->getActiveSheet()->fromArray([
+            ['Program Studi', 'Kode', 'Nama Mata Kuliah', 'SKS', 'Semester'],
+            ...$rows,
+        ]);
+
+        $path = tempnam(sys_get_temp_dir(), 'master-matkul-import-').'.xlsx';
+        IOFactory::createWriter($spreadsheet, 'Xlsx')->save($path);
+
+        return new UploadedFile(
+            $path,
+            'master-mata-kuliah-All.xlsx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            null,
+            true,
+        );
     }
 
     private function mataKuliahPayload(MasterMataKuliah $master, array $overrides = []): array

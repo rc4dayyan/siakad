@@ -42,7 +42,7 @@
             <div class="modal-header"><h5 class="modal-title" id="importOfferingModalLabel">Import Penawaran Mata Kuliah — {{ $period->name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
             <div class="modal-body">
                 @if($errors->any() && old('_form') === 'import-offerings')<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
-                <p class="text-muted">Gunakan hasil export sebagai template. Kode periode harus <strong>{{ $period->code }}</strong>. Penawaran dengan kombinasi mata kuliah, program studi, kurikulum, dan kelas yang sudah ada akan dilewati.</p>
+                <p class="text-muted">Gunakan hasil export sebagai template. Kode periode harus <strong>{{ $period->code }}</strong>. Semester Mata Kuliah dan Semester Prasyarat dapat ditulis dengan angka atau Romawi (contoh: 2 atau II). Penawaran dengan kombinasi mata kuliah, program studi, kurikulum, dan kelas yang sudah ada akan dilewati.</p>
                 <label for="import-offering-file" class="form-label">File XLSX atau CSV</label>
                 <input type="file" name="import" id="import-offering-file" class="form-control" accept=".xlsx,.csv" required>
             </div>
