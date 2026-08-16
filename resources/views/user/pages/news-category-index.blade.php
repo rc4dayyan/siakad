@@ -19,39 +19,13 @@
 @endsection
 @section('content')
 <section class="section row">
-
-    <div class="col-lg-3 col-12">
-        <form action="{{ route($prefix.'news.category-store') }}" method="POST" enctype="multipart/form-data">
-            @csrf
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title">@yield('submenu0')</h5>
-                    <button type="submit" class="btn btn-outline-primary"><i class="fa-solid fa-paper-plane"></i></button>
-                </div>
-                <div class="card-body">
-                    <div class="form-group">
-                        <label for="name">Nama Kategori</label>
-                        <input type="text" class="form-control" name="name" id="name" placeholder="Inputkan nama kategori berita...">
-                        @error('name')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="desc">Deskripsi Kategori Berita</label>
-                        <textarea name="desc" id="desc" class="form-control" placeholder="Inputkan Deskripsi Kategori Berita"></textarea>
-                        @error('desc')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
-    <div class="col-lg-9 col-12">
+    <div class="col-12">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title">@yield('submenu')</h5>
-
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createNewsCategoryModal">
+                    <i class="fas fa-plus me-1"></i> Tambah Kategori
+                </button>
             </div>
             <div class="card-body">
                 <table class="table table-striped" id="table1">
@@ -97,6 +71,38 @@
     </div>
 
 </section>
+
+<form action="{{ route($prefix.'news.category-store') }}" method="POST">
+    @csrf
+    <input type="hidden" name="_form" value="create-news-category">
+    <div class="modal fade" id="createNewsCategoryModal" tabindex="-1" aria-labelledby="createNewsCategoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createNewsCategoryModalLabel">Tambah Kategori Berita</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="create-category-name">Nama Kategori</label>
+                        <input type="text" class="form-control" name="name" id="create-category-name" value="{{ old('name') }}" placeholder="Inputkan nama kategori berita...">
+                        @error('name')<small class="text-danger">{{ $message }}</small>@enderror
+                    </div>
+                    <div class="form-group">
+                        <label for="create-category-desc">Deskripsi Kategori Berita</label>
+                        <textarea name="desc" id="create-category-desc" class="form-control" placeholder="Inputkan deskripsi kategori berita">{{ old('desc') }}</textarea>
+                        @error('desc')<small class="text-danger">{{ $message }}</small>@enderror
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
 <div class="me-1 mb-1 d-inline-block">
 
     <!--Extra Large Modal -->
@@ -148,4 +154,9 @@
 </div>
 @endsection
 @section('custom-js')
+    @if ($errors->any() && old('_form') === 'create-news-category')
+        <script>
+            document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('createNewsCategoryModal')).show());
+        </script>
+    @endif
 @endsection

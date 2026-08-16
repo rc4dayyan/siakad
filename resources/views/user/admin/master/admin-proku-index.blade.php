@@ -19,84 +19,11 @@
 @endsection
 @section('content')
 <section class="section row">
-
-    <div class="col-lg-4 col-12">
-        <form action="{{ route($prefix.'master.proku-store') }}" method="POST" enctype="multipart/form-data">
-            @csrf
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title">@yield('submenu0')</h5>
-                    <button type="submit" class="btn btn-outline-primary"><i class="fa-solid fa-paper-plane"></i></button>
-                </div>
-                <div class="card-body">
-                    <div class="form-group">
-                        <label for="taka_id">Tahun Akademik</label>
-                        <select name="taka_id" id="taka_id" class="form-select">
-                            <option value="" selected>Pilih Tahun Akademik</option>
-                            @foreach ($taka as $item)
-                                <option value="{{ $item->id }}">{{ $item->name }}</option>
-                            @endforeach
-                        </select>
-                        @error('taka_id')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="pstudi_id">Program Studi</label>
-                        <select name="pstudi_id" id="pstudi_id" class="form-select">
-                            <option value="" selected>Pilih Program Studi</option>
-                            @foreach ($pstudi as $item)
-                                <option value="{{ $item->id }}">{{ $item->name }}</option>
-                            @endforeach
-                        </select>
-                        @error('pstudi_id')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="name">Nama Program Kuliah</label>
-                        <input type="text" class="form-control" name="name" id="name" placeholder="Inputkan nama Program Kuliah...">
-                        @error('name')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="code">Kode Program Kuliah</label>
-                        <input type="text" class="form-control" name="code" id="code" placeholder="Inputkan kode Program Kuliah..." maxlength="20" uppercase >
-                        @error('code')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="wave">Gelombang Program Kuliah</label>
-                        <input type="text" class="form-control" name="wave" id="wave" placeholder="Inputkan Gelombang Program Kuliah..." maxlength="20" uppercase >
-                        @error('wave')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="wave_start">Periode Mulai Pendaftaran</label>
-                        <input type="date" class="form-control" name="wave_start" id="wave_start" placeholder="Pilih tanggal Gelombang Mulai Program Kuliah...">
-                        @error('wave_start')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="wave_ended">Periode Akhir Pendaftaran</label>
-                        <input type="date" class="form-control" name="wave_ended" id="wave_ended" placeholder="Pilih tanggal Gelombang Akhir Program Kuliah...">
-                        @error('wave_ended')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
-    <div class="col-lg-8 col-12">
+    <div class="col-12">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title">@yield('submenu')</h5>
-
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProkuModal"><i class="fas fa-plus me-1"></i> Tambah Program Kuliah</button>
             </div>
             <div class="card-body">
                 <table class="table table-striped" id="table1">
@@ -140,6 +67,21 @@
     </div>
 
 </section>
+<form action="{{ route($prefix.'master.proku-store') }}" method="POST">
+    @csrf
+    <input type="hidden" name="_form" value="create-proku">
+    <div class="modal fade" id="createProkuModal" tabindex="-1" aria-labelledby="createProkuModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="createProkuModalLabel">Tambah Data Program Kuliah</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label for="create-proku-period">Tahun Akademik</label><select name="taka_id" id="create-proku-period" class="form-select"><option value="">Pilih Tahun Akademik</option>@foreach ($taka as $item)<option value="{{ $item->id }}" @selected(old('taka_id') == $item->id)>{{ $item->name }}</option>@endforeach</select>@error('taka_id')<small class="text-danger">{{ $message }}</small>@enderror</div>
+            <div class="form-group"><label for="create-proku-study-program">Program Studi</label><select name="pstudi_id" id="create-proku-study-program" class="form-select"><option value="">Pilih Program Studi</option>@foreach ($pstudi as $item)<option value="{{ $item->id }}" @selected(old('pstudi_id') == $item->id)>{{ $item->name }}</option>@endforeach</select>@error('pstudi_id')<small class="text-danger">{{ $message }}</small>@enderror</div>
+            @foreach (['name' => 'Nama Program Kuliah', 'code' => 'Kode Program Kuliah', 'wave' => 'Gelombang Program Kuliah'] as $field => $label)<div class="form-group"><label for="create-proku-{{ $field }}">{{ $label }}</label><input type="text" class="form-control" name="{{ $field }}" id="create-proku-{{ $field }}" value="{{ old($field) }}" maxlength="20">@error($field)<small class="text-danger">{{ $message }}</small>@enderror</div>@endforeach
+            <div class="form-group"><label for="create-proku-start">Periode Mulai Pendaftaran</label><input type="date" class="form-control" name="wave_start" id="create-proku-start" value="{{ old('wave_start') }}">@error('wave_start')<small class="text-danger">{{ $message }}</small>@enderror</div>
+            <div class="form-group"><label for="create-proku-end">Periode Akhir Pendaftaran</label><input type="date" class="form-control" name="wave_ended" id="create-proku-end" value="{{ old('wave_ended') }}">@error('wave_ended')<small class="text-danger">{{ $message }}</small>@enderror</div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-primary">Simpan</button></div>
+    </div></div></div>
+</form>
 <div class="me-1 mb-1 d-inline-block">
 
     <!--Extra Large Modal -->
@@ -234,4 +176,9 @@
     </form>
     @endforeach
 </div>
+@endsection
+@section('custom-js')
+    @if ($errors->any() && old('_form') === 'create-proku')
+        <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('createProkuModal')).show());</script>
+    @endif
 @endsection

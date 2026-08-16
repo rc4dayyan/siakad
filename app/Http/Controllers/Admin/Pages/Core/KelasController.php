@@ -129,7 +129,7 @@ class KelasController extends Controller
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:32', Rule::unique('kelas', 'code')->ignore($kelas?->id)],
-            'capacity' => ['required', 'integer', 'between:1,35'],
+            'capacity' => ['required', 'integer', 'between:1,100'],
             'pstudi_id' => ['required', 'integer', 'exists:program_studis,id'],
             'proku_id' => [
                 'nullable',
@@ -140,6 +140,7 @@ class KelasController extends Controller
             ],
             'dosen_id' => ['nullable', 'integer', 'exists:dosens,id'],
         ], [
+            'capacity.between' => 'Kapasitas kelas harus antara 1 sampai 100 mahasiswa.',
             'proku_id.exists' => 'Program kuliah tidak tersedia pada periode dan program studi yang dipilih.',
         ]);
     }

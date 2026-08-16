@@ -71,6 +71,44 @@ class KelasAcademicPeriodTest extends TestCase
         ]);
     }
 
+    public function test_class_capacity_accepts_100_and_rejects_values_above_100(): void
+    {
+        $programStudiId = DB::table('program_studis')->insertGetId([
+            'name' => 'Pendidikan Agama Islam',
+            'code' => 'PAI-KAPASITAS',
+        ]);
+        $user = $this->academicUser();
+
+        $accepted = $this
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $this->activePeriod->id])
+            ->actingAs($user)
+            ->post(route('academic.master.kelas-store'), [
+                'name' => 'Kelas Kapasitas 100',
+                'code' => 'KAPASITAS-100',
+                'capacity' => 100,
+                'pstudi_id' => $programStudiId,
+            ]);
+
+        $accepted->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('kelas', [
+            'code' => 'KAPASITAS-100',
+            'capacity' => 100,
+        ]);
+
+        $rejected = $this
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $this->activePeriod->id])
+            ->actingAs($user)
+            ->post(route('academic.master.kelas-store'), [
+                'name' => 'Kelas Kapasitas 101',
+                'code' => 'KAPASITAS-101',
+                'capacity' => 101,
+                'pstudi_id' => $programStudiId,
+            ]);
+
+        $rejected->assertSessionHasErrors('capacity');
+        $this->assertDatabaseMissing('kelas', ['code' => 'KAPASITAS-101']);
+    }
+
     public function test_class_from_another_period_cannot_be_updated(): void
     {
         $class = $this->kelas('LAMA-B', $this->closedPeriod);

@@ -19,77 +19,12 @@
 @endsection
 @section('content')
 <section class="section row">
-
-    <div class="col-lg-4 col-12">
-        <form action="{{ route($prefix.'inventory.ruang-store') }}" method="POST" enctype="multipart/form-data">
-            @csrf
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title">@yield('submenu0')</h5>
-                    <button type="submit" class="btn btn-outline-primary"><i class="fa-solid fa-paper-plane"></i></button>
-                </div>
-                <div class="card-body">
-                    <div class="form-group">
-                        <label for="gedu_id">Gedung</label>
-                        <select name="gedu_id" id="gedu_id" class="form-select">
-                            <option value="" selected>Pilih Gedung</option>
-                            @foreach ($gedung as $item)
-                                <option value="{{ $item->id }}">{{ $item->name }}</option>
-                            @endforeach
-                        </select>
-                        @error('gedu_id')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="type">Type Ruang</label>
-                        <select name="type" id="type" class="form-select">
-                            <option value="" selected>Pilih Type Ruang</option>
-                            <option value="0" >Ruang Kelas</option>
-                            <option value="1" >Ruang Laboratorium </option>
-                            <option value="2" >Ruang Kerja </option>
-                            <option value="3" >Ruang Pribadi </option>
-                            <option value="4" >Fasilitas Umum </option>
-                        </select>
-                        @error('type')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="floor">Lokasi Lantai Gedung</label>
-                        <input type="number" class="form-control" name="floor" id="floor" placeholder="Ada dilantai berapa ruangan ini?...">
-                        @error('floor')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="kapasitas">Kapasitas Ruangan</label>
-                        <input type="number" min="1" max="1000" class="form-control" name="kapasitas" id="kapasitas" value="40" required>
-                        @error('kapasitas')<small class="text-danger">{{ $message }}</small>@enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="name">Nama Ruangan</label>
-                        <input type="text" class="form-control" name="name" id="name" placeholder="Inputkan nama ruangan...">
-                        @error('name')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="code">Kode Ruangan ( 5 Huruf Bebas )</label>
-                        <input type="text" class="form-control" name="code" id="code" placeholder="Inputkan kode ruangan..." maxlength="5" uppercase onkeydown="return /[a-zA-Z0-9]/i.test(event.key)" >
-                        @error('code')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
-    <div class="col-lg-8 col-12">
+    <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title">@yield('submenu')</h5>
                 <div>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRuangModal"><i class="fas fa-plus me-1"></i> Tambah</button>
                     <a href="{{ route($prefix.'services.convert.export-ruang') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
                     <a href="#" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importRuang"><i class="fa-solid fa-file-import"></i></a>
                 </div>
@@ -138,6 +73,24 @@
     </div>
 
 </section>
+<form action="{{ route($prefix.'inventory.ruang-store') }}" method="POST">
+    @csrf
+    <input type="hidden" name="_form" value="create-ruang">
+    <div class="modal fade" id="createRuangModal" tabindex="-1" aria-labelledby="createRuangModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title" id="createRuangModalLabel">Tambah Data Ruang</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
+            <div class="modal-body">
+                <div class="form-group"><label for="create-ruang-gedung">Gedung</label><select name="gedu_id" id="create-ruang-gedung" class="form-select"><option value="">Pilih Gedung</option>@foreach ($gedung as $item)<option value="{{ $item->id }}" @selected(old('gedu_id') == $item->id)>{{ $item->name }}</option>@endforeach</select>@error('gedu_id')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label for="create-ruang-type">Tipe Ruang</label><select name="type" id="create-ruang-type" class="form-select"><option value="">Pilih Tipe Ruang</option>@foreach ([0 => 'Ruang Kelas', 1 => 'Ruang Laboratorium', 2 => 'Ruang Kerja', 3 => 'Ruang Pribadi', 4 => 'Fasilitas Umum'] as $value => $label)<option value="{{ $value }}" @selected(old('type') !== null && (int) old('type') === $value)>{{ $label }}</option>@endforeach</select>@error('type')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label for="create-ruang-floor">Lokasi Lantai Gedung</label><input type="number" class="form-control" name="floor" id="create-ruang-floor" value="{{ old('floor') }}" placeholder="Ada di lantai berapa ruangan ini?">@error('floor')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label for="create-ruang-capacity">Kapasitas Ruangan</label><input type="number" min="1" max="1000" class="form-control" name="kapasitas" id="create-ruang-capacity" value="{{ old('kapasitas', 40) }}" required>@error('kapasitas')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label for="create-ruang-name">Nama Ruangan</label><input type="text" class="form-control" name="name" id="create-ruang-name" value="{{ old('name') }}" placeholder="Inputkan nama ruangan...">@error('name')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label for="create-ruang-code">Kode Ruangan (5 Huruf Bebas)</label><input type="text" class="form-control" name="code" id="create-ruang-code" value="{{ old('code') }}" placeholder="Inputkan kode ruangan..." maxlength="5" uppercase onkeydown="return /[a-zA-Z0-9]/i.test(event.key)">@error('code')<small class="text-danger">{{ $message }}</small>@enderror</div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-primary">Simpan</button></div>
+        </div></div>
+    </div>
+</form>
 <div class="me-1 mb-1 d-inline-block">
     <form action="{{ route($prefix.'services.convert.import-ruang') }}" method="POST" enctype="multipart/form-data">
         @csrf
@@ -255,4 +208,9 @@
     </form>
     @endforeach
 </div>
+@endsection
+@section('custom-js')
+    @if ($errors->any() && old('_form') === 'create-ruang')
+        <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('createRuangModal')).show());</script>
+    @endif
 @endsection

@@ -13,8 +13,11 @@ use App\Models\Mahasiswa;
 use App\Models\MataKuliah;
 use App\Models\RegistrasiMahasiswa;
 use App\Models\Ruang;
+use App\Models\TahunAkademik;
 use App\Models\User;
+use App\Models\Wilayah;
 use App\Services\Academic\AcademicPeriodContext;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Rap2hpoutre\FastExcel\FastExcel;
 
@@ -66,23 +69,124 @@ class ExportController extends Controller
             ->forAcademicPeriod($period)
             ->when($studentIds !== null, fn ($query) => $query->whereIn('mahasiswa_id', $studentIds))
             ->when($filters['kelas_id'] ?? null, fn ($query, $kelasId) => $query->where('kelas_id', $kelasId))
-            ->with(['mahasiswa', 'kelas', 'taka'])
+            ->with(['mahasiswa.registrasiAwal.taka', 'kelas.pstudi', 'taka'])
             ->get();
 
-        return (new FastExcel($registrations))->download('export-student-'.$period->code.'-'.uniqid().'.csv', function ($registration) {
+        $districtNames = $registrations
+            ->pluck('mahasiswa.mhs_addr_kecamatan')
+            ->filter()
+            ->unique()
+            ->values();
+        $regions = Wilayah::query()
+            ->whereIn('kecamatan', $districtNames)
+            ->get();
+
+        return (new FastExcel($registrations))->download('export-mahasiswa-openfeeder-'.$period->code.'-'.now()->format('YmdHis').'.xlsx', function ($registration) use ($regions) {
+            $student = $registration->mahasiswa;
+            $studyProgram = $registration->kelas?->pstudi;
+            $region = $regions->first(fn (Wilayah $item) => $this->sameRegion($student, $item));
+
             return [
-                'Kode Tahun Akademik' => $registration->taka?->code,
-                'NIM' => $registration->mahasiswa?->mhs_nim,
-                'Email' => $registration->mahasiswa?->mhs_mail,
-                'Telepon' => $registration->mahasiswa?->mhs_phone,
-                'Nama' => $registration->mahasiswa?->mhs_name,
-                'Kode Kelas' => $registration->kelas?->code,
-                'Semester Mahasiswa' => $registration->semester_mahasiswa,
-                'Status Akademik' => $registration->status_akademik,
-                'Status Registrasi' => $registration->status_registrasi,
-                'Batas SKS' => $registration->batas_sks,
+                'NIM' => $student?->mhs_nim,
+                'Nama' => $student?->mhs_name,
+                'Tempat Lahir' => $student?->mhs_birthplace,
+                'Tanggal Lahir' => $this->exportDate($student?->mhs_birthdate),
+                'Jenis Kelamin' => $student?->mhs_gend,
+                'NIK' => $student?->mhs_nik,
+                'Agama' => $student?->raw_mhs_reli,
+                'NISN' => null,
+                'Jalur Pendaftaran' => null,
+                'NPWP' => null,
+                'Kewarganegaraan' => null,
+                'Jenis Pendaftaran' => $student?->mhs_register_type,
+                'Tanggal Masuk Kuliah' => $this->exportDate($student?->mhs_register_date),
+                'Mulai Semester' => $student ? $this->openFeederSemester($student->registrasiAwal?->taka, $student) : null,
+                'Jalan' => $student?->mhs_addr_domisili,
+                'RT' => null,
+                'RW' => null,
+                'Nama Dusun' => null,
+                'Kelurahan' => $student?->mhs_addr_kelurahan,
+                'Kecamatan' => $region?->code,
+                'Kode Pos' => null,
+                'Jenis Tinggal' => null,
+                'Alat Transportasi' => null,
+                'Telp Rumah' => null,
+                'No HP' => $student?->getRawOriginal('mhs_phone'),
+                'Email' => $student?->mhs_mail,
+                'Terima KPS' => null,
+                'No KPS' => null,
+                'NIK Ayah' => null,
+                'Nama Ayah' => $student?->mhs_parent_father,
+                'Tanggal Lahir Ayah' => null,
+                'Pendidikan Ayah' => null,
+                'Pekerjaan Ayah' => null,
+                'Penghasilan Ayah' => null,
+                'NIK Ibu' => null,
+                'Nama Ibu' => $student?->mhs_parent_mother,
+                'Tanggal Lahir Ibu' => null,
+                'Pendidikan Ibu' => null,
+                'Pekerjaan Ibu' => null,
+                'Penghasilan Ibu' => null,
+                'Nama Wali' => $student?->mhs_wali_name,
+                'Tanggal Lahir Wali' => null,
+                'Pendidikan Wali' => null,
+                'Pekerjaan Wali' => null,
+                'Penghasilan Wali' => null,
+                'Kode Prodi' => $studyProgram?->code,
+                'Nama Prodi' => $studyProgram?->name,
+                'SKS Diakui' => null,
+                'Kode PT Asal' => null,
+                'Nama PT Asal' => null,
+                'Kode Prodi Asal' => null,
+                'Nama Prodi Asal' => null,
+                'Jenis Pembiayaan' => null,
+                'Jumlah Biaya Masuk' => $student?->mhs_register_amount,
+                'Status Biodata' => 1,
+                'Keterangan Biodata' => null,
+                'Status Riwayat' => 1,
+                'Keterangan Riwayat' => null,
             ];
         });
+    }
+
+    private function openFeederSemester(?TahunAkademik $period, Mahasiswa $student): ?string
+    {
+        $year = $period?->year_start ?: ((int) $student->years_id ?: null);
+
+        if (! $year) {
+            return null;
+        }
+
+        $term = match ($period?->term) {
+            TahunAkademik::TERM_GENAP => '2',
+            TahunAkademik::TERM_PENDEK => '3',
+            default => '1',
+        };
+
+        return $year.$term;
+    }
+
+    private function exportDate(mixed $value): ?string
+    {
+        if (! $value) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->format('Y-m-d');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function sameRegion(?Mahasiswa $student, Wilayah $region): bool
+    {
+        if (! $student || strcasecmp(trim((string) $student->mhs_addr_kecamatan), trim($region->kecamatan)) !== 0) {
+            return false;
+        }
+
+        return ($student->mhs_addr_kota === null || strcasecmp(trim($student->mhs_addr_kota), trim((string) $region->kabupaten)) === 0)
+            && ($student->mhs_addr_provinsi === null || strcasecmp(trim($student->mhs_addr_provinsi), trim((string) $region->provinsi)) === 0);
     }
 
     public function exportKelas(AcademicPeriodContext $context)

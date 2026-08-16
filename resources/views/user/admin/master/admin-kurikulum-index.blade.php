@@ -19,60 +19,11 @@
 @endsection
 @section('content')
 <section class="section row">
-
-    <div class="col-lg-4 col-12">
-        <form action="{{ route($prefix.'master.kurikulum-store') }}" method="POST" enctype="multipart/form-data">
-            @csrf
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title">@yield('submenu0')</h5>
-                    <button type="submit" class="btn btn-outline-primary"><i class="fa-solid fa-paper-plane"></i></button>
-                </div>
-                <div class="card-body row">
-                    <div class="form-group col-12">
-                        <label for="name">Nama Kurikulum</label>
-                        <input type="text" class="form-control" name="name" id="name" placeholder="Inputkan nama kurikulum...">
-                        @error('name')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group col-12">
-                        <label for="code">Kode Kurikulum ( 3 Huruf Kapital )</label>
-                        <input type="text" class="form-control" name="code" id="code" placeholder="Inputkan kode kurikulum..." maxlength="3" uppercase onkeydown="return /[a-zA-Z0-9]/i.test(event.key)" >
-                        @error('code')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group col-6">
-                        <label for="year_start">Pilih Tahun Mulai Berlaku</label>
-                        <input type="number" class="form-control" name="year_start" id="year_start" min="2010" max="2100" maxlength="4" value="{{ \Carbon\Carbon::now()->format('Y') }}" placeholder="Inputkan tahun mulai...">
-                        @error('year_start')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group col-6">
-                        <label for="year_ended">Pilih Tahun Akhir Berlaku</label>
-                        <input type="number" class="form-control" name="year_ended" id="year_ended" min="2010" max="2100" maxlength="4" value="{{ \Carbon\Carbon::now()->format('Y') }}" placeholder="Inputkan tahun akhir...">
-                        @error('year_ended')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group col-12">
-                        <label for="desc">Deskripsi Kurikulum</label>
-                        <textarea name="desc" class="form-control" id="desc" cols="30" rows="10">Inputkan deskripsi kurikulum</textarea>
-                        @error('desc')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
-    <div class="col-lg-8 col-12">
+    <div class="col-12">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title">@yield('submenu')</h5>
-
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createKurikulumModal"><i class="fas fa-plus me-1"></i> Tambah Kurikulum</button>
             </div>
             <div class="card-body">
                 <table class="table table-striped" id="table1">
@@ -116,6 +67,21 @@
     </div>
 
 </section>
+<form action="{{ route($prefix.'master.kurikulum-store') }}" method="POST">
+    @csrf
+    <input type="hidden" name="_form" value="create-kurikulum">
+    <div class="modal fade" id="createKurikulumModal" tabindex="-1" aria-labelledby="createKurikulumModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title" id="createKurikulumModalLabel">Tambah Data Kurikulum</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
+        <div class="modal-body row">
+            <div class="form-group col-12"><label for="create-curriculum-name">Nama Kurikulum</label><input type="text" class="form-control" name="name" id="create-curriculum-name" value="{{ old('name') }}" placeholder="Inputkan nama kurikulum...">@error('name')<small class="text-danger">{{ $message }}</small>@enderror</div>
+            <div class="form-group col-12"><label for="create-curriculum-code">Kode Kurikulum (3 Huruf Kapital)</label><input type="text" class="form-control" name="code" id="create-curriculum-code" value="{{ old('code') }}" maxlength="3" uppercase onkeydown="return /[a-zA-Z0-9]/i.test(event.key)">@error('code')<small class="text-danger">{{ $message }}</small>@enderror</div>
+            <div class="form-group col-6"><label for="create-curriculum-start">Tahun Mulai Berlaku</label><input type="number" class="form-control" name="year_start" id="create-curriculum-start" min="2010" max="2100" value="{{ old('year_start', now()->year) }}">@error('year_start')<small class="text-danger">{{ $message }}</small>@enderror</div>
+            <div class="form-group col-6"><label for="create-curriculum-end">Tahun Akhir Berlaku</label><input type="number" class="form-control" name="year_ended" id="create-curriculum-end" min="2010" max="2100" value="{{ old('year_ended', now()->year) }}">@error('year_ended')<small class="text-danger">{{ $message }}</small>@enderror</div>
+            <div class="form-group col-12"><label for="create-curriculum-desc">Deskripsi Kurikulum</label><textarea name="desc" class="form-control" id="create-curriculum-desc" rows="5" placeholder="Inputkan deskripsi kurikulum">{{ old('desc') }}</textarea>@error('desc')<small class="text-danger">{{ $message }}</small>@enderror</div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-primary">Simpan</button></div>
+    </div></div></div>
+</form>
 <div class="me-1 mb-1 d-inline-block">
 
     <!--Extra Large Modal -->
@@ -186,4 +152,9 @@
     </form>
     @endforeach
 </div>
+@endsection
+@section('custom-js')
+    @if ($errors->any() && old('_form') === 'create-kurikulum')
+        <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('createKurikulumModal')).show());</script>
+    @endif
 @endsection

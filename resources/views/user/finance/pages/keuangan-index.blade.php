@@ -79,51 +79,11 @@
                 </div>
             </div>
         </div>
-        <div class="col-lg-4 col-12">
-            <form action="{{ route($prefix . 'finance.keuangan-store') }}" method="POST" enctype="multipart/form-data">
-                @csrf
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title">Tambah @yield('menu')</h5>
-                        <button type="submit" class="btn btn-outline-primary"><i class="fa-solid fa-paper-plane"></i></button>
-                    </div>
-                    <div class="card-body">
-                        <div class="form-group">
-                            <label for="type">Type Keuangan</label>
-                            <select name="type" id="type" class="form-select">
-                                <option value="" selected>Pilih Type Keuangan</option>
-                                <option value="0">Balance Pending</option>
-                                <option value="1">Balance Income</option>
-                                <option value="2">Balance Expenses</option>
-                            </select>
-                            @error('type')
-                                <small class="text-danger">{{ $message }}</small>
-                            @enderror
-                        </div>
-                        <div class="form-group">
-                            <label for="value">Nominal Balance</label>
-                            <input type="text" class="form-control" name="value" id="value" placeholder="Inputkan nominal balance...">
-                            @error('value')
-                                <small class="text-danger">{{ $message }}</small>
-                            @enderror
-                        </div>
-                        <div class="form-group">
-                            <label for="desc">Deskripsi Balance</label>
-                            <textarea name="desc" id="desc" class="form-control" cols="30" rows="10" placeholder="Inputkan deskripsi sumber dana..."></textarea>
-                            @error('desc')
-                                <small class="text-danger">{{ $message }}</small>
-                            @enderror
-                        </div>
-
-                    </div>
-                </div>
-            </form>
-        </div>
-        <div class="col-lg-8 col-12">
+        <div class="col-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title">@yield('menu')</h5>
-
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createBalanceModal"><i class="fas fa-plus me-1"></i> Tambah Data Keuangan</button>
                 </div>
                 <div class="card-body">
                     <table class="table table-striped" id="table1">
@@ -177,6 +137,19 @@
         </div>
 
     </section>
+    <form action="{{ route($prefix . 'finance.keuangan-store') }}" method="POST">
+        @csrf
+        <input type="hidden" name="_form" value="create-balance">
+        <div class="modal fade" id="createBalanceModal" tabindex="-1" aria-labelledby="createBalanceModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title" id="createBalanceModalLabel">Tambah Data Keuangan</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
+            <div class="modal-body">
+                <div class="form-group"><label for="create-balance-type">Tipe Keuangan</label><select name="type" id="create-balance-type" class="form-select"><option value="">Pilih Tipe Keuangan</option>@foreach ([0 => 'Balance Pending', 1 => 'Balance Income', 2 => 'Balance Expenses'] as $value => $label)<option value="{{ $value }}" @selected(old('type') !== null && (int) old('type') === $value)>{{ $label }}</option>@endforeach</select>@error('type')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label for="create-balance-value">Nominal Balance</label><input type="text" class="form-control" name="value" id="create-balance-value" value="{{ old('value') }}" placeholder="Inputkan nominal balance...">@error('value')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label for="create-balance-desc">Deskripsi Balance</label><textarea name="desc" id="create-balance-desc" class="form-control" rows="5" placeholder="Inputkan deskripsi sumber dana...">{{ old('desc') }}</textarea>@error('desc')<small class="text-danger">{{ $message }}</small>@enderror</div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-primary">Simpan</button></div>
+        </div></div></div>
+    </form>
     <div class="me-1 mb-1 d-inline-block">
 
         <!--Extra Large Modal -->
@@ -233,4 +206,9 @@
             </form>
         @endforeach
     </div>
+@endsection
+@section('custom-js')
+    @if ($errors->any() && old('_form') === 'create-balance')
+        <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('createBalanceModal')).show());</script>
+    @endif
 @endsection

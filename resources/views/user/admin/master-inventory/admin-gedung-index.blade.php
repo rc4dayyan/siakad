@@ -19,39 +19,12 @@
 @endsection
 @section('content')
 <section class="section row">
-
-    <div class="col-lg-4 col-12">
-        <form action="{{ route($prefix.'inventory.gedung-store') }}" method="POST" enctype="multipart/form-data">
-            @csrf
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title">@yield('submenu0')</h5>
-                    <button type="submit" class="btn btn-outline-primary"><i class="fa-solid fa-paper-plane"></i></button>
-                </div>
-                <div class="card-body">
-                    <div class="form-group">
-                        <label for="name">Nama Gedung</label>
-                        <input type="text" class="form-control" name="name" id="name" placeholder="Inputkan nama gedung...">
-                        @error('name')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="code">Kode Gedung ( 3 Huruf Kapital )</label>
-                        <input type="text" class="form-control" name="code" id="code" placeholder="Inputkan kode gedung..." maxlength="3" uppercase onkeydown="return /[a-zA-Z]/i.test(event.key)" >
-                        @error('code')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
-    <div class="col-lg-8 col-12">
+    <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title">@yield('submenu')</h5>
                 <div>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createGedungModal"><i class="fas fa-plus me-1"></i> Tambah</button>
                     <a href="{{ route($prefix.'services.convert.export-gedung') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
                     <a href="#" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importGedung"><i class="fa-solid fa-file-import"></i></a>
                 </div>
@@ -96,6 +69,20 @@
     </div>
 
 </section>
+<form action="{{ route($prefix.'inventory.gedung-store') }}" method="POST">
+    @csrf
+    <input type="hidden" name="_form" value="create-gedung">
+    <div class="modal fade" id="createGedungModal" tabindex="-1" aria-labelledby="createGedungModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title" id="createGedungModalLabel">Tambah Data Gedung</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
+            <div class="modal-body">
+                <div class="form-group"><label for="create-gedung-name">Nama Gedung</label><input type="text" class="form-control" name="name" id="create-gedung-name" value="{{ old('name') }}" placeholder="Inputkan nama gedung...">@error('name')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label for="create-gedung-code">Kode Gedung (3 Huruf Kapital)</label><input type="text" class="form-control" name="code" id="create-gedung-code" value="{{ old('code') }}" placeholder="Inputkan kode gedung..." maxlength="3" uppercase onkeydown="return /[a-zA-Z]/i.test(event.key)">@error('code')<small class="text-danger">{{ $message }}</small>@enderror</div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-primary">Simpan</button></div>
+        </div></div>
+    </div>
+</form>
 <div class="me-1 mb-1 d-inline-block">
     <form action="{{ route($prefix.'services.convert.import-gedung') }}" method="POST" enctype="multipart/form-data">
         @csrf
@@ -176,4 +163,9 @@
     </form>
     @endforeach
 </div>
+@endsection
+@section('custom-js')
+    @if ($errors->any() && old('_form') === 'create-gedung')
+        <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('createGedungModal')).show());</script>
+    @endif
 @endsection

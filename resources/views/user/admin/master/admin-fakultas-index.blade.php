@@ -19,51 +19,13 @@
 @endsection
 @section('content')
 <section class="section row">
-
-    <div class="col-lg-4 col-12">
-        <form action="{{ route($prefix.'master.fakultas-store') }}" method="POST" enctype="multipart/form-data">
-            @csrf
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title">@yield('submenu0')</h5>
-                    <button type="submit" class="btn btn-outline-primary"><i class="fa-solid fa-paper-plane"></i></button>
-                </div>
-                <div class="card-body">
-                    <div class="form-group">
-                        <label for="name">Nama Fakultas</label>
-                        <input type="text" class="form-control" name="name" id="name" placeholder="Inputkan nama fakultas...">
-                        @error('name')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="code">Kode Fakultas ( 3 Huruf Kapital )</label>
-                        <input type="text" class="form-control" name="code" id="code" placeholder="Inputkan kode fakultas..." maxlength="3" uppercase onkeydown="return /[a-zA-Z]/i.test(event.key)" >
-                        @error('code')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                    <div class="form-group">
-                        <label for="head_id">Kepala Fakultas</label>
-                        <select name="head_id" id="head_id" class="form-select">
-                            <option value="" selected>Pilih Kepala Fakultas</option>
-                            @foreach ($dosen as $item)
-                                <option value="{{ $item->id }}">{{ $item->dsn_name }}</option>
-                            @endforeach
-                        </select>
-                        @error('head_id')
-                            <small class="text-danger">{{ $message }}</small>
-                        @enderror
-                    </div>
-                </div>
-            </div>
-        </form>
-    </div>
-    <div class="col-lg-8 col-12">
+    <div class="col-12">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title">@yield('submenu')</h5>
-
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createFakultasModal">
+                    <i class="fas fa-plus me-1"></i> Tambah Fakultas
+                </button>
             </div>
             <div class="card-body">
                 <table class="table table-striped" id="table1">
@@ -80,7 +42,7 @@
                                 <td data-label="Number">{{ ++$key }}</td>
                                 <td data-label="Nama Fakultas">{{ $item->name }}</td>
                                 <td data-label="Kode Fakultas">{{ $item->code }}</td>
-                                <td data-label="Kepala Fakultas">{{ $item->head->dsn_name }}</td>
+                                <td data-label="Kepala Fakultas">{{ $item->head?->dsn_name ?? 'Belum ditentukan' }}</td>
                                 <td class="d-flex justify-content-center align-items-center">
                                     <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#updateFakultas{{ $item->code }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
                                     {{-- <a href="{{ route($prefix.'staffmanager-dosen-view', $item->code) }}"  style="margin-right: 10px" class="btn btn-outline-info"><i class="fa-solid fa-eye"></i></a> --}}
@@ -107,6 +69,54 @@
     </div>
 
 </section>
+
+<form action="{{ route($prefix.'master.fakultas-store') }}" method="POST">
+    @csrf
+    <input type="hidden" name="_form" value="create-fakultas">
+    <div class="modal fade" id="createFakultasModal" tabindex="-1" aria-labelledby="createFakultasModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createFakultasModalLabel">Tambah Data Fakultas</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="create-fakultas-name">Nama Fakultas</label>
+                        <input type="text" class="form-control" name="name" id="create-fakultas-name" value="{{ old('name') }}" placeholder="Inputkan nama fakultas...">
+                        @error('name')
+                            <small class="text-danger">{{ $message }}</small>
+                        @enderror
+                    </div>
+                    <div class="form-group">
+                        <label for="create-fakultas-code">Kode Fakultas (3 Huruf Kapital)</label>
+                        <input type="text" class="form-control" name="code" id="create-fakultas-code" value="{{ old('code') }}" placeholder="Inputkan kode fakultas..." maxlength="3" uppercase onkeydown="return /[a-zA-Z]/i.test(event.key)">
+                        @error('code')
+                            <small class="text-danger">{{ $message }}</small>
+                        @enderror
+                    </div>
+                    <div class="form-group">
+                        <label for="create-fakultas-head">Kepala Fakultas</label>
+                        <select name="head_id" id="create-fakultas-head" class="form-select">
+                            <option value="">Pilih Kepala Fakultas</option>
+                            @foreach ($dosen as $item)
+                                <option value="{{ $item->id }}" @selected(old('head_id') == $item->id)>{{ $item->dsn_name }}</option>
+                            @endforeach
+                        </select>
+                        @error('head_id')
+                            <small class="text-danger">{{ $message }}</small>
+                        @enderror
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Simpan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
 <div class="me-1 mb-1 d-inline-block">
 
     <!--Extra Large Modal -->
@@ -166,6 +176,20 @@
             </div>
         </div>
     </form>
-    @endforeach
+@endforeach
 </div>
+@endsection
+
+@section('custom-js')
+    @if ($errors->any() && old('_form') === 'create-fakultas')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const modal = document.getElementById('createFakultasModal');
+
+                if (modal) {
+                    bootstrap.Modal.getOrCreateInstance(modal).show();
+                }
+            });
+        </script>
+    @endif
 @endsection

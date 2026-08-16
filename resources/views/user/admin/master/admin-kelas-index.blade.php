@@ -136,6 +136,7 @@
     <!--Extra Large Modal -->
     <form action="{{ route($prefix.'master.kelas-store') }}" method="POST" enctype="multipart/form-data">
         @csrf
+        <input type="hidden" name="_form" value="create-kelas">
         <div class="modal fade text-left w-100" id="tambahKelas" tabindex="-1" role="dialog"
             aria-labelledby="myModalLabel16" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl"
@@ -157,22 +158,22 @@
                     <div class="modal-body">
                         <div class="row">
                             <div class="form-group col-lg-4 col-12">
-                                <label for="name">Nama Kelas</label>
-                                <input type="text" class="form-control" name="name" id="name" placeholder="Inputkan nama Kelas...">
+                                <label for="create-class-name">Nama Kelas</label>
+                                <input type="text" class="form-control" name="name" id="create-class-name" value="{{ old('name') }}" placeholder="Inputkan nama Kelas...">
                                 @error('name')
                                     <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
                             <div class="form-group col-lg-4 col-12">
-                                <label for="code">Kode Kelas</label>
-                                <input type="text" class="form-control" name="code" id="code" placeholder="Inputkan kode Kelas..." maxlength="32">
+                                <label for="create-class-code">Kode Kelas</label>
+                                <input type="text" class="form-control" name="code" id="create-class-code" value="{{ old('code') }}" placeholder="Inputkan kode Kelas..." maxlength="32">
                                 @error('code')
                                     <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
                             <div class="form-group col-lg-4 col-12">
-                                <label for="capacity">Kapasitas Kelas</label>
-                                <input type="number" class="form-control" name="capacity" id="capacity" placeholder="Inputkan kode Kelas..." max="35" maxlength="2">
+                                <label for="create-class-capacity">Kapasitas Kelas</label>
+                                <input type="number" class="form-control" name="capacity" id="create-class-capacity" value="{{ old('capacity') }}" placeholder="Inputkan kapasitas Kelas..." min="1" max="100" required>
                                 @error('capacity')
                                     <small class="text-danger">{{ $message }}</small>
                                 @enderror
@@ -182,11 +183,11 @@
                                 <input type="text" class="form-control" value="{{ $selectedPeriod?->name }}" readonly>
                             </div>
                             <div class="form-group col-lg-6 col-12">
-                                <label for="pstudi_id">Program Studi</label>
-                                <select name="pstudi_id" id="pstudi_id" class="form-select">
-                                    <option value="" selected>Pilih Program Studi</option>
+                                <label for="create-class-study-program">Program Studi</label>
+                                <select name="pstudi_id" id="create-class-study-program" class="form-select">
+                                    <option value="">Pilih Program Studi</option>
                                     @foreach ($pstudi as $studi)
-                                        <option value="{{ $studi->id }}">{{ $studi->name }}</option>
+                                        <option value="{{ $studi->id }}" @selected(old('pstudi_id') == $studi->id)>{{ $studi->name }}</option>
                                     @endforeach
                                 </select>
                                 @error('pstudi_id')
@@ -194,11 +195,11 @@
                                 @enderror
                             </div>
                             <div class="form-group col-lg-6 col-12">
-                                <label for="proku_id">Program Kuliah</label>
-                                <select name="proku_id" id="proku_id" class="form-select">
-                                    <option value="" selected>Pilih Program Kuliah</option>
+                                <label for="create-class-program">Program Kuliah</label>
+                                <select name="proku_id" id="create-class-program" class="form-select">
+                                    <option value="">Pilih Program Kuliah</option>
                                     @foreach ($proku as $item)
-                                        <option value="{{ $item->id }}">{{ $item->name }}</option>
+                                        <option value="{{ $item->id }}" @selected(old('proku_id') == $item->id)>{{ $item->name }}</option>
                                     @endforeach
                                 </select>
                                 @error('proku_id')
@@ -206,11 +207,11 @@
                                 @enderror
                             </div>
                             <div class="form-group col-lg-6 col-12">
-                                <label for="dosen_id">Wali Dosen</label>
-                                <select name="dosen_id" id="dosen_id" class="form-select">
-                                    <option value="" selected>Pilih Wali Dosen</option>
+                                <label for="create-class-advisor">Wali Dosen</label>
+                                <select name="dosen_id" id="create-class-advisor" class="form-select">
+                                    <option value="">Pilih Wali Dosen</option>
                                     @foreach ($dosen as $item)
-                                        <option value="{{ $item->id }}">{{ $item->dsn_name }}</option>
+                                        <option value="{{ $item->id }}" @selected(old('dosen_id') == $item->id)>{{ $item->dsn_name }}</option>
                                     @endforeach
                                 </select>
                                 @error('dosen_id')
@@ -266,8 +267,8 @@
                                 @enderror
                             </div>
                             <div class="form-group col-lg-4 col-12">
-                                <label for="capacity">Kapasitas Kelas</label>
-                                <input type="number" class="form-control" name="capacity" id="capacity" placeholder="Inputkan kode Kelas..." max="35" maxlength="2" uppercase value="{{ $item->capacity }}" >
+                                <label for="capacity-{{ $item->id }}">Kapasitas Kelas</label>
+                                <input type="number" class="form-control" name="capacity" id="capacity-{{ $item->id }}" placeholder="Inputkan kapasitas Kelas..." min="1" max="100" value="{{ $item->capacity }}" required>
                                 @error('capacity')
                                     <small class="text-danger">{{ $message }}</small>
                                 @enderror
@@ -322,4 +323,9 @@
     @endforeach
     
 </div>
+@endsection
+@section('custom-js')
+    @if ($errors->any() && old('_form') === 'create-kelas')
+        <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('tambahKelas')).show());</script>
+    @endif
 @endsection

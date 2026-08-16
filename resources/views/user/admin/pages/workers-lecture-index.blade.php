@@ -22,6 +22,7 @@
                 @yield('menu')
                 <div class="">
                     <a href="{{ route('web-admin.workers.lecture-create') }}" class="btn btn-outline-primary"><i class="fa-solid fa-plus"></i></a>
+                    <a href="#" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#importLecture" title="Import dosen OpenFeeder"><i class="fa-solid fa-file-import"></i></a>
                 </div>
             </h5>
         </div>
@@ -81,6 +82,41 @@
 </section>
 <div class="me-1 mb-1 d-inline-block">
 
+<form action="{{ route('web-admin.workers.lecture-import') }}" method="POST" enctype="multipart/form-data">
+    @csrf
+    <div class="modal fade text-left w-100" id="importLecture" tabindex="-1" role="dialog"
+        aria-labelledby="importLectureLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-l" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="importLectureLabel">Import Data Dosen OpenFeeder</h4>
+                    <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal" aria-label="Tutup">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">Unggah file XLSX OpenFeeder. Sistem hanya menggunakan kolom <strong>NIDN</strong> dan <strong>Nama Dosen</strong>, serta menggabungkan NIDN yang berulang.</p>
+                    <div class="alert alert-info">
+                        Username dan password awal akun baru adalah NIDN. Email dan telepon sementara dibuat otomatis dari NIDN dan dapat dilengkapi melalui menu edit.
+                    </div>
+                    <div class="form-group">
+                        <label for="import_dosen">File XLSX atau CSV</label>
+                        <input type="file" name="import" id="import_dosen" class="form-control" accept=".xlsx,.csv" required>
+                        @error('import')
+                            <small class="text-danger">{{ $message }}</small>
+                        @enderror
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-file-import"></i> Import
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
 @foreach ($dosen as $item)
     
 <div class="modal fade text-left w-100" id="viewContact{{ $item->dsn_code }}" tabindex="-1" role="dialog"
@@ -128,4 +164,11 @@
 @section('custom-js')
 <script src="{{ asset('dist') }}/assets/extensions/tinymce/tinymce.min.js"></script>
 <script src="{{ asset('dist') }}/assets/static/js/pages/tinymce.js"></script>
+@if ($errors->has('import'))
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    new bootstrap.Modal(document.getElementById('importLecture')).show();
+});
+</script>
+@endif
 @endsection

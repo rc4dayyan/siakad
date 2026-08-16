@@ -30,34 +30,29 @@
     </div>
 
     <div class="card">
-        <div class="card-header"><h5>Buat Template Tagihan</h5></div>
-        <div class="card-body">
-            <form method="POST" action="{{ route($prefix.'billing-period.store') }}" class="row g-3">
-                @csrf
-                <div class="col-md-4"><label class="form-label">Nama</label><input class="form-control" name="name" value="{{ old('name') }}" required></div>
-                <div class="col-md-2"><label class="form-label">Jenis</label><input class="form-control" name="jenis" value="{{ old('jenis', 'ukt') }}" required></div>
-                <div class="col-md-3"><label class="form-label">Nominal</label><input class="form-control" type="number" min="1" name="nominal" value="{{ old('nominal') }}" required></div>
-                <div class="col-md-3"><label class="form-label">Jenis target</label><select class="form-select" name="target_type" required><option value="mahasiswa">Mahasiswa</option><option value="prodi">Program Studi</option><option value="proku">Program Kuliah</option><option value="kelompok">Kelompok status</option></select></div>
-                <div class="col-md-3"><label class="form-label">Terbit</label><input class="form-control" type="date" name="tanggal_terbit" value="{{ old('tanggal_terbit', now()->toDateString()) }}" required></div>
-                <div class="col-md-3"><label class="form-label">Jatuh tempo</label><input class="form-control" type="date" name="jatuh_tempo" value="{{ old('jatuh_tempo') }}" required></div>
-                <div class="col-md-3"><label class="form-label">Mahasiswa</label><select class="form-select" name="target_mahasiswa_id"><option value="">-</option>@foreach ($mahasiswas as $student)<option value="{{ $student->id }}">{{ $student->mhs_name }}</option>@endforeach</select></div>
-                <div class="col-md-3"><label class="form-label">Program Studi</label><select class="form-select" name="target_prodi_id"><option value="">-</option>@foreach ($prodis as $prodi)<option value="{{ $prodi->id }}">{{ $prodi->name }}</option>@endforeach</select></div>
-                <div class="col-md-3"><label class="form-label">Program Kuliah</label><select class="form-select" name="target_proku_id"><option value="">-</option>@foreach ($prokus as $proku)<option value="{{ $proku->id }}">{{ $proku->name }}</option>@endforeach</select></div>
-                <div class="col-md-3"><label class="form-label">Kelompok status</label><select class="form-select" name="kelompok_target"><option value="">-</option><option value="semua">Semua</option>@foreach ($academicStatuses as $value => $label)<option value="{{ $value }}">{{ $label }}</option>@endforeach</select></div>
-                <div class="col-md-3 d-flex align-items-end"><div class="form-check mb-2"><input type="hidden" name="wajib_lunas_krs" value="0"><input class="form-check-input" type="checkbox" name="wajib_lunas_krs" value="1" id="required-krs"><label class="form-check-label" for="required-krs">Wajib lunas sebelum KRS</label></div></div>
-                <div class="col-12"><small class="text-muted">Isi hanya satu kolom target sesuai jenis target yang dipilih.</small><br><button class="btn btn-primary mt-2">Simpan template</button></div>
-            </form>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header"><h5>Template dan Penerbitan</h5></div>
+        <div class="card-header d-flex justify-content-between align-items-center"><h5>Template dan Penerbitan</h5><button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createBillingTemplateModal"><i class="fas fa-plus me-1"></i> Tambah Template</button></div>
         <div class="card-body table-responsive"><table class="table"><thead><tr><th>Template</th><th>Nominal</th><th>Target</th><th>Aksi</th></tr></thead><tbody>
             @forelse ($templates as $template)
                 <tr><td>{{ $template->name }}<br><small>{{ $template->jenis }}{{ $template->wajib_lunas_krs ? ' · wajib KRS' : '' }}</small></td><td>Rp {{ number_format($template->nominal, 0, ',', '.') }}</td><td>{{ $template->target_type }}</td><td class="d-flex gap-2"><a href="{{ route($prefix.'billing-period.preview', $template) }}" class="btn btn-sm btn-outline-primary">Pratinjau</a><form method="POST" action="{{ route($prefix.'billing-period.issue', $template) }}" onsubmit="return confirm('Terbitkan tagihan kepada seluruh calon?')">@csrf<button class="btn btn-sm btn-success">Terbitkan</button></form></td></tr>
             @empty<tr><td colspan="4" class="text-center text-muted">Belum ada template.</td></tr>@endforelse
         </tbody></table></div>
     </div>
+
+    <form method="POST" action="{{ route($prefix.'billing-period.store') }}">
+        @csrf
+        <input type="hidden" name="_form" value="create-billing-template">
+        <div class="modal fade" id="createBillingTemplateModal" tabindex="-1" aria-labelledby="createBillingTemplateModalLabel" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title" id="createBillingTemplateModalLabel">Tambah Template Tagihan</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
+            <div class="modal-body row g-3">
+                @if ($errors->any() && old('_form') === 'create-billing-template')<div class="col-12"><div class="alert alert-danger"><ul class="mb-0">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div></div>@endif
+                <div class="col-md-4"><label class="form-label">Nama</label><input class="form-control" name="name" value="{{ old('name') }}" required></div><div class="col-md-2"><label class="form-label">Jenis</label><input class="form-control" name="jenis" value="{{ old('jenis', 'ukt') }}" required></div><div class="col-md-3"><label class="form-label">Nominal</label><input class="form-control" type="number" min="1" name="nominal" value="{{ old('nominal') }}" required></div><div class="col-md-3"><label class="form-label">Jenis target</label><select class="form-select" name="target_type" required>@foreach (['mahasiswa' => 'Mahasiswa', 'prodi' => 'Program Studi', 'proku' => 'Program Kuliah', 'kelompok' => 'Kelompok status'] as $value => $label)<option value="{{ $value }}" @selected(old('target_type') === $value)>{{ $label }}</option>@endforeach</select></div>
+                <div class="col-md-3"><label class="form-label">Terbit</label><input class="form-control" type="date" name="tanggal_terbit" value="{{ old('tanggal_terbit', now()->toDateString()) }}" required></div><div class="col-md-3"><label class="form-label">Jatuh tempo</label><input class="form-control" type="date" name="jatuh_tempo" value="{{ old('jatuh_tempo') }}" required></div>
+                <div class="col-md-3"><label class="form-label">Mahasiswa</label><select class="form-select" name="target_mahasiswa_id"><option value="">-</option>@foreach ($mahasiswas as $student)<option value="{{ $student->id }}" @selected(old('target_mahasiswa_id') == $student->id)>{{ $student->mhs_name }}</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">Program Studi</label><select class="form-select" name="target_prodi_id"><option value="">-</option>@foreach ($prodis as $prodi)<option value="{{ $prodi->id }}" @selected(old('target_prodi_id') == $prodi->id)>{{ $prodi->name }}</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">Program Kuliah</label><select class="form-select" name="target_proku_id"><option value="">-</option>@foreach ($prokus as $proku)<option value="{{ $proku->id }}" @selected(old('target_proku_id') == $proku->id)>{{ $proku->name }}</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">Kelompok status</label><select class="form-select" name="kelompok_target"><option value="">-</option><option value="semua" @selected(old('kelompok_target') === 'semua')>Semua</option>@foreach ($academicStatuses as $value => $label)<option value="{{ $value }}" @selected(old('kelompok_target') === $value)>{{ $label }}</option>@endforeach</select></div>
+                <div class="col-12"><div class="form-check"><input type="hidden" name="wajib_lunas_krs" value="0"><input class="form-check-input" type="checkbox" name="wajib_lunas_krs" value="1" id="create-required-krs" @checked(old('wajib_lunas_krs'))><label class="form-check-label" for="create-required-krs">Wajib lunas sebelum KRS</label></div><small class="text-muted">Isi hanya satu kolom target sesuai jenis target yang dipilih.</small></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary">Simpan Template</button></div>
+        </div></div></div>
+    </form>
 
     @if ($preview)
         <div class="alert alert-warning"><strong>Pratinjau {{ $previewTemplate->name }}:</strong> {{ $preview['calon'] }} mahasiswa, total Rp {{ number_format($preview['total_nominal'], 0, ',', '.') }}. Pratinjau tidak mengubah data.</div>
@@ -77,4 +72,7 @@
             this.action = document.getElementById('override-registration').selectedOptions[0].dataset.url;
         });
     </script>
+    @if ($errors->any() && old('_form') === 'create-billing-template')
+        <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('createBillingTemplateModal')).show());</script>
+    @endif
 @endsection

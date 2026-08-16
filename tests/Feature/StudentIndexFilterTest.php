@@ -9,6 +9,8 @@ use App\Models\TahunAkademik;
 use App\Models\User;
 use App\Services\Academic\AcademicPeriodContext;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Rap2hpoutre\FastExcel\FastExcel;
 use Tests\TestCase;
 
 class StudentIndexFilterTest extends TestCase
@@ -26,11 +28,30 @@ class StudentIndexFilterTest extends TestCase
         (require database_path('migrations/2024_04_26_060533_create_tahun_akademiks_table.php'))->up();
         (require database_path('migrations/2026_07_17_000003_extend_tahun_akademiks_for_period_lifecycle.php'))->up();
         (require database_path('migrations/2024_03_09_024013_create_mahasiswas_table.php'))->up();
+        (require database_path('migrations/2025_06_15_153738_add__to_mahasiswas_table.php'))->up();
         (require database_path('migrations/2024_03_09_024021_create_dosens_table.php'))->up();
         (require database_path('migrations/2024_04_27_041303_create_kelas_table.php'))->up();
         (require database_path('migrations/2024_05_23_095204_create_ticket_supports_table.php'))->up();
         (require database_path('migrations/2024_05_30_004205_create_notifications_table.php'))->up();
         (require database_path('migrations/2026_07_17_000005_create_registrasi_mahasiswas_table.php'))->up();
+        (require database_path('migrations/2026_08_16_000002_create_wilayahs_table.php'))->up();
+
+        Schema::create('program_studis', function ($table): void {
+            $table->id();
+            $table->string('name');
+            $table->string('code')->unique();
+        });
+        DB::table('program_studis')->insert([
+            'id' => 1,
+            'name' => 'Pendidikan Agama Islam',
+            'code' => 'PAI',
+        ]);
+        DB::table('wilayahs')->insert([
+            'code' => '021614',
+            'kecamatan' => 'Jatiwangi',
+            'kabupaten' => 'Majalengka',
+            'provinsi' => 'Jawa Barat',
+        ]);
 
         DB::table('web_settings')->insert([
             'school_apps' => 'SIAKAD',
@@ -64,6 +85,19 @@ class StudentIndexFilterTest extends TestCase
         $matchingStudent = Mahasiswa::factory()->create([
             'years_id' => 2025,
             'class_id' => $otherClass->id,
+            'mhs_nik' => '3210112601070002',
+            'mhs_birthplace' => 'Majalengka',
+            'mhs_birthdate' => '2007-01-26',
+            'mhs_gend' => 'L',
+            'mhs_reli' => '1',
+            'mhs_addr_domisili' => 'Jalan Raya',
+            'mhs_addr_kelurahan' => 'Pinangraja',
+            'mhs_addr_kecamatan' => 'Jatiwangi',
+            'mhs_addr_kota' => 'Majalengka',
+            'mhs_addr_provinsi' => 'Jawa Barat',
+            'mhs_register_date' => '2025-09-01',
+            'mhs_register_type' => '1',
+            'mhs_register_amount' => 3000000,
         ]);
         $wrongYear = Mahasiswa::factory()->create(['years_id' => 2024]);
         $wrongClass = Mahasiswa::factory()->create(['years_id' => 2025]);
@@ -97,10 +131,33 @@ class StudentIndexFilterTest extends TestCase
             ]));
         $export->assertOk();
         $content = $export->streamedContent();
+        $this->assertStringEndsWith('.xlsx', (string) $export->headers->get('content-disposition'));
 
-        $this->assertStringContainsString($matchingStudent->mhs_nim, $content);
-        $this->assertStringNotContainsString($wrongYear->mhs_nim, $content);
-        $this->assertStringNotContainsString($wrongClass->mhs_nim, $content);
+        $path = sys_get_temp_dir().'/student-openfeeder-export-'.uniqid().'.xlsx';
+        file_put_contents($path, $content);
+        try {
+            $rows = (new FastExcel)->import($path);
+        } finally {
+            @unlink($path);
+        }
+
+        $this->assertCount(1, $rows);
+        $this->assertSame([
+            'NIM', 'Nama', 'Tempat Lahir', 'Tanggal Lahir', 'Jenis Kelamin', 'NIK', 'Agama', 'NISN',
+            'Jalur Pendaftaran', 'NPWP', 'Kewarganegaraan', 'Jenis Pendaftaran', 'Tanggal Masuk Kuliah',
+            'Mulai Semester', 'Jalan', 'RT', 'RW', 'Nama Dusun', 'Kelurahan', 'Kecamatan', 'Kode Pos',
+            'Jenis Tinggal', 'Alat Transportasi', 'Telp Rumah', 'No HP', 'Email', 'Terima KPS', 'No KPS',
+            'NIK Ayah', 'Nama Ayah', 'Tanggal Lahir Ayah', 'Pendidikan Ayah', 'Pekerjaan Ayah',
+            'Penghasilan Ayah', 'NIK Ibu', 'Nama Ibu', 'Tanggal Lahir Ibu', 'Pendidikan Ibu',
+            'Pekerjaan Ibu', 'Penghasilan Ibu', 'Nama Wali', 'Tanggal Lahir Wali', 'Pendidikan Wali',
+            'Pekerjaan Wali', 'Penghasilan Wali', 'Kode Prodi', 'Nama Prodi', 'SKS Diakui', 'Kode PT Asal',
+            'Nama PT Asal', 'Kode Prodi Asal', 'Nama Prodi Asal', 'Jenis Pembiayaan', 'Jumlah Biaya Masuk',
+            'Status Biodata', 'Keterangan Biodata', 'Status Riwayat', 'Keterangan Riwayat',
+        ], array_keys($rows->first()));
+        $this->assertSame($matchingStudent->mhs_nim, (string) $rows->first()['NIM']);
+        $this->assertSame('021614', (string) $rows->first()['Kecamatan']);
+        $this->assertSame('PAI', $rows->first()['Kode Prodi']);
+        $this->assertSame('20251', (string) $rows->first()['Mulai Semester']);
     }
 
     public function test_invalid_entry_year_filter_is_rejected(): void

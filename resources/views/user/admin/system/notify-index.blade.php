@@ -13,57 +13,11 @@
 @endsection
 @section('content')
     <section class="content row">
-        <div class="col-lg-4">
-            <div class="card">
-                <form action="{{ route($prefix.'system.notify-store') }}" method="POST" enctype="multipart/form-data">
-                    @csrf
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h4 class="card-title">Tambah @yield('menu')</h4>
-                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
-                    </div>
-                    <div class="card-body">
-                        <div class="form-group">
-                            <label for="send_to">Target Notifikasi</label>
-                            <select name="send_to" id="send_to" class="form-select">
-                                <option value="">Pilih Target Notifikasi</option>
-                                <option value="0">Semua Orang</option>
-                                <option value="1">Khusus Staff / Pegawai</option>
-                                <option value="2">Khusus Dosen</option>
-                                <option value="3">Khusus Mahasiswa</option>
-                            </select>
-                            @error('send_to')
-                                <small class="text-danger">{{ $message }}</small>
-                            @enderror
-                        </div>
-                        <div class="form-group">
-                            <label for="name">Judul Notifikasi</label>
-                            <input type="text" name="name" id="name" class="form-control" placeholder="Inputkan judul notifikasi...">
-                            @error('name')
-                                <small class="text-danger">{{ $message }}</small>
-                            @enderror
-                        </div>
-                        <div class="form-group">
-                            <label for="type">Kategori Notifikasi</label>
-                            <input type="text" name="type" id="type" class="form-control" placeholder="Inputkan kategori notifikasi...">
-                            @error('type')
-                                <small class="text-danger">{{ $message }}</small>
-                            @enderror
-                        </div>
-                        <div class="form-group">
-                            <label for="desc">Pesan Notifikasi</label>
-                            <textarea name="desc" id="dark" class="form-control" cols="30" rows="10" placeholder="Inputkan pesan notifikasi"></textarea>
-                            @error('desc')
-                                <small class="text-danger">{{ $message }}</small>
-                            @enderror
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-        <div class="col-lg-8">
+        <div class="col-12">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h4 class="card-title">@yield('menu')</h4>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createNotifyModal"><i class="fas fa-plus me-1"></i> Tambah Pengumuman</button>
                 </div>
                 <div class="card-body">
                     <table class="table table-striped" id="table1">
@@ -105,6 +59,20 @@
             </div>
         </div>
     </section>
+    <form action="{{ route($prefix.'system.notify-store') }}" method="POST">
+        @csrf
+        <input type="hidden" name="_form" value="create-notify">
+        <div class="modal fade" id="createNotifyModal" tabindex="-1" aria-labelledby="createNotifyModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg"><div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title" id="createNotifyModalLabel">Tambah Pengumuman</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
+            <div class="modal-body">
+                <div class="form-group"><label for="create-notify-target">Target Notifikasi</label><select name="send_to" id="create-notify-target" class="form-select"><option value="">Pilih Target Notifikasi</option>@foreach ([0 => 'Semua Orang', 1 => 'Khusus Staff / Pegawai', 2 => 'Khusus Dosen', 3 => 'Khusus Mahasiswa'] as $value => $label)<option value="{{ $value }}" @selected(old('send_to') !== null && (int) old('send_to') === $value)>{{ $label }}</option>@endforeach</select>@error('send_to')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label for="create-notify-name">Judul Notifikasi</label><input type="text" name="name" id="create-notify-name" class="form-control" value="{{ old('name') }}">@error('name')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label for="create-notify-type">Kategori Notifikasi</label><input type="text" name="type" id="create-notify-type" class="form-control" value="{{ old('type') }}">@error('type')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label for="dark">Pesan Notifikasi</label><textarea name="desc" id="dark" class="form-control" rows="8">{{ old('desc') }}</textarea>@error('desc')<small class="text-danger">{{ $message }}</small>@enderror</div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-primary">Simpan</button></div>
+        </div></div></div>
+    </form>
     <div class="me-1 mb-1 d-inline-block">
 
         <!--Extra Large Modal -->
@@ -165,4 +133,7 @@
 @section('custom-js')
     <script src="{{ asset('dist') }}/assets/extensions/tinymce/tinymce.min.js"></script>
     <script src="{{ asset('dist') }}/assets/static/js/pages/tinymce.js"></script>
+    @if ($errors->any() && old('_form') === 'create-notify')
+        <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('createNotifyModal')).show());</script>
+    @endif
 @endsection

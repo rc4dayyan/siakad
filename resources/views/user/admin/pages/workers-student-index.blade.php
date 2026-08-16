@@ -24,7 +24,7 @@ Halaman untuk melihat data pengguna Mahasiswa
                     <a href="{{ route($prefix.'workers.student-promotion-index') }}" class="btn btn-outline-warning" title="Kenaikan semester massal"><i class="fa-solid fa-users-gear"></i></a>
                     <a href="{{ route($prefix.'workers.student-create') }}" class="btn btn-outline-primary"><i class="fa-solid fa-plus"></i></a>
                     <a href="{{ route($prefix.'services.convert.export-student', array_filter($filters ?? [])) }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
-                    <a href="#" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importStudent"><i class="fa-solid fa-file-import"></i></a>
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importStudent" title="Import mahasiswa"><i class="fa-solid fa-file-import"></i></button>
                 </div>
             </h5>
         </div>
@@ -119,7 +119,7 @@ Halaman untuk melihat data pengguna Mahasiswa
 <div class="me-1 mb-1 d-inline-block">
 
     <!--Extra Large Modal -->
-    <form action="{{ route($prefix.'services.convert.import-student') }}" method="POST" enctype="multipart/form-data">
+    <form action="{{ route('web-admin.workers.student-import') }}" method="POST" enctype="multipart/form-data">
         @csrf
         <div class="modal fade text-left w-100" id="importStudent" tabindex="-1" role="dialog"
             aria-labelledby="myModalLabel16" aria-hidden="true">
@@ -127,30 +127,25 @@ Halaman untuk melihat data pengguna Mahasiswa
                 role="document">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h4 class="modal-title" id="myModalLabel16">
-                            Import Mahasiswa
-                            <br />
-                            <small><a href="{{ route('root.download-mahasiswa-example') }}">Download contoh file</a></small>
-                        </h4>
-                        <div class="">
-
-                            <button type="submit" class="btn btn-outline-primary">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal"
-                                aria-label="Close">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
+                        <h4 class="modal-title" id="myModalLabel16">Import Mahasiswa</h4>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
                     <div class="modal-body">
+                        <p class="text-muted">
+                            Unggah file XLSX dengan kolom <strong>NIM</strong>, <strong>Nama</strong>, biodata,
+                            alamat, orang tua, <strong>Kode Prodi</strong>, dan <strong>Nama Prodi</strong>. Kode Kecamatan
+                            akan dicocokkan dengan master wilayah. Username dan password awal adalah NIM.
+                        </p>
+                        @error('academic_period')
+                            <div class="alert alert-danger py-2">{{ $message }}</div>
+                        @enderror
                         <div class="row">
                             <div class="form-group col-12">
-                                <label for="class_id">Kelas</label>
-                                <select name="class_id" id="class_id" class="form-select">
-                                    <option value="" selected>Pilih Kelas</option>
-                                    @foreach ($kelas as $item)
-                                    <option value="{{ $item->id }}">{{ $item->name }}</option>
+                                <label for="class_id" class="form-label">Kelas tujuan</label>
+                                <select name="class_id" id="class_id" class="form-select" required>
+                                    <option value="">Pilih Kelas</option>
+                                    @foreach ($filterKelas as $item)
+                                    <option value="{{ $item->id }}" @selected(old('class_id') == $item->id)>{{ $item->name }}</option>
                                     @endforeach
                                 </select>
                                 @error('class_id')
@@ -158,13 +153,26 @@ Halaman untuk melihat data pengguna Mahasiswa
                                 @enderror
                             </div>
                             <div class="form-group col-12">
-                                <label for="import">Import Files ( xlsx, csv )</label>
-                                <input type="file" name="import" id="import" class="form-control" accept=".xls, .xlsx, .csv">
+                                <label for="import" class="form-label">File XLSX atau CSV (maksimal 5 MB)</label>
+                                <input type="file" name="import" id="import" class="form-control" accept=".xlsx,.csv" required>
                                 @error('import')
                                 <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
+                            <div class="form-group col-12">
+                                <div class="form-check">
+                                    <input type="hidden" name="dry_run" value="0">
+                                    <input class="form-check-input" type="checkbox" name="dry_run" value="1" id="student_import_dry_run" @checked(old('dry_run'))>
+                                    <label class="form-check-label" for="student_import_dry_run">Dry-run (validasi tanpa menyimpan data)</label>
+                                </div>
+                            </div>
                         </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-primary" @disabled(! $academicPeriod)>
+                            <i class="fas fa-file-import me-1"></i> Import
+                        </button>
                     </div>
                 </div>
             </div>
@@ -220,4 +228,11 @@ Halaman untuk melihat data pengguna Mahasiswa
 @section('custom-js')
 <script src="{{ asset('dist') }}/assets/extensions/tinymce/tinymce.min.js"></script>
 <script src="{{ asset('dist') }}/assets/static/js/pages/tinymce.js"></script>
+@if ($errors->has('import') || $errors->has('class_id') || $errors->has('academic_period'))
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    new bootstrap.Modal(document.getElementById('importStudent')).show();
+});
+</script>
+@endif
 @endsection

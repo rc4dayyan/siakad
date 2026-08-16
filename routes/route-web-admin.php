@@ -33,6 +33,7 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::get('/workers/data-dosen/create',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'createLecture'])->name('workers.lecture-create');
         Route::get('/workers/data-dosen/{code}/edit',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'editLecture'])->name('workers.lecture-edit');
         Route::post('/workers/data-dosen/store',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'storeLecture'])->name('workers.lecture-store');
+        Route::post('/workers/data-dosen/import',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'importLecture'])->name('workers.lecture-import');
         Route::patch('/workers/data-dosen/{code}/update',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'updateLecture'])->name('workers.lecture-update');
         Route::delete('/workers/data-dosen/{code}/destroy',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'destroyLecture'])->name('workers.lecture-destroy');
         // MENU KHUSUS DATA PENGGUNA => DATA MAHASISWA
@@ -41,6 +42,7 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::post('/workers/kenaikan-semester/preview',[App\Http\Controllers\Admin\SemesterPromotionController::class, 'preview'])->name('workers.student-promotion-preview');
         Route::post('/workers/kenaikan-semester/execute',[App\Http\Controllers\Admin\SemesterPromotionController::class, 'execute'])->name('workers.student-promotion-execute');
         Route::get('/workers/data-mahasiswa/create',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'createStudent'])->name('workers.student-create');
+        Route::post('/workers/data-mahasiswa/import',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'importStudent'])->name('workers.student-import');
         Route::get('/workers/data-mahasiswa/{code}/edit',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'editStudent'])->name('workers.student-edit');
         Route::post('/workers/data-mahasiswa/store',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'storeStudent'])->name('workers.student-store');
         Route::post('/workers/data-mahasiswa/{code}/registrasi',[App\Http\Controllers\Admin\StudentRegistrationController::class, 'store'])->name('workers.student-registration-store');
@@ -56,6 +58,13 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::delete('/academic/krs-management/items/{item}', [App\Http\Controllers\Admin\KrsManagementController::class, 'remove'])->name('krs-management.remove');
         Route::patch('/academic/krs-management/{krs}/reopen', [App\Http\Controllers\Admin\KrsManagementController::class, 'reopen'])->name('krs-management.reopen');
         Route::patch('/academic/krs-management/{krs}/approve', [App\Http\Controllers\Admin\KrsManagementController::class, 'approve'])->name('krs-management.approve');
+
+        // MENU KHUSUS DATA MASTER => DATA WILAYAH
+        Route::get('/master/data-wilayah', [App\Http\Controllers\Admin\Pages\Core\WilayahController::class, 'index'])->name('master.wilayah-index');
+        Route::post('/master/data-wilayah/store', [App\Http\Controllers\Admin\Pages\Core\WilayahController::class, 'store'])->name('master.wilayah-store');
+        Route::post('/master/data-wilayah/import', [App\Http\Controllers\Admin\Pages\Core\WilayahController::class, 'import'])->name('master.wilayah-import');
+        Route::patch('/master/data-wilayah/{wilayah}/update', [App\Http\Controllers\Admin\Pages\Core\WilayahController::class, 'update'])->name('master.wilayah-update');
+        Route::delete('/master/data-wilayah/{wilayah}/destroy', [App\Http\Controllers\Admin\Pages\Core\WilayahController::class, 'destroy'])->name('master.wilayah-destroy');
 
         // MENU KHUSUS DATA MASTER => DATA FAKULTAS
         Route::get('/master/data-fakultas',[App\Http\Controllers\Admin\Pages\Core\FakultasController::class, 'index'])->name('master.fakultas-index');

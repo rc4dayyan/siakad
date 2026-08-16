@@ -22,6 +22,11 @@ use App\Models\Mahasiswa;
 use App\Models\RegistrasiMahasiswa;
 use App\Models\Settings\webSettings;
 use App\Services\Academic\AcademicPeriodContext;
+use App\Services\Imports\DosenOpenFeederImportService;
+use App\Services\Imports\MahasiswaOpenFeederImportService;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use Rap2hpoutre\FastExcel\FastExcel;
 
 class WorkersController extends Controller
 {
@@ -446,6 +451,40 @@ class WorkersController extends Controller
         Alert::success('Success', 'Data berhasil ditambahkan');
         return back();
     }
+    public function importLecture(Request $request, DosenOpenFeederImportService $importer)
+    {
+        $request->validate([
+            'import' => ['required', 'file', 'mimes:xlsx,csv', 'max:2048'],
+        ], [
+            'import.required' => 'File dosen wajib diunggah.',
+            'import.file' => 'Berkas import dosen tidak valid.',
+            'import.mimes' => 'File harus berformat XLSX atau CSV.',
+            'import.max' => 'Ukuran file maksimal 2 MB.',
+        ]);
+
+        $path = $request->file('import')->store('excel-files', 'local');
+
+        try {
+            $rows = (new FastExcel)->import(Storage::disk('local')->path($path));
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                'import' => 'File tidak dapat dibaca. Gunakan file XLSX OpenFeeder atau CSV yang valid.',
+            ]);
+        } finally {
+            Storage::disk('local')->delete($path);
+        }
+
+        $result = $importer->import($rows);
+        $message = "Import selesai: {$result['imported']} dosen baru dibuat";
+        if ($result['skipped'] > 0) {
+            $message .= " dan {$result['skipped']} dosen dilewati karena NIDN sudah terdaftar";
+        }
+        $message .= '. Username dan password awal dosen baru adalah NIDN.';
+
+        Alert::success('Sukses', $message);
+
+        return back()->with('success', $message);
+    }
     public function updateLecture(Request $request, $code)
     {
         $user = Dosen::where('dsn_code', $code)->first();
@@ -519,6 +558,64 @@ class WorkersController extends Controller
         return back();
     }
     // KHUSUS KELOLA DATA ROLE MAHASISWA
+    public function importStudent(
+        Request $request,
+        AcademicPeriodContext $periodContext,
+        MahasiswaOpenFeederImportService $importer
+    ) {
+        $period = $periodContext->requireWritableCurrent($request->user());
+
+        $request->validate([
+            'import' => [
+                'required',
+                'file',
+                'extensions:xlsx,csv',
+                'mimetypes:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-zip-compressed,text/csv,text/plain,application/csv',
+                'max:5120',
+            ],
+            'class_id' => ['required', 'integer', 'exists:kelas,id'],
+            'dry_run' => ['nullable', 'boolean'],
+        ], [
+            'import.required' => 'File mahasiswa OpenFeeder wajib diunggah.',
+            'import.file' => 'Berkas import mahasiswa tidak valid.',
+            'import.extensions' => 'Ekstensi file harus XLSX atau CSV.',
+            'import.mimetypes' => 'Tipe file harus berupa dokumen XLSX atau CSV.',
+            'import.max' => 'Ukuran file maksimal 5 MB.',
+            'class_id.required' => 'Kelas tujuan wajib dipilih.',
+        ]);
+
+        $class = Kelas::query()
+            ->forAcademicPeriod($period)
+            ->with(['pstudi', 'taka', 'dosen'])
+            ->find($request->integer('class_id'));
+
+        if (! $class) {
+            throw ValidationException::withMessages([
+                'class_id' => 'Kelas harus berasal dari periode akademik yang sedang dipilih.',
+            ]);
+        }
+
+        $path = $request->file('import')->store('excel-files', 'local');
+
+        try {
+            $rows = (new FastExcel)->import(Storage::disk('local')->path($path));
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                'import' => 'File tidak dapat dibaca. Gunakan file XLSX OpenFeeder atau CSV yang valid.',
+            ]);
+        } finally {
+            Storage::disk('local')->delete($path);
+        }
+
+        $result = $importer->import($rows, $class, $request->boolean('dry_run'));
+        $message = $request->boolean('dry_run')
+            ? "Dry-run berhasil: {$result['imported']} mahasiswa baru valid dan {$result['skipped']} NIM sudah terdaftar. Tidak ada data disimpan."
+            : "Import selesai: {$result['imported']} mahasiswa baru dibuat dan {$result['skipped']} NIM yang sudah terdaftar dilewati. Username dan password awal mahasiswa baru adalah NIM.";
+
+        Alert::success('Sukses', $message);
+
+        return back()->with('success', $message);
+    }
     public function indexStudent(Request $request, AcademicPeriodContext $periodContext)
     {
         $filters = $request->validate([

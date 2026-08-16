@@ -58,6 +58,7 @@
 
 <form action="{{ route($prefix.'master.master-matkul-store') }}" method="POST">
     @csrf
+    <input type="hidden" name="_form" value="create-master-matkul">
     <div class="modal fade" id="createMasterMatkul" tabindex="-1" aria-labelledby="createMasterMatkulLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -126,4 +127,9 @@
         </div>
     </div>
 </form>
+@endsection
+@section('custom-js')
+    @if ($errors->any() && old('_form') === 'create-master-matkul')
+        <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('createMasterMatkul')).show());</script>
+    @endif
 @endsection
