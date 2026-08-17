@@ -19,7 +19,14 @@ class KrsApprovalController extends Controller
         return view('dosen.pages.krs-approval-index', [
             'submissions' => Krs::query()
                 ->whereHas('registrasiMahasiswa', fn ($query) => $query->where('dosen_wali_id', $advisor->id))
-                ->with(['registrasiMahasiswa.mahasiswa', 'registrasiMahasiswa.taka', 'items.penawaranMataKuliah.masterMataKuliah'])
+                ->with([
+                    'registrasiMahasiswa.mahasiswa',
+                    'registrasiMahasiswa.taka',
+                    'registrasiMahasiswa.kelas',
+                    'items.penawaranMataKuliah.masterMataKuliah',
+                    'items.penawaranMataKuliah.kelas',
+                    'items.penawaranMataKuliah.dosenUtama',
+                ])
                 ->latest('diajukan_at')->get(),
         ]);
     }

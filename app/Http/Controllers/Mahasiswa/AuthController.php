@@ -2,45 +2,47 @@
 
 namespace App\Http\Controllers\Mahasiswa;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-// SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
-use Coderflex\LaravelTurnstile\Rules\TurnstileCheck;
-use Coderflex\LaravelTurnstile\Facades\LaravelTurnstile;
-use Auth;
-use Str;
-// SECTION ADDONS EXTERNAL
 use Alert;
-// SECTION AUTH
+use App\Http\Controllers\Controller;
+// SECTION ADDONS SYSTEM
 use App\Models\Mahasiswa;
 use App\Models\Settings\webSettings;
+use Auth;
+use Coderflex\LaravelTurnstile\Rules\TurnstileCheck;
+use Illuminate\Http\Request;
+// SECTION ADDONS EXTERNAL
+use Illuminate\Support\Facades\Hash;
+// SECTION AUTH
+use Illuminate\Support\Facades\Mail;
+use Str;
 
 class AuthController extends Controller
 {
     public function AuthSignInPage()
     {
-        if(Auth::guard('dosen')->check()){
-            Alert::info('info', 'Saat ini kamu telah login sebagai ' . Auth::guard('dosen')->user()->dsn_name);
+        if (Auth::guard('dosen')->check()) {
+            Alert::info('info', 'Saat ini kamu telah login sebagai '.Auth::guard('dosen')->user()->dsn_name);
+
             return redirect()->route('dosen.home-index');
         }
-        if(Auth::guard('mahasiswa')->check()){
-            Alert::info('Informasi', 'Saat ini kamu telah login sebagai ' . Auth::guard('mahasiswa')->user()->dsn_name);
+        if (Auth::guard('mahasiswa')->check()) {
+            Alert::info('Informasi', 'Saat ini kamu telah login sebagai '.Auth::guard('mahasiswa')->user()->mhs_name);
+
             return redirect()->route('mahasiswa.home-index');
         }
 
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['title'] = "Login Mahasiswa - " . $data['web']->school_name;
-        $data['menu'] = "Halaman Login Mahasiswa";
-        $data['submenu'] = "SignIn to continue";
-        $data['subdesc'] = "Gunakan id unique anda untuk login...";
+        $data['title'] = 'Login Mahasiswa - '.$data['web']->school_name;
+        $data['menu'] = 'Halaman Login Mahasiswa';
+        $data['submenu'] = 'SignIn to continue';
+        $data['subdesc'] = 'Gunakan id unique anda untuk login...';
 
         return view('base.auth.auth-mhs-signin', $data);
 
     }
 
-    public function AuthSignInPost(Request $request){
+    public function AuthSignInPost(Request $request)
+    {
 
         $request->validate([
             'login' => 'required',
@@ -61,29 +63,30 @@ class AuthController extends Controller
 
         $user = Mahasiswa::where($fieldType, $request->login)->first();
 
-
-        if(!$user){
+        if (! $user) {
             Alert::error('Error', 'Mohon maaf akun anda belum terdaftar');
+
             return back();
         }
 
         $remember_me = $request->has('remember_me') ? true : false;
 
         // Coba untuk melakukan autentikasi menggunakan metode 'attempt' dari facade 'Auth'
-        if (Auth::guard('mahasiswa')->attempt(array($fieldType => $login, 'password' => $request->input('password')), $remember_me) ) {
-            // Jika autentikasi berhasil, pengguna akan dialihkan ke dashboard
-            if($user->rawtype == 0){
-                Alert::success('Success', 'Anda berhasil login Sebagai Calon Mahasiswa');
-                // return redirect()->route('web-admin.dashboard-page');
-                return redirect()->route('mahasiswa.home-index');
-                // echo "Anda login sebagai admin.";
-            }elseif($user->rawtype == 1){
-                return redirect()->route('web-admin.home-index');
-                Alert::success('Success', 'Anda berhasil login');
-                // return back();
+        if (Auth::guard('mahasiswa')->attempt([$fieldType => $login, 'password' => $request->input('password')], $remember_me)) {
+            if ((int) $user->raw_mhs_stat !== 1) {
+                Auth::guard('mahasiswa')->logout();
+                Alert::error('Error', 'Akun mahasiswa Anda belum aktif. Silakan hubungi Administrator.');
+
+                return back();
             }
-        }else{
+
+            $request->session()->regenerate();
+            Alert::success('Success', 'Anda berhasil login');
+
+            return redirect()->route('mahasiswa.home-index');
+        } else {
             Alert::error('Error', 'Mohon Maaf, Username / Email atau password salah');
+
             return back();
         }
     }
@@ -91,16 +94,17 @@ class AuthController extends Controller
     public function AuthForgotPage()
     {
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['title'] = "Reset Password Mahasiswa - " . $data['web']->school_name;
-        $data['menu'] = "Halaman Reset Password Mahasiswa";
-        $data['submenu'] = "SignIn to continue";
-        $data['subdesc'] = "Gunakan id unique anda untuk login...";
+        $data['title'] = 'Reset Password Mahasiswa - '.$data['web']->school_name;
+        $data['menu'] = 'Halaman Reset Password Mahasiswa';
+        $data['submenu'] = 'SignIn to continue';
+        $data['subdesc'] = 'Gunakan id unique anda untuk login...';
 
         return view('base.auth.auth-mhs-forgot', $data);
 
     }
 
-    public function AuthForgotVerify(Request $request){
+    public function AuthForgotVerify(Request $request)
+    {
         $request->validate([
             'email' => 'required|exists:mahasiswas,mhs_nim',
         ]);
@@ -110,25 +114,28 @@ class AuthController extends Controller
         $user->token_created_at = now();
 
         if ($user->save()) {
-            Mail::send('base.resource.mail-mhs-forgot-temp', ['user' => $user], function($message) use ($user) {
+            Mail::send('base.resource.mail-mhs-forgot-temp', ['user' => $user], function ($message) use ($user) {
                 $message->to($user->mhs_mail);
-                $message->subject('Reset Password for ' . $user->mhs_name);
+                $message->subject('Reset Password for '.$user->mhs_name);
                 $message->from('admin@staipuimajalengka.ac.id', config('app.name'));
                 // $message->embedData(file_get_contents(public_path('/storage/images/default/logo.svg')), 'logo.svg', 'image/svg+xml');
             });
 
             Alert::success('Success', 'Email berhasil dikirim.');
+
             return back();
             // return redirect()->route('root.root-main-index');
         } else {
             Alert::error('Error', 'Email tidak terdaftar');
+
             return back();
         }
     }
 
-    public function AuthResetPage($token){
+    public function AuthResetPage($token)
+    {
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['title'] = "Reset Password Mahasiswa - " . $data['web']->school_name;
+        $data['title'] = 'Reset Password Mahasiswa - '.$data['web']->school_name;
         $data['menu'] = 'Beranda';
         $data['submenu'] = 'Reset Password';
         $data['subdesc'] = 'Halaman untuk mereset Password pengguna';
@@ -140,7 +147,8 @@ class AuthController extends Controller
 
     }
 
-    public function AuthResetPassword(Request $request, $token) {
+    public function AuthResetPassword(Request $request, $token)
+    {
 
         $request->validate([
             'password' => 'required|same:password_confirm|min:6',
@@ -154,19 +162,23 @@ class AuthController extends Controller
             $user->save();
 
             Alert::success('Success', 'Password berhasil direset');
+
             return redirect()->route('mahasiswa.auth-signin-page');
             // return back();
 
         } else {
             Alert::error('Error', 'Token verifikasi tidak valid atau telah kedaluwarsa');
+
             return back();
         }
     }
 
-    public function AuthSignOutPost(Request $request){
+    public function AuthSignOutPost(Request $request)
+    {
         Auth::guard('mahasiswa')->logout();
 
         Alert::success('Success', 'Anda berhasil logout');
+
         return redirect()->route('mahasiswa.auth-signin-page');
     }
 }

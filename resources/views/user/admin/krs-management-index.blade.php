@@ -19,6 +19,7 @@
         <div class="card-body">
             <div class="alert alert-secondary mb-3">Nama harus cocok dengan NIM pada periode <strong>{{ $period->name }}</strong>. Baris dengan aksi kosong diabaikan.</div>
             <div class="table-responsive mb-3"><table class="table table-sm table-bordered mb-0"><thead><tr><th>Nilai kolom Aksi</th><th>Keterangan</th><th>Syarat status</th></tr></thead><tbody>
+                @if ($canManageKrs && $canApproveKrs)<tr><td><code>ajukan_setujui</code></td><td>Menambahkan seluruh penawaran kelas yang belum ada, mengajukan, lalu menyetujui KRS dalam satu proses. Catatan minimal 10 karakter wajib diisi.</td><td>Belum dibuat, <code>draft</code>, atau <code>rejected</code></td></tr>@endif
                 @if ($canApproveKrs)<tr><td><code>setujui</code></td><td>Menyetujui dan mengunci KRS. Mahasiswa serta dosen wali menerima notifikasi.</td><td><code>submitted</code> / Diajukan</td></tr>@endif
                 @if ($canManageKrs)<tr><td><code>buka_kembali</code></td><td>Membuka KRS agar dapat diperbaiki dan diajukan kembali. Alasan minimal 10 karakter wajib diisi.</td><td><code>submitted</code>, <code>approved</code>, atau <code>locked</code></td></tr>@endif
                 <tr><td><em>kosong</em></td><td>Baris mahasiswa tidak diproses.</td><td>Semua status</td></tr>
@@ -40,7 +41,7 @@
                 <form method="POST" action="{{ route($prefix.'krs-management.import-execute') }}" class="row g-2 align-items-end">
                     @csrf
                     <input type="hidden" name="token" value="{{ $importPreview['token'] }}">
-                    <div class="col-md-9"><label class="form-label" for="krs-import-note">Catatan/alasan</label><input class="form-control" id="krs-import-note" name="catatan" maxlength="2000" placeholder="Wajib minimal 10 karakter jika terdapat aksi buka_kembali"></div>
+                    <div class="col-md-9"><label class="form-label" for="krs-import-note">Catatan/alasan</label><input class="form-control" id="krs-import-note" name="catatan" maxlength="2000" placeholder="Wajib minimal 10 karakter untuk buka_kembali atau ajukan_setujui"></div>
                     <div class="col-md-3"><button class="btn btn-success w-100" onclick="return confirm('Jalankan seluruh update KRS pada pratinjau ini?')">Jalankan update Excel</button></div>
                 </form>
                 <small class="text-muted">Pratinjau berlaku selama 15 menit. Seluruh file dibatalkan jika satu baris berubah atau tidak lagi memenuhi syarat saat dieksekusi.</small>
@@ -123,13 +124,89 @@
         </div>
         <div class="col-lg-12">
             <div class="card">
-                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2"><h5 class="mb-0">Pilih mahasiswa</h5><a href="{{ route($prefix.'krs-management.import-template', ['q' => $search, 'status' => $status]) }}" class="btn btn-sm btn-outline-success"><i class="fa-solid fa-file-excel"></i> Unduh daftar Excel</a></div>
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div>
+                        <h5 class="mb-1">Pilih Mahasiswa</h5>
+                        <small class="text-muted">Temukan mahasiswa berdasarkan identitas, kelas, atau status KRS.</small>
+                    </div>
+                    <a href="{{ route($prefix.'krs-management.import-template', array_filter(['q' => $search, 'status' => $status, 'kelas_id' => $classId], fn ($value) => filled($value))) }}" class="btn btn-sm btn-outline-success">
+                        <i class="fa-solid fa-file-excel me-1"></i> Unduh Daftar Excel
+                    </a>
+                </div>
                 <div class="card-body">
-                    <form method="GET" class="row g-2 mb-3">
-                        <div class="col-md-7"><input class="form-control" name="q" value="{{ $search }}" placeholder="Cari nama atau NIM"></div>
-                        <div class="col-md-5"><select class="form-select" name="status" onchange="this.form.submit()"><option value="">Semua status</option><option value="submitted" @selected($status === 'submitted')>Diajukan</option><option value="approved" @selected($status === 'approved')>Disetujui</option><option value="rejected" @selected($status === 'rejected')>Ditolak</option><option value="draft" @selected($status === 'draft')>Draft</option><option value="locked" @selected($status === 'locked')>Dikunci</option><option value="none" @selected($status === 'none')>Belum ada KRS</option></select></div>
-                        <div class="col-12"><button class="btn btn-outline-primary w-100">Terapkan pencarian dan filter</button></div>
-                    </form>
+                    <div class="border rounded-3 bg-light p-3 mb-4 mt-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <div>
+                                <h6 class="mb-1"><i class="fa-solid fa-filter me-2 text-primary"></i>Filter Daftar Mahasiswa</h6>
+                                <small class="text-muted">Gunakan satu atau beberapa filter untuk mempersempit hasil.</small>
+                            </div>
+                            @if ($search !== '' || $status !== '' || $classId)
+                                <a href="{{ route($prefix.'krs-management.index') }}" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fa-solid fa-rotate-left me-1"></i> Reset Filter
+                                </a>
+                            @endif
+                        </div>
+
+                        <form method="GET" action="{{ route($prefix.'krs-management.index') }}" class="row g-3 align-items-end">
+                            <div class="col-lg-4 col-md-6">
+                                <label for="student-search" class="form-label fw-semibold">Nama atau NIM</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                                    <input type="search" class="form-control" id="student-search" name="q" value="{{ $search }}" placeholder="Contoh: Ahmad atau 20260001">
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label for="student-class-filter" class="form-label fw-semibold">Kelas</label>
+                                <select class="form-select" id="student-class-filter" name="kelas_id">
+                                    <option value="">Semua kelas</option>
+                                    @foreach ($classes as $class)
+                                        <option value="{{ $class->id }}" @selected($classId === $class->id)>{{ $class->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label for="student-status-filter" class="form-label fw-semibold">Status KRS</label>
+                                <select class="form-select" id="student-status-filter" name="status">
+                                    <option value="">Semua status</option>
+                                    <option value="submitted" @selected($status === 'submitted')>Diajukan</option>
+                                    <option value="approved" @selected($status === 'approved')>Disetujui</option>
+                                    <option value="rejected" @selected($status === 'rejected')>Perlu perbaikan</option>
+                                    <option value="draft" @selected($status === 'draft')>Draf</option>
+                                    <option value="locked" @selected($status === 'locked')>Dikunci</option>
+                                    <option value="none" @selected($status === 'none')>Belum ada KRS</option>
+                                </select>
+                            </div>
+                            <div class="col-lg-2 col-md-6">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fa-solid fa-filter me-1"></i> Terapkan
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="d-flex flex-wrap align-items-center gap-2 mt-3 pt-3 border-top">
+                            <span class="text-muted small">Hasil:</span>
+                            <span class="badge bg-primary">{{ $registrations->total() }} mahasiswa</span>
+                            @if ($search !== '')
+                                <span class="badge bg-light-secondary text-secondary">Pencarian: “{{ $search }}”</span>
+                            @endif
+                            @if ($classId)
+                                <span class="badge bg-light-secondary text-secondary">Kelas: {{ $classes->firstWhere('id', $classId)?->name }}</span>
+                            @endif
+                            @if ($status !== '')
+                                @php
+                                    $filterStatusLabels = [
+                                        'submitted' => 'Diajukan',
+                                        'approved' => 'Disetujui',
+                                        'rejected' => 'Perlu perbaikan',
+                                        'draft' => 'Draf',
+                                        'locked' => 'Dikunci',
+                                        'none' => 'Belum ada KRS',
+                                    ];
+                                @endphp
+                                <span class="badge bg-light-secondary text-secondary">Status: {{ $filterStatusLabels[$status] }}</span>
+                            @endif
+                        </div>
+                    </div>
 
                     @php
                         $selectedKrsIds = collect(old('krs_ids', []))
@@ -138,14 +215,14 @@
                     @endphp
                     <form method="POST" action="{{ route($prefix.'krs-management.bulk') }}" id="krs-bulk-form">
                         @csrf @method('PATCH')
-                        <div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th><input type="checkbox" id="select-all-krs" aria-label="Pilih semua KRS yang sesuai dengan aksi pada halaman ini"></th><th>Mahasiswa</th><th>Kelas</th><th>Status KRS</th><th></th></tr></thead><tbody>
+                        <div class="table-responsive"><table class="table table-sm table-striped table-hover align-middle"><thead class="table-light"><tr><th><input type="checkbox" id="select-all-krs" aria-label="Pilih semua KRS yang sesuai dengan aksi pada halaman ini"></th><th>Mahasiswa</th><th>Kelas</th><th>Status KRS</th><th class="text-end">Aksi</th></tr></thead><tbody>
                             @forelse ($registrations as $registration)
                                 @php
                                     $rowKrs = $registration->krs;
                                     $canSelectForApproval = $canApproveKrs && $rowKrs?->status === \App\Models\Krs::STATUS_SUBMITTED;
                                     $canSelectForReopen = $canManageKrs && $rowKrs && ! $rowKrs->isEditable();
                                 @endphp
-                                <tr><td><input class="krs-bulk-item" type="checkbox" name="krs_ids[]" value="{{ $rowKrs?->id ?? '' }}" data-can-approve="{{ $canSelectForApproval ? '1' : '0' }}" data-can-reopen="{{ $canSelectForReopen ? '1' : '0' }}" @checked($rowKrs && in_array((int) $rowKrs->id, $selectedKrsIds, true)) @disabled(! $canSelectForApproval && ! $canSelectForReopen) title="{{ $rowKrs ? ((! $canSelectForApproval && ! $canSelectForReopen) ? 'Status KRS ini belum mendukung aksi massal.' : 'Pilih KRS untuk aksi massal.') : 'Mahasiswa belum memiliki KRS.' }}" aria-label="Pilih KRS {{ $registration->mahasiswa?->mhs_name }}"></td><td>{{ $registration->mahasiswa?->mhs_name }}<br><small>{{ $registration->mahasiswa?->mhs_nim }}</small></td><td>{{ $registration->kelas?->name ?? '-' }}</td><td><span class="badge bg-secondary">{{ strtoupper($rowKrs?->status ?? 'belum dibuat') }}</span></td><td><a class="btn btn-sm btn-outline-primary" href="{{ route($prefix.'krs-management.index', ['registration' => $registration->id, 'q' => $search, 'status' => $status, 'students_page' => $registrations->currentPage()]) }}">{{ $canManageKrs ? 'Kelola' : 'Tinjau' }}</a></td></tr>
+                                <tr><td><input class="krs-bulk-item" type="checkbox" name="krs_ids[]" value="{{ $rowKrs?->id ?? '' }}" data-can-approve="{{ $canSelectForApproval ? '1' : '0' }}" data-can-reopen="{{ $canSelectForReopen ? '1' : '0' }}" @checked($rowKrs && in_array((int) $rowKrs->id, $selectedKrsIds, true)) @disabled(! $canSelectForApproval && ! $canSelectForReopen) title="{{ $rowKrs ? ((! $canSelectForApproval && ! $canSelectForReopen) ? 'Status KRS ini belum mendukung aksi massal.' : 'Pilih KRS untuk aksi massal.') : 'Mahasiswa belum memiliki KRS.' }}" aria-label="Pilih KRS {{ $registration->mahasiswa?->mhs_name }}"></td><td><span class="fw-semibold text-dark">{{ $registration->mahasiswa?->mhs_name }}</span><br><small class="text-muted">{{ $registration->mahasiswa?->mhs_nim }}</small></td><td>{{ $registration->kelas?->name ?? '-' }}</td><td><span class="badge bg-secondary">{{ strtoupper($rowKrs?->status ?? 'belum dibuat') }}</span></td><td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ route($prefix.'krs-management.index', ['registration' => $registration->id, 'q' => $search, 'status' => $status, ...($classId ? ['kelas_id' => $classId] : []), 'students_page' => $registrations->currentPage()]) }}"><i class="fa-solid fa-eye me-1"></i>{{ $canManageKrs ? 'Kelola' : 'Tinjau' }}</a></td></tr>
                             @empty<tr><td colspan="5" class="text-center text-muted">Registrasi mahasiswa tidak ditemukan.</td></tr>@endforelse
                         </tbody></table></div>
 

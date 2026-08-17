@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Helper\roleTrait;
 use App\Http\Controllers\Controller;
+use App\Models\Kelas;
 use App\Models\Krs;
 use App\Models\KrsItem;
 use App\Models\PenawaranMataKuliah;
@@ -43,6 +44,12 @@ class KrsManagementController extends Controller
         ];
         $status = $request->string('status')->value();
         $status = in_array($status, $allowedStatuses, true) ? $status : '';
+        $classes = Kelas::query()
+            ->forAcademicPeriod($period)
+            ->orderBy('name')
+            ->get();
+        $requestedClassId = $request->integer('kelas_id');
+        $classId = $classes->contains('id', $requestedClassId) ? $requestedClassId : null;
         $importPreview = $request->session()->get('krs_bulk_import');
         if (! is_array($importPreview)
             || (int) ($importPreview['user_id'] ?? 0) !== $request->user()->id
@@ -57,6 +64,7 @@ class KrsManagementController extends Controller
             ->when($search !== '', fn ($query) => $query->whereHas('mahasiswa', fn ($student) => $student
                 ->where('mhs_name', 'like', '%'.$search.'%')
                 ->orWhere('mhs_nim', 'like', '%'.$search.'%')))
+            ->when($classId, fn ($query, $selectedClassId) => $query->where('kelas_id', $selectedClassId))
             ->when($status === 'none', fn ($query) => $query->whereDoesntHave('krs'))
             ->when($status !== '' && $status !== 'none', fn ($query) => $query
                 ->whereHas('krs', fn ($krs) => $krs->where('status', $status)))
@@ -94,6 +102,8 @@ class KrsManagementController extends Controller
             'offerings' => $offerings,
             'search' => $search,
             'status' => $status,
+            'classes' => $classes,
+            'classId' => $classId,
             'canManageKrs' => $canManageKrs,
             'canApproveKrs' => $canApproveKrs,
             'importPreview' => $importPreview,
@@ -280,6 +290,11 @@ class KrsManagementController extends Controller
         $this->authorizeViewRole($request);
         $period = $periods->requireCurrent($request->user());
         $search = trim($request->string('q')->value());
+        $requestedClassId = $request->integer('kelas_id');
+        $classId = Kelas::query()
+            ->forAcademicPeriod($period)
+            ->whereKey($requestedClassId)
+            ->value('id');
         $status = $request->string('status')->value();
         $status = in_array($status, [
             Krs::STATUS_DRAFT,
@@ -295,6 +310,7 @@ class KrsManagementController extends Controller
             ->when($search !== '', fn ($query) => $query->whereHas('mahasiswa', fn ($student) => $student
                 ->where('mhs_name', 'like', '%'.$search.'%')
                 ->orWhere('mhs_nim', 'like', '%'.$search.'%')))
+            ->when($classId, fn ($query, $selectedClassId) => $query->where('kelas_id', $selectedClassId))
             ->when($status === 'none', fn ($query) => $query->whereDoesntHave('krs'))
             ->when($status !== '' && $status !== 'none', fn ($query) => $query
                 ->whereHas('krs', fn ($krs) => $krs->where('status', $status)))
@@ -303,7 +319,7 @@ class KrsManagementController extends Controller
         $actionDescription = match ((int) $request->user()->raw_type) {
             3 => 'buka_kembali = membuka KRS diajukan/disetujui/dikunci agar dapat diperbaiki',
             4 => 'setujui = menyetujui dan mengunci KRS berstatus diajukan',
-            default => 'setujui = menyetujui dan mengunci; buka_kembali = membuka KRS agar dapat diperbaiki',
+            default => 'ajukan_setujui = isi semua penawaran kelas, ajukan, dan setujui; setujui = menyetujui KRS diajukan; buka_kembali = membuka KRS',
         };
         $rows = $registrations->map(fn (RegistrasiMahasiswa $registration) => [
             'NIM' => $registration->mahasiswa?->mhs_nim,
@@ -386,17 +402,25 @@ class KrsManagementController extends Controller
             ]);
         }
 
-        $containsReopen = collect($preview['rows'])->contains(fn (array $row) => $row['Aksi'] === KrsBulkImportService::ACTION_REOPEN);
-        if ($containsReopen && Str::length(trim((string) ($data['catatan'] ?? ''))) < 10) {
+        $requiresReason = collect($preview['rows'])->contains(fn (array $row) => in_array($row['Aksi'], [
+            KrsBulkImportService::ACTION_REOPEN,
+            KrsBulkImportService::ACTION_PREPARE_APPROVE,
+        ], true));
+        if ($requiresReason && Str::length(trim((string) ($data['catatan'] ?? ''))) < 10) {
             throw ValidationException::withMessages([
-                'catatan' => 'Alasan minimal 10 karakter wajib diisi untuk aksi buka kembali.',
+                'catatan' => 'Catatan atau alasan minimal 10 karakter wajib diisi untuk aksi buka_kembali atau ajukan_setujui.',
             ]);
         }
 
         $result = $importer->execute($preview['rows'], $period, $request->user(), $data['catatan'] ?? null);
         $request->session()->forget('krs_bulk_import');
 
-        return back()->with('success', "Import selesai: {$result['approved']} KRS disetujui dan {$result['reopened']} KRS dibuka kembali.");
+        $message = "Import selesai: {$result['approved']} KRS disetujui dan {$result['reopened']} KRS dibuka kembali.";
+        if ($result['prepared_approved'] > 0) {
+            $message = "Import selesai: {$result['approved']} KRS disetujui, {$result['reopened']} KRS dibuka kembali, dan {$result['prepared_approved']} KRS diisi seluruh penawarannya, diajukan, serta disetujui.";
+        }
+
+        return back()->with('success', $message);
     }
 
     private function authorizeRole(Request $request): void

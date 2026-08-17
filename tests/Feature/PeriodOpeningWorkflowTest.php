@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\Academic\AcademicPeriodContext;
 use App\Services\Academic\AcademicStatusService;
 use App\Services\Academic\AdminKrsManagementService;
+use App\Services\Academic\KrsBulkImportService;
 use App\Services\Academic\KrsService;
 use App\Services\Academic\PeriodConfigurationCopyService;
 use App\Services\Academic\PeriodPublicationService;
@@ -627,6 +628,57 @@ class PeriodOpeningWorkflowTest extends TestCase
             ->assertSee("return checkbox.dataset.canApprove === '1' || checkbox.dataset.canReopen === '1';", false);
     }
 
+    public function test_krs_management_student_list_can_be_filtered_by_current_period_class(): void
+    {
+        $data = $this->readyPeriod();
+        $sourceClass = DB::table('kelas')->where('id', $data['classId'])->first();
+        $otherClassId = DB::table('kelas')->insertGetId([
+            'taka_id' => $data['period']->id,
+            'pstudi_id' => $sourceClass->pstudi_id,
+            'proku_id' => $sourceClass->proku_id,
+            'dosen_id' => $data['advisor']->id,
+            'capacity' => 30,
+            'name' => 'Kelas Filter Lain',
+            'code' => 'FILTER-OTHER-CLASS',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $otherStudent = $this->student('FILTER-OTHER');
+        RegistrasiMahasiswa::create([
+            'mahasiswa_id' => $otherStudent->id,
+            'taka_id' => $data['period']->id,
+            'semester_mahasiswa' => 1,
+            'status_akademik' => 'aktif',
+            'status_registrasi' => 'terdaftar',
+            'kelas_id' => $otherClassId,
+            'dosen_wali_id' => $data['advisor']->id,
+            'batas_sks' => 24,
+        ]);
+
+        $filteredTemplateUrl = route('web-admin.krs-management.import-template', [
+            'kelas_id' => $data['classId'],
+        ]);
+        $detailUrl = route('web-admin.krs-management.index', [
+            'registration' => $data['registration']->id,
+            'q' => '',
+            'status' => '',
+            'kelas_id' => $data['classId'],
+            'students_page' => 1,
+        ]);
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('web-admin.krs-management.index', ['kelas_id' => $data['classId']]))
+            ->assertOk()
+            ->assertSee('Filter Daftar Mahasiswa')
+            ->assertSee('name="kelas_id"', false)
+            ->assertSee($data['student']->mhs_name)
+            ->assertDontSee($otherStudent->mhs_name)
+            ->assertSee('1 mahasiswa')
+            ->assertSee($filteredTemplateUrl)
+            ->assertSee($detailUrl);
+    }
+
     public function test_department_admin_can_preview_and_execute_krs_excel_import(): void
     {
         $data = $this->readyPeriod();
@@ -688,6 +740,112 @@ class PeriodOpeningWorkflowTest extends TestCase
         $this->assertSame(Krs::STATUS_APPROVED, $secondKrs->fresh()->status);
         $this->assertSame(2, DB::table('academic_workflow_audits')
             ->where('event', 'krs.admin_approved')->where('actor_id', $admin->id)->count());
+    }
+
+    public function test_web_administrator_can_prepare_submit_and_approve_all_available_courses_through_excel(): void
+    {
+        $data = $this->readyPeriod();
+        $secondOffering = $this->additionalOffering($data, 'EXCEL-PREPARE', 2);
+        $file = UploadedFile::fake()->createWithContent('ajukan-setujui-krs.csv', implode("\n", [
+            'NIM,Nama,Aksi,Keterangan Aksi',
+            "{$data['student']->mhs_nim},{$data['student']->mhs_name},ajukan_setujui,Isi seluruh penawaran dan setujui",
+        ]));
+
+        $previewResponse = $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('web-admin.krs-management.import-preview'), ['import' => $file])
+            ->assertRedirect()
+            ->assertSessionHas('success')
+            ->assertSessionHas('krs_bulk_import');
+        $preview = $previewResponse->getSession()->get('krs_bulk_import');
+        $this->assertSame(KrsBulkImportService::ACTION_PREPARE_APPROVE, $preview['prepared'][0]['aksi']);
+        $this->assertStringContainsString('Isi 2 penawaran', $preview['prepared'][0]['aksi_label']);
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('web-admin.krs-management.import-execute'), [
+                'token' => $preview['token'],
+                'catatan' => 'Pengajuan dan persetujuan dilakukan berdasarkan paket semester.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Import selesai: 0 KRS disetujui, 0 KRS dibuka kembali, dan 1 KRS diisi seluruh penawarannya, diajukan, serta disetujui.');
+
+        $krs = Krs::where('registrasi_mahasiswa_id', $data['registration']->id)->firstOrFail();
+        $this->assertSame(Krs::STATUS_APPROVED, $krs->status);
+        $this->assertSame($data['offering']->sks + $secondOffering->sks, $krs->total_sks);
+        $this->assertEqualsCanonicalizing(
+            [$data['offering']->id, $secondOffering->id],
+            $krs->items()->pluck('penawaran_mata_kuliah_id')->all()
+        );
+        $this->assertDatabaseHas('academic_workflow_audits', ['event' => 'krs.admin_items_added', 'subject_id' => $krs->id]);
+        $this->assertDatabaseHas('academic_workflow_audits', ['event' => 'krs.admin_submitted', 'subject_id' => $krs->id]);
+        $this->assertDatabaseHas('academic_workflow_audits', ['event' => 'krs.admin_approved', 'subject_id' => $krs->id]);
+    }
+
+    public function test_academic_department_cannot_use_prepare_and_approve_excel_action(): void
+    {
+        $data = $this->readyPeriod();
+        $academic = User::create([
+            'type' => 3, 'code' => 'ACA-EXCEL-PREPARE', 'name' => 'Academic Excel Prepare', 'user' => 'academic-excel-prepare', 'phone' => '081191',
+            'email' => 'academic-excel-prepare@example.test', 'password' => 'secret', 'status' => 1,
+        ]);
+        $file = UploadedFile::fake()->createWithContent('ajukan-setujui-krs.csv', implode("\n", [
+            'NIM,Nama,Aksi',
+            "{$data['student']->mhs_nim},{$data['student']->mhs_name},ajukan_setujui",
+        ]));
+
+        $this->actingAs($academic)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('academic.krs-management.import-preview'), ['import' => $file])
+            ->assertRedirect()
+            ->assertSessionHasErrors('import')
+            ->assertSessionMissing('krs_bulk_import');
+
+        $this->assertDatabaseMissing('krs', ['registrasi_mahasiswa_id' => $data['registration']->id]);
+    }
+
+    public function test_prepare_and_approve_excel_action_rolls_back_all_students_when_one_fails(): void
+    {
+        $data = $this->readyPeriod();
+        $secondStudent = $this->student('EXCEL-PREPARE-ROLLBACK');
+        $secondRegistration = RegistrasiMahasiswa::create([
+            'mahasiswa_id' => $secondStudent->id,
+            'taka_id' => $data['period']->id,
+            'semester_mahasiswa' => 1,
+            'status_akademik' => 'aktif',
+            'status_registrasi' => 'terdaftar',
+            'kelas_id' => $data['classId'],
+            'dosen_wali_id' => $data['advisor']->id,
+            'batas_sks' => 1,
+        ]);
+        $file = UploadedFile::fake()->createWithContent('ajukan-setujui-rollback.csv', implode("\n", [
+            'NIM,Nama,Aksi',
+            "{$data['student']->mhs_nim},{$data['student']->mhs_name},ajukan_setujui",
+            "{$secondStudent->mhs_nim},{$secondStudent->mhs_name},ajukan_setujui",
+        ]));
+
+        $previewResponse = $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('web-admin.krs-management.import-preview'), ['import' => $file])
+            ->assertRedirect()
+            ->assertSessionHas('krs_bulk_import');
+        $preview = $previewResponse->getSession()->get('krs_bulk_import');
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('web-admin.krs-management.import-execute'), [
+                'token' => $preview['token'],
+                'catatan' => 'Pengujian rollback seluruh pengajuan dan persetujuan Excel.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('penawaran');
+
+        $this->assertDatabaseMissing('krs', ['registrasi_mahasiswa_id' => $data['registration']->id]);
+        $this->assertDatabaseMissing('krs', ['registrasi_mahasiswa_id' => $secondRegistration->id]);
+        $this->assertDatabaseMissing('academic_workflow_audits', [
+            'event' => 'krs.admin_approved',
+            'actor_id' => $data['actor']->id,
+        ]);
     }
 
     public function test_krs_excel_preview_rejects_name_that_does_not_match_nim(): void
