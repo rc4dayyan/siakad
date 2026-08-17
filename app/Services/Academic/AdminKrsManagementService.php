@@ -34,6 +34,41 @@ class AdminKrsManagementService
         });
     }
 
+    public function addMany(Krs $krs, Collection $offerings, User $actor, string $reason): Krs
+    {
+        $this->authorize($actor);
+
+        if ($offerings->isEmpty()) {
+            throw ValidationException::withMessages([
+                'penawaran_ids' => 'Pilih minimal satu mata kuliah yang akan ditambahkan.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($krs, $offerings, $actor, $reason): Krs {
+            $before = $this->snapshot($krs);
+
+            foreach ($offerings as $offering) {
+                $this->krsService->addForAdministration($krs, $offering);
+            }
+
+            $updated = $krs->fresh(['items.penawaranMataKuliah.masterMataKuliah', 'registrasiMahasiswa']);
+            $courseNames = $offerings->map(fn (PenawaranMataKuliah $offering) => $offering->masterMataKuliah->name);
+            $this->audit->record('krs.admin_items_added', $updated, $updated->registrasiMahasiswa->taka_id, $actor,
+                $before, $this->snapshot($updated), [
+                    'reason' => $reason,
+                    'offering_ids' => $offerings->pluck('id')->all(),
+                ]);
+            $this->notify(
+                $updated,
+                $actor,
+                'KRS diubah oleh Akademik',
+                $offerings->count().' mata kuliah ditambahkan: '.$courseNames->implode(', ').'. Alasan: '.$reason
+            );
+
+            return $updated;
+        });
+    }
+
     public function remove(Krs $krs, int $itemId, User $actor, string $reason): Krs
     {
         $this->authorize($actor);
@@ -70,6 +105,30 @@ class AdminKrsManagementService
             $this->audit->record('krs.admin_reopened', $updated, $updated->registrasiMahasiswa->taka_id, $actor,
                 $before, $this->snapshot($updated), ['reason' => $reason]);
             $this->notify($updated, $actor, 'KRS dibuka kembali', 'KRS perlu diperbaiki kembali. Alasan: '.$reason);
+
+            return $updated;
+        });
+    }
+
+    public function submit(Krs $krs, User $actor, string $reason): Krs
+    {
+        $this->authorize($actor);
+
+        return DB::transaction(function () use ($krs, $actor, $reason): Krs {
+            $before = $this->snapshot($krs);
+            $updated = $this->krsService->submitForAdministration(
+                $krs,
+                'Diajukan oleh administrator. Alasan: '.$reason
+            );
+
+            $this->audit->record('krs.admin_submitted', $updated, $updated->registrasiMahasiswa->taka_id, $actor,
+                $before, $this->snapshot($updated), ['reason' => $reason]);
+            $this->notify(
+                $updated,
+                $actor,
+                'KRS diajukan oleh administrator',
+                'KRS telah diajukan atas nama mahasiswa. Alasan: '.$reason
+            );
 
             return $updated;
         });

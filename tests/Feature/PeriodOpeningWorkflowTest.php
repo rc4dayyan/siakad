@@ -257,6 +257,70 @@ class PeriodOpeningWorkflowTest extends TestCase
             ->assertSee('Tambahkan mata kuliah');
     }
 
+    public function test_web_administrator_can_add_multiple_courses_to_student_krs_in_one_request(): void
+    {
+        $data = $this->readyPeriod();
+        $secondOffering = $this->additionalOffering($data, 'BULK-ADD', 2);
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('web-admin.krs-management.index', ['registration' => $data['registration']->id]))
+            ->assertOk()
+            ->assertSee('name="penawaran_ids[]"', false)
+            ->assertSee('Pilih semua penawaran mata kuliah');
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('web-admin.krs-management.add-many', $data['registration']), [
+                'penawaran_ids' => [$data['offering']->id, $secondOffering->id],
+                'alasan_penambahan' => 'Penyesuaian paket mata kuliah berdasarkan kurikulum semester.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', '2 mata kuliah berhasil ditambahkan ke KRS dan perubahan telah diaudit.');
+
+        $krs = Krs::where('registrasi_mahasiswa_id', $data['registration']->id)->firstOrFail();
+        $this->assertSame($data['offering']->sks + $secondOffering->sks, $krs->total_sks);
+        $this->assertEqualsCanonicalizing(
+            [$data['offering']->id, $secondOffering->id],
+            $krs->items()->pluck('penawaran_mata_kuliah_id')->all()
+        );
+        $this->assertDatabaseHas('academic_workflow_audits', [
+            'event' => 'krs.admin_items_added',
+            'actor_id' => $data['actor']->id,
+            'subject_id' => $krs->id,
+        ]);
+        $this->assertSame(2, Notification::query()
+            ->where('auth_id', $data['actor']->id)
+            ->where('name', 'KRS diubah oleh Akademik')
+            ->count());
+    }
+
+    public function test_multiple_admin_course_addition_rolls_back_when_one_course_exceeds_credit_limit(): void
+    {
+        $data = $this->readyPeriod();
+        $data['registration']->update(['batas_sks' => 4]);
+        $secondOffering = $this->additionalOffering($data, 'BULK-ROLLBACK', 2);
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->from(route('web-admin.krs-management.index', ['registration' => $data['registration']->id]))
+            ->post(route('web-admin.krs-management.add-many', $data['registration']), [
+                'penawaran_ids' => [$data['offering']->id, $secondOffering->id],
+                'alasan_penambahan' => 'Pengujian transaksi penambahan mata kuliah secara menyeluruh.',
+            ])
+            ->assertRedirect(route('web-admin.krs-management.index', ['registration' => $data['registration']->id]))
+            ->assertSessionHasErrors('penawaran');
+
+        $krs = Krs::where('registrasi_mahasiswa_id', $data['registration']->id)->firstOrFail();
+        $this->assertSame(0, $krs->total_sks);
+        $this->assertDatabaseCount('krs_items', 0);
+        $this->assertDatabaseMissing('academic_workflow_audits', [
+            'event' => 'krs.admin_items_added',
+            'actor_id' => $data['actor']->id,
+            'subject_id' => $krs->id,
+        ]);
+    }
+
     public function test_krs_management_rejects_unauthorized_role(): void
     {
         $data = $this->readyPeriod();
@@ -284,6 +348,92 @@ class PeriodOpeningWorkflowTest extends TestCase
             ->get(route('academic.krs-management.index', ['registration' => $data['registration']->id]))
             ->assertOk()
             ->assertSee($data['student']->mhs_name);
+    }
+
+    public function test_academic_department_can_submit_krs_on_behalf_with_audit_and_notifications(): void
+    {
+        $data = $this->readyPeriod();
+        $academic = User::create([
+            'type' => 3, 'code' => 'ACA-SUBMIT', 'name' => 'Academic Submit', 'user' => 'academic-submit', 'phone' => '081141',
+            'email' => 'academic-submit@example.test', 'password' => 'secret', 'status' => 1,
+        ]);
+        $krs = app(KrsService::class)->forRegistration($data['registration']);
+        app(AdminKrsManagementService::class)->add(
+            $krs,
+            $data['offering'],
+            $academic,
+            'Penyusunan KRS berdasarkan hasil konsultasi akademik.'
+        );
+        KalenderAkademik::query()->where('taka_id', $data['period']->id)->update([
+            'selesai_at' => now()->subMinute(),
+        ]);
+
+        $this->actingAs($academic)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('academic.krs-management.index', ['registration' => $data['registration']->id]))
+            ->assertOk()
+            ->assertSee('Ajukan atas nama mahasiswa');
+
+        $this->actingAs($academic)
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->patch(route('academic.krs-management.submit-on-behalf', $krs), [
+                'alasan_pengajuan' => 'Mahasiswa meminta bantuan pengajuan melalui bagian akademik.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(Krs::STATUS_SUBMITTED, $krs->fresh()->status);
+        $this->assertNotNull($krs->fresh()->diajukan_at);
+        $this->assertStringContainsString('Diajukan oleh administrator', $krs->fresh()->catatan_mahasiswa);
+        $this->assertDatabaseHas('academic_workflow_audits', [
+            'event' => 'krs.admin_submitted',
+            'actor_id' => $academic->id,
+            'subject_id' => $krs->id,
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'auth_id' => $academic->id,
+            'student_id' => $data['student']->id,
+            'name' => 'KRS diajukan oleh administrator',
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'auth_id' => $academic->id,
+            'lecture_id' => $data['advisor']->id,
+            'name' => 'KRS diajukan oleh administrator',
+        ]);
+    }
+
+    public function test_approval_only_administrator_cannot_submit_krs_on_behalf(): void
+    {
+        $data = $this->readyPeriod();
+        $krs = app(KrsService::class)->forRegistration($data['registration']);
+        app(AdminKrsManagementService::class)->add(
+            $krs,
+            $data['offering'],
+            $data['actor'],
+            'Persiapan KRS untuk pemeriksaan pembatasan akses.'
+        );
+        $admin = User::create([
+            'type' => 4, 'code' => 'ADM-NO-SUBMIT', 'name' => 'Admin No Submit', 'user' => 'admin-no-submit', 'phone' => '081142',
+            'email' => 'admin-no-submit@example.test', 'password' => 'secret', 'status' => 1,
+        ]);
+
+        try {
+            app(AdminKrsManagementService::class)->submit(
+                $krs,
+                $admin,
+                'Percobaan pengajuan dari role yang tidak diizinkan.'
+            );
+            $this->fail('Administrator persetujuan tidak boleh mengajukan KRS atas nama mahasiswa.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+
+        $this->assertSame(Krs::STATUS_DRAFT, $krs->fresh()->status);
+        $this->assertDatabaseMissing('academic_workflow_audits', [
+            'event' => 'krs.admin_submitted',
+            'actor_id' => $admin->id,
+            'subject_id' => $krs->id,
+        ]);
     }
 
     public function test_department_admin_can_approve_submitted_krs_with_audit_and_notifications(): void
@@ -873,6 +1023,29 @@ class PeriodOpeningWorkflowTest extends TestCase
         ]);
 
         return $krs->load('registrasiMahasiswa.taka');
+    }
+
+    private function additionalOffering(array $data, string $suffix, int $sks): PenawaranMataKuliah
+    {
+        $master = MasterMataKuliah::create([
+            'program_studi' => 'PAI',
+            'semester' => 1,
+            'name' => 'Mata Kuliah '.$suffix,
+            'sks' => $sks,
+        ]);
+        $source = $data['offering'];
+
+        return PenawaranMataKuliah::create([
+            'master_mata_kuliah_id' => $master->id,
+            'taka_id' => $source->taka_id,
+            'pstudi_id' => $source->pstudi_id,
+            'kuri_id' => $source->kuri_id,
+            'kelas_id' => $source->kelas_id,
+            'dosen_utama_id' => $source->dosen_utama_id,
+            'code' => 'OF-'.$suffix,
+            'sks' => $sks,
+            'kapasitas' => 40,
+        ]);
     }
 
     private function actor(): User

@@ -125,6 +125,20 @@ class KrsService
     public function submit(Krs $krs, ?string $note = null): Krs
     {
         $this->assertEditableAndEligible($krs);
+
+        return $this->submitValidated($krs, $note);
+    }
+
+    public function submitForAdministration(Krs $krs, ?string $note = null): Krs
+    {
+        $this->assertEditablePeriod($krs);
+        $this->eligibility->ensureEligible($krs->registrasiMahasiswa);
+
+        return $this->submitValidated($krs, $note);
+    }
+
+    private function submitValidated(Krs $krs, ?string $note = null): Krs
+    {
         if (! $krs->items()->exists()) {
             $this->reject('krs', 'KRS belum memiliki mata kuliah.');
         }

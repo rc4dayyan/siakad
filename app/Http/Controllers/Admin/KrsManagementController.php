@@ -120,6 +120,53 @@ class KrsManagementController extends Controller
         return back()->with('success', 'Mata kuliah berhasil ditambahkan ke KRS dan perubahan telah diaudit.');
     }
 
+    public function addMany(Request $request, RegistrasiMahasiswa $registration, AcademicPeriodContext $periods, KrsService $krsService, AdminKrsManagementService $management): RedirectResponse
+    {
+        $this->authorizeRole($request);
+        $period = $periods->requireWritableCurrent($request->user());
+        abort_unless($registration->taka_id === $period->id, 404);
+        $data = $request->validate([
+            'penawaran_ids' => ['required', 'array', 'min:1', 'max:50'],
+            'penawaran_ids.*' => ['required', 'integer', 'distinct', 'exists:penawaran_mata_kuliahs,id'],
+            'alasan_penambahan' => ['required', 'string', 'min:10', 'max:1000'],
+        ], [
+            'penawaran_ids.required' => 'Pilih minimal satu mata kuliah yang akan ditambahkan.',
+            'penawaran_ids.min' => 'Pilih minimal satu mata kuliah yang akan ditambahkan.',
+            'penawaran_ids.max' => 'Maksimal 50 mata kuliah dapat ditambahkan sekaligus.',
+            'penawaran_ids.*.distinct' => 'Pilihan mata kuliah tidak boleh duplikat.',
+            'penawaran_ids.*.exists' => 'Salah satu penawaran mata kuliah tidak ditemukan.',
+            'alasan_penambahan.required' => 'Alasan penambahan mata kuliah wajib diisi.',
+            'alasan_penambahan.min' => 'Alasan penambahan minimal 10 karakter.',
+            'alasan_penambahan.max' => 'Alasan penambahan maksimal 1.000 karakter.',
+        ]);
+
+        $registration->loadMissing('kelas');
+        $ids = collect($data['penawaran_ids'])->map(fn ($id) => (int) $id)->unique()->values();
+        $offerings = PenawaranMataKuliah::query()
+            ->forAcademicPeriod($period)
+            ->where('pstudi_id', $registration->kelas?->pstudi_id)
+            ->where('kelas_id', $registration->kelas_id)
+            ->whereKey($ids)
+            ->with('masterMataKuliah')
+            ->get()
+            ->keyBy('id');
+        if ($offerings->count() !== $ids->count()) {
+            throw ValidationException::withMessages([
+                'penawaran_ids' => 'Sebagian penawaran tidak sesuai dengan periode, program studi, atau kelas mahasiswa.',
+            ]);
+        }
+        $orderedOfferings = $ids->map(fn (int $id) => $offerings->get($id));
+
+        $management->addMany(
+            $krsService->forRegistration($registration),
+            $orderedOfferings,
+            $request->user(),
+            $data['alasan_penambahan']
+        );
+
+        return back()->with('success', $orderedOfferings->count().' mata kuliah berhasil ditambahkan ke KRS dan perubahan telah diaudit.');
+    }
+
     public function remove(Request $request, KrsItem $item, AcademicPeriodContext $periods, AdminKrsManagementService $management): RedirectResponse
     {
         $this->authorizeRole($request);
@@ -142,6 +189,25 @@ class KrsManagementController extends Controller
         $management->reopen($krs, $request->user(), $data['alasan']);
 
         return back()->with('success', 'KRS berhasil dibuka kembali dan mahasiswa serta dosen wali telah diberi notifikasi.');
+    }
+
+    public function submitOnBehalf(Request $request, Krs $krs, AcademicPeriodContext $periods, AdminKrsManagementService $management): RedirectResponse
+    {
+        $this->authorizeRole($request);
+        $period = $periods->requireWritableCurrent($request->user());
+        $krs->load('registrasiMahasiswa.taka');
+        abort_unless($krs->registrasiMahasiswa->taka_id === $period->id, 404);
+        $data = $request->validate([
+            'alasan_pengajuan' => ['required', 'string', 'min:10', 'max:1000'],
+        ], [
+            'alasan_pengajuan.required' => 'Alasan pengajuan atas nama mahasiswa wajib diisi.',
+            'alasan_pengajuan.min' => 'Alasan pengajuan minimal 10 karakter.',
+            'alasan_pengajuan.max' => 'Alasan pengajuan maksimal 1.000 karakter.',
+        ]);
+
+        $management->submit($krs, $request->user(), $data['alasan_pengajuan']);
+
+        return back()->with('success', 'KRS berhasil diajukan atas nama mahasiswa dan dosen wali telah diberi notifikasi.');
     }
 
     public function approve(Request $request, Krs $krs, AcademicPeriodContext $periods, AdminKrsManagementService $management): RedirectResponse

@@ -61,8 +61,18 @@
                             <form method="POST" action="{{ route($prefix.'krs-management.approve', $krs) }}" class="row g-2 mb-3">@csrf @method('PATCH')<div class="col-md-9"><textarea class="form-control" name="catatan" maxlength="2000" rows="2" placeholder="Catatan persetujuan (opsional)">{{ old('catatan') }}</textarea></div><div class="col-md-3"><button class="btn btn-success w-100" onclick="return confirm('Setujui dan kunci KRS ini?')">Setujui KRS</button></div></form>
                         @endif
 
+                        @if ($canManageKrs && $krs->isEditable())
+                            <div class="alert alert-info">Administrator dapat mengajukan KRS ini atas nama mahasiswa. Alasan, identitas administrator, dan perubahan status akan dicatat dalam audit serta diberitahukan kepada mahasiswa dan dosen wali.</div>
+                            <form method="POST" action="{{ route($prefix.'krs-management.submit-on-behalf', $krs) }}" class="row g-2 mb-3">
+                                @csrf @method('PATCH')
+                                <div class="col-md-9"><input class="form-control" name="alasan_pengajuan" value="{{ old('alasan_pengajuan') }}" minlength="10" maxlength="1000" placeholder="Alasan pengajuan atas nama mahasiswa (minimal 10 karakter)" required></div>
+                                <div class="col-md-3"><button class="btn btn-info w-100" onclick="return confirm('Ajukan KRS ini atas nama mahasiswa?')" @disabled($krs->items->isEmpty())>Ajukan atas nama mahasiswa</button></div>
+                                @if ($krs->items->isEmpty())<div class="col-12"><small class="text-muted">Tambahkan minimal satu mata kuliah sebelum mengajukan KRS.</small></div>@endif
+                            </form>
+                        @endif
+
                         @if ($canManageKrs && ! $krs->isEditable())
-                            <div class="alert alert-warning">KRS telah diajukan atau disetujui. Buka kembali sebelum mengubah isinya; mahasiswa harus mengajukan ulang kepada dosen wali.</div>
+                            <div class="alert alert-warning">KRS telah diajukan atau disetujui. Buka kembali sebelum mengubah isinya; setelah diperbaiki, mahasiswa atau administrator dapat mengajukannya ulang kepada dosen wali.</div>
                             <form method="POST" action="{{ route($prefix.'krs-management.reopen', $krs) }}" class="row g-2 mb-3">@csrf @method('PATCH')<div class="col-md-9"><input class="form-control" name="alasan" minlength="10" maxlength="1000" placeholder="Alasan membuka kembali KRS (minimal 10 karakter)" required></div><div class="col-md-3"><button class="btn btn-warning w-100" onclick="return confirm('Buka kembali KRS ini?')">Buka kembali</button></div></form>
                         @endif
 
@@ -74,11 +84,37 @@
                         </tbody><tfoot><tr><th>Total</th><th>{{ $krs->total_sks }} SKS</th><th>Batas {{ $selected->batas_sks }} SKS</th></tr></tfoot></table></div>
 
                         @if ($canManageKrs && $krs->isEditable())
+                            @php
+                                $selectedOfferingIds = collect(old('penawaran_ids', []))->map(fn ($id) => (int) $id)->all();
+                                $existingOfferingIds = $krs->items->pluck('penawaran_mata_kuliah_id');
+                                $selectableOfferingCount = $offerings->whereNotIn('id', $existingOfferingIds)->count();
+                            @endphp
                             <hr><h6>Tambahkan mata kuliah</h6>
-                            <form method="POST" action="{{ route($prefix.'krs-management.add', $selected) }}" class="row g-2">@csrf
-                                <div class="col-md-6"><select class="form-select" name="penawaran_mata_kuliah_id" required><option value="">Pilih penawaran</option>@foreach ($offerings as $offering)<option value="{{ $offering->id }}">{{ $offering->masterMataKuliah->name }} · {{ $offering->sks }} SKS · {{ $offering->dosenUtama?->dsn_name }}</option>@endforeach</select></div>
-                                <div class="col-md-4"><input class="form-control" name="alasan" minlength="10" maxlength="1000" placeholder="Alasan penambahan" required></div>
-                                <div class="col-md-2"><button class="btn btn-primary w-100">Tambahkan</button></div>
+                            <form method="POST" action="{{ route($prefix.'krs-management.add-many', $selected) }}" id="krs-add-many-form">@csrf
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-sm table-striped align-middle">
+                                        <thead><tr><th style="width: 42px"><input type="checkbox" class="form-check-input" id="select-all-krs-offerings" aria-label="Pilih semua penawaran mata kuliah" @disabled($selectableOfferingCount === 0)></th><th>Mata kuliah</th><th>Dosen</th><th>SKS</th><th>Kapasitas</th><th>Status</th></tr></thead>
+                                        <tbody>
+                                            @forelse ($offerings as $offering)
+                                                @php $alreadyAdded = $existingOfferingIds->contains($offering->id); @endphp
+                                                <tr>
+                                                    <td><input type="checkbox" class="form-check-input krs-offering-item" name="penawaran_ids[]" value="{{ $offering->id }}" aria-label="Pilih {{ $offering->masterMataKuliah->name }}" @checked(in_array($offering->id, $selectedOfferingIds, true) && ! $alreadyAdded) @disabled($alreadyAdded)></td>
+                                                    <td>{{ $offering->masterMataKuliah->name }}@if($offering->prasyaratMaster)<br><small class="text-muted">Prasyarat: {{ $offering->prasyaratMaster->name }}</small>@endif</td>
+                                                    <td>{{ $offering->dosenUtama?->dsn_name ?? '-' }}</td>
+                                                    <td>{{ $offering->sks }}</td>
+                                                    <td>{{ $offering->krsItems()->count() }} / {{ $offering->kapasitas }}</td>
+                                                    <td>@if($alreadyAdded)<span class="badge bg-success">Sudah ditambahkan</span>@else<span class="badge bg-secondary">Tersedia</span>@endif</td>
+                                                </tr>
+                                            @empty
+                                                <tr><td colspan="6" class="text-center text-muted">Belum ada penawaran untuk kelas mahasiswa ini.</td></tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-md-9"><input class="form-control" name="alasan_penambahan" value="{{ old('alasan_penambahan') }}" minlength="10" maxlength="1000" placeholder="Alasan penambahan mata kuliah (minimal 10 karakter)" required></div>
+                                    <div class="col-md-3"><button class="btn btn-primary w-100" id="krs-add-many-submit" disabled onclick="return confirm('Tambahkan seluruh mata kuliah yang dipilih?')">Tambahkan (<span id="krs-offering-selected-count">0</span>)</button></div>
+                                </div>
                             </form>
                         @endif
                     </div>
@@ -136,6 +172,28 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const offeringSelectAll = document.getElementById('select-all-krs-offerings');
+            const offeringSubmit = document.getElementById('krs-add-many-submit');
+            const offeringSelectedCount = document.getElementById('krs-offering-selected-count');
+            const offeringItems = Array.from(document.querySelectorAll('.krs-offering-item:not(:disabled)'));
+
+            const syncOfferingSelection = () => {
+                const checked = offeringItems.filter((checkbox) => checkbox.checked);
+                if (offeringSelectAll) {
+                    offeringSelectAll.checked = offeringItems.length > 0 && checked.length === offeringItems.length;
+                    offeringSelectAll.indeterminate = checked.length > 0 && checked.length < offeringItems.length;
+                }
+                if (offeringSelectedCount) offeringSelectedCount.textContent = checked.length;
+                if (offeringSubmit) offeringSubmit.disabled = checked.length === 0;
+            };
+
+            offeringSelectAll?.addEventListener('change', () => {
+                offeringItems.forEach((checkbox) => { checkbox.checked = offeringSelectAll.checked; });
+                syncOfferingSelection();
+            });
+            offeringItems.forEach((checkbox) => checkbox.addEventListener('change', syncOfferingSelection));
+            syncOfferingSelection();
+
             const form = document.getElementById('krs-bulk-form');
             const selectAll = document.getElementById('select-all-krs');
             const action = document.getElementById('krs-bulk-action');

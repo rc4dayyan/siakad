@@ -55,7 +55,9 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::post('/academic/krs-management/import/execute', [App\Http\Controllers\Admin\KrsManagementController::class, 'importExecute'])->name('krs-management.import-execute');
         Route::patch('/academic/krs-management/bulk', [App\Http\Controllers\Admin\KrsManagementController::class, 'bulk'])->name('krs-management.bulk');
         Route::post('/academic/krs-management/{registration}/items', [App\Http\Controllers\Admin\KrsManagementController::class, 'add'])->name('krs-management.add');
+        Route::post('/academic/krs-management/{registration}/items/bulk', [App\Http\Controllers\Admin\KrsManagementController::class, 'addMany'])->name('krs-management.add-many');
         Route::delete('/academic/krs-management/items/{item}', [App\Http\Controllers\Admin\KrsManagementController::class, 'remove'])->name('krs-management.remove');
+        Route::patch('/academic/krs-management/{krs}/submit-on-behalf', [App\Http\Controllers\Admin\KrsManagementController::class, 'submitOnBehalf'])->name('krs-management.submit-on-behalf');
         Route::patch('/academic/krs-management/{krs}/reopen', [App\Http\Controllers\Admin\KrsManagementController::class, 'reopen'])->name('krs-management.reopen');
         Route::patch('/academic/krs-management/{krs}/approve', [App\Http\Controllers\Admin\KrsManagementController::class, 'approve'])->name('krs-management.approve');
 

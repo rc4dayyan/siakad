@@ -29,7 +29,9 @@ Route::group(['prefix' => 'academic', 'middleware' => ['user-access:Departement 
         Route::post('/krs-management/import/execute', [App\Http\Controllers\Admin\KrsManagementController::class, 'importExecute'])->name('krs-management.import-execute');
         Route::patch('/krs-management/bulk', [App\Http\Controllers\Admin\KrsManagementController::class, 'bulk'])->name('krs-management.bulk');
         Route::post('/krs-management/{registration}/items', [App\Http\Controllers\Admin\KrsManagementController::class, 'add'])->name('krs-management.add');
+        Route::post('/krs-management/{registration}/items/bulk', [App\Http\Controllers\Admin\KrsManagementController::class, 'addMany'])->name('krs-management.add-many');
         Route::delete('/krs-management/items/{item}', [App\Http\Controllers\Admin\KrsManagementController::class, 'remove'])->name('krs-management.remove');
+        Route::patch('/krs-management/{krs}/submit-on-behalf', [App\Http\Controllers\Admin\KrsManagementController::class, 'submitOnBehalf'])->name('krs-management.submit-on-behalf');
         Route::patch('/krs-management/{krs}/reopen', [App\Http\Controllers\Admin\KrsManagementController::class, 'reopen'])->name('krs-management.reopen');
 
         // MENU KHUSUS DATA MASTER => DATA KELAS
