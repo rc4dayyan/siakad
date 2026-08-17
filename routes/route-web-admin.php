@@ -141,6 +141,8 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::get('/master/jadwal-mingguan', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'index'])->name('master.jadwal-mingguan-index');
         Route::get('/master/jadwal-mingguan/cetak', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'printTimetable'])->name('master.jadwal-mingguan-print');
         Route::get('/master/jadwal-mingguan/rekap-presensi', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'recap'])->name('master.jadwal-mingguan-recap');
+        Route::get('/master/jadwal-mingguan/export', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'export'])->name('master.jadwal-mingguan-export');
+        Route::post('/master/jadwal-mingguan/import', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'import'])->name('master.jadwal-mingguan-import');
         Route::post('/master/jadwal-mingguan', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'store'])->name('master.jadwal-mingguan-store');
         Route::post('/master/jadwal-mingguan/kalender-libur', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'storeHoliday'])->name('master.jadwal-mingguan-holiday-store');
         Route::patch('/master/jadwal-mingguan/{jadwal}', [App\Http\Controllers\Admin\JadwalMingguanController::class, 'update'])->name('master.jadwal-mingguan-update');

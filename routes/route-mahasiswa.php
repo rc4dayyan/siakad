@@ -48,6 +48,7 @@ Route::group(['prefix' => 'mahasiswa', 'middleware' => ['mhs-access:Mahasiswa Ak
 
     // PRIVATE FUNCTION => KARTU RENCANA STUDI
     Route::get('/krs', [App\Http\Controllers\Mahasiswa\KrsController::class, 'index'])->name('akademik.krs-index');
+    Route::post('/krs/penawaran', [App\Http\Controllers\Mahasiswa\KrsController::class, 'addMany'])->name('akademik.krs-add-many');
     Route::post('/krs/penawaran/{penawaran}', [App\Http\Controllers\Mahasiswa\KrsController::class, 'add'])->name('akademik.krs-add');
     Route::delete('/krs/item/{item}', [App\Http\Controllers\Mahasiswa\KrsController::class, 'remove'])->name('akademik.krs-remove');
     Route::post('/krs/submit', [App\Http\Controllers\Mahasiswa\KrsController::class, 'submit'])->name('akademik.krs-submit');

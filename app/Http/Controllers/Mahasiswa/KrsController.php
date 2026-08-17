@@ -43,6 +43,30 @@ class KrsController extends Controller
         return back()->with('success', 'Mata kuliah berhasil ditambahkan ke draft KRS.');
     }
 
+    public function addMany(Request $request, StudentAcademicContext $context, KrsService $service): RedirectResponse
+    {
+        $data = $request->validate([
+            'penawaran_ids' => ['required', 'array', 'min:1'],
+            'penawaran_ids.*' => ['required', 'integer', 'distinct', 'exists:penawaran_mata_kuliahs,id'],
+        ], [
+            'penawaran_ids.required' => 'Pilih minimal satu mata kuliah yang akan ditambahkan.',
+            'penawaran_ids.min' => 'Pilih minimal satu mata kuliah yang akan ditambahkan.',
+            'penawaran_ids.*.distinct' => 'Pilihan mata kuliah tidak boleh duplikat.',
+            'penawaran_ids.*.exists' => 'Salah satu penawaran mata kuliah tidak ditemukan.',
+        ]);
+
+        $offerings = PenawaranMataKuliah::query()
+            ->whereKey($data['penawaran_ids'])
+            ->get()
+            ->keyBy('id');
+        $orderedOfferings = collect($data['penawaran_ids'])
+            ->map(fn (int|string $id) => $offerings->get((int) $id));
+
+        $service->addMany($this->currentKrs($context, $service), $orderedOfferings);
+
+        return back()->with('success', $orderedOfferings->count().' mata kuliah berhasil ditambahkan ke draft KRS.');
+    }
+
     public function remove(int $item, StudentAcademicContext $context, KrsService $service): RedirectResponse
     {
         $service->remove($this->currentKrs($context, $service), $item);

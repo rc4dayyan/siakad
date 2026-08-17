@@ -61,7 +61,7 @@ class KrsManagementController extends Controller
             ->when($status !== '' && $status !== 'none', fn ($query) => $query
                 ->whereHas('krs', fn ($krs) => $krs->where('status', $status)))
             ->orderBy('id')
-            ->paginate(25)
+            ->paginate(25, ['*'], 'students_page')
             ->withQueryString();
 
         $selected = null;

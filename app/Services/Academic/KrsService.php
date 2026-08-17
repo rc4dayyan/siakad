@@ -41,6 +41,23 @@ class KrsService
         return $this->addValidated($krs, $offering);
     }
 
+    public function addMany(Krs $krs, iterable $offerings): Krs
+    {
+        $offerings = collect($offerings);
+
+        if ($offerings->isEmpty()) {
+            $this->reject('penawaran_ids', 'Pilih minimal satu mata kuliah yang akan ditambahkan.');
+        }
+
+        return DB::transaction(function () use ($krs, $offerings): Krs {
+            foreach ($offerings as $offering) {
+                $this->add($krs, $offering);
+            }
+
+            return $krs->fresh('items.penawaranMataKuliah.masterMataKuliah');
+        });
+    }
+
     public function addForAdministration(Krs $krs, PenawaranMataKuliah $offering): Krs
     {
         $this->assertEditablePeriod($krs);

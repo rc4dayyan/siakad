@@ -14,7 +14,91 @@
 @if($krs->status === 'rejected')<div class="alert alert-warning">Catatan dosen wali: {{ $krs->catatan_keputusan }}</div>@endif
 @if($krs->isEditable())<form method="POST" action="{{ route('mahasiswa.akademik.krs-submit') }}">@csrf<textarea name="catatan_mahasiswa" class="form-control mb-2" placeholder="Catatan untuk dosen wali (opsional)">{{ old('catatan_mahasiswa') }}</textarea><button class="btn btn-primary" onclick="return confirm('Ajukan KRS kepada dosen wali?')">Ajukan KRS</button></form>@endif
 </div></div>
-<div class="card"><div class="card-header"><h5>Penawaran untuk kelas {{ $registration->kelas?->name }}</h5></div><div class="card-body table-responsive"><table class="table table-striped"><thead><tr><th>Mata kuliah</th><th>Dosen</th><th>Prasyarat</th><th>SKS</th><th>Kapasitas</th><th></th></tr></thead><tbody>@forelse($offerings as $item)<tr><td>{{ $item->masterMataKuliah->name }}</td><td>{{ $item->dosenUtama->dsn_name }}</td><td>{{ $item->prasyaratMaster?->name ?? '-' }}</td><td>{{ $item->sks }}</td><td>{{ $item->krsItems()->count() }} / {{ $item->kapasitas }}</td><td>@if($krs->isEditable() && !$krs->items->contains('penawaran_mata_kuliah_id', $item->id))<form method="POST" action="{{ route('mahasiswa.akademik.krs-add', $item) }}">@csrf<button class="btn btn-sm btn-outline-primary">Tambah</button></form>@endif</td></tr>@empty<tr><td colspan="6" class="text-center">Belum ada penawaran untuk kelas ini.</td></tr>@endforelse</tbody></table></div></div>
+@php
+    $selectedOfferingIds = collect(old('penawaran_ids', []))->map(fn ($id) => (int) $id)->all();
+    $selectableOfferings = $offerings->reject(fn ($item) => $krs->items->contains('penawaran_mata_kuliah_id', $item->id));
+@endphp
+<form method="POST" action="{{ route('mahasiswa.akademik.krs-add-many') }}" id="krs-add-many-form">
+    @csrf
+    <div class="card">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <h5 class="mb-0">Penawaran untuk kelas {{ $registration->kelas?->name }}</h5>
+            @if($krs->isEditable())
+                <button type="submit" class="btn btn-primary" id="krs-add-selected" disabled>
+                    Tambah yang dipilih (<span id="krs-selected-count">0</span>)
+                </button>
+            @endif
+        </div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th style="width: 42px">
+                            <input type="checkbox" class="form-check-input" id="krs-select-all"
+                                aria-label="Pilih semua penawaran"
+                                @disabled(! $krs->isEditable() || $selectableOfferings->isEmpty())>
+                        </th>
+                        <th>Mata kuliah</th><th>Dosen</th><th>Prasyarat</th><th>SKS</th><th>Kapasitas</th><th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($offerings as $item)
+                        @php $alreadyAdded = $krs->items->contains('penawaran_mata_kuliah_id', $item->id); @endphp
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input krs-offering-checkbox"
+                                    name="penawaran_ids[]" value="{{ $item->id }}"
+                                    aria-label="Pilih {{ $item->masterMataKuliah->name }}"
+                                    @checked(in_array($item->id, $selectedOfferingIds, true) && ! $alreadyAdded)
+                                    @disabled(! $krs->isEditable() || $alreadyAdded)>
+                            </td>
+                            <td>{{ $item->masterMataKuliah->name }}</td>
+                            <td>{{ $item->dosenUtama->dsn_name }}</td>
+                            <td>{{ $item->prasyaratMaster?->name ?? '-' }}</td>
+                            <td>{{ $item->sks }}</td>
+                            <td>{{ $item->krsItems()->count() }} / {{ $item->kapasitas }}</td>
+                            <td>
+                                @if($alreadyAdded)
+                                    <span class="badge bg-success">Sudah ditambahkan</span>
+                                @else
+                                    <span class="badge bg-secondary">Belum dipilih</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="7" class="text-center">Belum ada penawaran untuk kelas ini.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const selectAll = document.getElementById('krs-select-all');
+    const checkboxes = Array.from(document.querySelectorAll('.krs-offering-checkbox:not(:disabled)'));
+    const submitButton = document.getElementById('krs-add-selected');
+    const selectedCount = document.getElementById('krs-selected-count');
+
+    const updateSelection = () => {
+        const count = checkboxes.filter((checkbox) => checkbox.checked).length;
+        if (selectedCount) selectedCount.textContent = count;
+        if (submitButton) submitButton.disabled = count === 0;
+        if (selectAll) {
+            selectAll.checked = checkboxes.length > 0 && count === checkboxes.length;
+            selectAll.indeterminate = count > 0 && count < checkboxes.length;
+        }
+    };
+
+    selectAll?.addEventListener('change', () => {
+        checkboxes.forEach((checkbox) => { checkbox.checked = selectAll.checked; });
+        updateSelection();
+    });
+    checkboxes.forEach((checkbox) => checkbox.addEventListener('change', updateSelection));
+    updateSelection();
+});
+</script>
 @endif
 </section>
 @endsection

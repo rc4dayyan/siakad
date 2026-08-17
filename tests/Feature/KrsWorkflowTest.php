@@ -54,6 +54,7 @@ class KrsWorkflowTest extends TestCase
             '2026_07_17_000003_extend_tahun_akademiks_for_period_lifecycle.php',
             '2026_07_17_000004_link_grades_and_study_results_to_academic_periods.php',
             '2026_07_17_000005_create_registrasi_mahasiswas_table.php',
+            '2026_07_17_000011_create_period_opening_workflow_and_audit.php',
         ] as $migration) {
             if ($migration === '2026_07_17_000004_link_grades_and_study_results_to_academic_periods.php') {
                 // Migration tersebut juga mengubah hasil_studis; bagian ini tidak dibutuhkan untuk workflow KRS.
@@ -122,6 +123,69 @@ class KrsWorkflowTest extends TestCase
 
         $this->expectException(LogicException::class);
         KrsItem::create(['krs_id' => $approved->id, 'penawaran_mata_kuliah_id' => $offering->id, 'sks' => 3]);
+    }
+
+    public function test_student_can_add_multiple_course_offerings_in_one_request(): void
+    {
+        $data = $this->academicData();
+        DB::table('tahun_akademiks')->where('id', $data['periodId'])->update([
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+        $firstOffering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $secondMaster = MasterMataKuliah::create([
+            'program_studi' => 'PAI', 'semester' => 1, 'name' => 'Bahasa Arab Dasar', 'sks' => 2,
+        ]);
+        $secondOffering = PenawaranMataKuliah::create([
+            ...$this->offeringAttributes($data),
+            'master_mata_kuliah_id' => $secondMaster->id,
+            'sks' => 2,
+        ]);
+
+        $this->actingAs($data['student'], 'mahasiswa')
+            ->post(route('mahasiswa.akademik.krs-add-many'), [
+                'penawaran_ids' => [$firstOffering->id, $secondOffering->id],
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', '2 mata kuliah berhasil ditambahkan ke draft KRS.');
+
+        $krs = Krs::where('registrasi_mahasiswa_id', $data['registration']->id)->firstOrFail();
+        $this->assertSame(5, $krs->total_sks);
+        $this->assertEqualsCanonicalizing(
+            [$firstOffering->id, $secondOffering->id],
+            $krs->items()->pluck('penawaran_mata_kuliah_id')->all()
+        );
+    }
+
+    public function test_multiple_course_offering_addition_is_rolled_back_when_one_selection_is_invalid(): void
+    {
+        $data = $this->academicData();
+        DB::table('tahun_akademiks')->where('id', $data['periodId'])->update([
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+        $data['registration']->update(['batas_sks' => 4]);
+        $firstOffering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $secondMaster = MasterMataKuliah::create([
+            'program_studi' => 'PAI', 'semester' => 1, 'name' => 'Bahasa Arab Dasar', 'sks' => 2,
+        ]);
+        $secondOffering = PenawaranMataKuliah::create([
+            ...$this->offeringAttributes($data),
+            'master_mata_kuliah_id' => $secondMaster->id,
+            'sks' => 2,
+        ]);
+
+        $this->actingAs($data['student'], 'mahasiswa')
+            ->from(route('mahasiswa.akademik.krs-index'))
+            ->post(route('mahasiswa.akademik.krs-add-many'), [
+                'penawaran_ids' => [$firstOffering->id, $secondOffering->id],
+            ])
+            ->assertRedirect(route('mahasiswa.akademik.krs-index'))
+            ->assertSessionHasErrors('penawaran');
+
+        $krs = Krs::where('registrasi_mahasiswa_id', $data['registration']->id)->firstOrFail();
+        $this->assertSame(0, $krs->fresh()->total_sks);
+        $this->assertDatabaseCount('krs_items', 0);
     }
 
     public function test_krs_rejects_closed_window_and_credit_limit(): void

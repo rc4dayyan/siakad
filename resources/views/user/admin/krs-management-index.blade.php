@@ -95,38 +95,89 @@
                         <div class="col-12"><button class="btn btn-outline-primary w-100">Terapkan pencarian dan filter</button></div>
                     </form>
 
+                    @php
+                        $selectedKrsIds = collect(old('krs_ids', []))
+                            ->map(fn ($id) => (int) $id)
+                            ->all();
+                    @endphp
                     <form method="POST" action="{{ route($prefix.'krs-management.bulk') }}" id="krs-bulk-form">
                         @csrf @method('PATCH')
-                        <div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th><input type="checkbox" id="select-all-krs" aria-label="Pilih semua KRS pada halaman"></th><th>Mahasiswa</th><th>Kelas</th><th>Status KRS</th><th></th></tr></thead><tbody>
+                        <div class="table-responsive"><table class="table table-sm table-striped"><thead><tr><th><input type="checkbox" id="select-all-krs" aria-label="Pilih semua KRS yang sesuai dengan aksi pada halaman ini"></th><th>Mahasiswa</th><th>Kelas</th><th>Status KRS</th><th></th></tr></thead><tbody>
                             @forelse ($registrations as $registration)
                                 @php
                                     $rowKrs = $registration->krs;
                                     $canSelectForApproval = $canApproveKrs && $rowKrs?->status === \App\Models\Krs::STATUS_SUBMITTED;
                                     $canSelectForReopen = $canManageKrs && $rowKrs && ! $rowKrs->isEditable();
                                 @endphp
-                                <tr><td>@if ($canSelectForApproval || $canSelectForReopen)<input class="krs-bulk-item" type="checkbox" name="krs_ids[]" value="{{ $rowKrs->id }}" aria-label="Pilih KRS {{ $registration->mahasiswa?->mhs_name }}">@else<span class="text-muted">—</span>@endif</td><td>{{ $registration->mahasiswa?->mhs_name }}<br><small>{{ $registration->mahasiswa?->mhs_nim }}</small></td><td>{{ $registration->kelas?->name ?? '-' }}</td><td><span class="badge bg-secondary">{{ strtoupper($rowKrs?->status ?? 'belum dibuat') }}</span></td><td><a class="btn btn-sm btn-outline-primary" href="{{ route($prefix.'krs-management.index', ['registration' => $registration->id, 'q' => $search, 'status' => $status]) }}">{{ $canManageKrs ? 'Kelola' : 'Tinjau' }}</a></td></tr>
+                                <tr><td><input class="krs-bulk-item" type="checkbox" name="krs_ids[]" value="{{ $rowKrs?->id ?? '' }}" data-can-approve="{{ $canSelectForApproval ? '1' : '0' }}" data-can-reopen="{{ $canSelectForReopen ? '1' : '0' }}" @checked($rowKrs && in_array((int) $rowKrs->id, $selectedKrsIds, true)) @disabled(! $canSelectForApproval && ! $canSelectForReopen) title="{{ $rowKrs ? ((! $canSelectForApproval && ! $canSelectForReopen) ? 'Status KRS ini belum mendukung aksi massal.' : 'Pilih KRS untuk aksi massal.') : 'Mahasiswa belum memiliki KRS.' }}" aria-label="Pilih KRS {{ $registration->mahasiswa?->mhs_name }}"></td><td>{{ $registration->mahasiswa?->mhs_name }}<br><small>{{ $registration->mahasiswa?->mhs_nim }}</small></td><td>{{ $registration->kelas?->name ?? '-' }}</td><td><span class="badge bg-secondary">{{ strtoupper($rowKrs?->status ?? 'belum dibuat') }}</span></td><td><a class="btn btn-sm btn-outline-primary" href="{{ route($prefix.'krs-management.index', ['registration' => $registration->id, 'q' => $search, 'status' => $status, 'students_page' => $registrations->currentPage()]) }}">{{ $canManageKrs ? 'Kelola' : 'Tinjau' }}</a></td></tr>
                             @empty<tr><td colspan="5" class="text-center text-muted">Registrasi mahasiswa tidak ditemukan.</td></tr>@endforelse
                         </tbody></table></div>
 
                         <div class="border rounded p-3 mb-3">
                             <h6>Aksi massal</h6>
                             <div class="row g-2">
-                                <div class="col-md-4"><select class="form-select" name="action" required><option value="">Pilih aksi</option>@if ($canApproveKrs)<option value="approve">Setujui dan kunci</option>@endif @if ($canManageKrs)<option value="reopen">Buka kembali</option>@endif</select></div>
-                                <div class="col-md-5"><input class="form-control" name="catatan" maxlength="2000" placeholder="Catatan; wajib min. 10 karakter untuk buka kembali"></div>
-                                <div class="col-md-3"><button class="btn btn-primary w-100" onclick="return confirm('Jalankan aksi pada seluruh KRS yang dipilih?')">Jalankan</button></div>
+                                <div class="col-md-4"><select class="form-select" name="action" id="krs-bulk-action" required><option value="">Pilih aksi</option>@if ($canApproveKrs)<option value="approve" @selected(old('action') === 'approve')>Setujui dan kunci</option>@endif @if ($canManageKrs)<option value="reopen" @selected(old('action') === 'reopen')>Buka kembali</option>@endif</select></div>
+                                <div class="col-md-5"><input class="form-control" name="catatan" value="{{ old('catatan') }}" maxlength="2000" placeholder="Catatan; wajib min. 10 karakter untuk buka kembali"></div>
+                                <div class="col-md-3"><button class="btn btn-primary w-100" id="krs-bulk-submit" disabled onclick="return confirm('Jalankan aksi pada seluruh KRS yang dipilih?')">Jalankan (<span id="krs-selected-count">0</span>)</button></div>
                             </div>
-                            <small class="text-muted">Aksi dibatalkan seluruhnya jika salah satu KRS tidak memenuhi syarat.</small>
+                            <small class="text-muted">Checklist KRS yang memenuhi syarat dapat dipilih sebelum atau sesudah menentukan aksi. Checklist abu-abu berarti mahasiswa belum memiliki KRS atau statusnya belum mendukung aksi massal.</small>
                         </div>
                     </form>
-                    {{ $registrations->links() }}
+                    @if ($registrations->hasPages())
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <small class="text-muted">Menampilkan {{ $registrations->firstItem() }}–{{ $registrations->lastItem() }} dari {{ $registrations->total() }} mahasiswa</small>
+                            {{ $registrations->onEachSide(1)->links('pagination::bootstrap-5') }}
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        document.getElementById('select-all-krs')?.addEventListener('change', function () {
-            document.querySelectorAll('.krs-bulk-item').forEach((checkbox) => checkbox.checked = this.checked);
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('krs-bulk-form');
+            const selectAll = document.getElementById('select-all-krs');
+            const action = document.getElementById('krs-bulk-action');
+            const submit = document.getElementById('krs-bulk-submit');
+            const selectedCount = document.getElementById('krs-selected-count');
+            const items = Array.from(document.querySelectorAll('.krs-bulk-item'));
+
+            if (!form || !selectAll || !action || !submit || !selectedCount) return;
+
+            const isCompatible = (checkbox) => {
+                if (action.value === 'approve') return checkbox.dataset.canApprove === '1';
+                if (action.value === 'reopen') return checkbox.dataset.canReopen === '1';
+                return checkbox.dataset.canApprove === '1' || checkbox.dataset.canReopen === '1';
+            };
+
+            const syncState = () => {
+                const enabled = items.filter((checkbox) => !checkbox.disabled);
+                const checked = enabled.filter((checkbox) => checkbox.checked);
+                selectAll.disabled = enabled.length === 0;
+                selectAll.checked = enabled.length > 0 && checked.length === enabled.length;
+                selectAll.indeterminate = checked.length > 0 && checked.length < enabled.length;
+                selectedCount.textContent = checked.length;
+                submit.disabled = action.value === '' || checked.length === 0;
+            };
+
+            const syncCompatibility = () => {
+                items.forEach((checkbox) => {
+                    checkbox.disabled = !isCompatible(checkbox);
+                    if (checkbox.disabled) checkbox.checked = false;
+                });
+                syncState();
+            };
+
+            action.addEventListener('change', syncCompatibility);
+            selectAll.addEventListener('change', () => {
+                items.filter((checkbox) => !checkbox.disabled).forEach((checkbox) => {
+                    checkbox.checked = selectAll.checked;
+                });
+                syncState();
+            });
+            items.forEach((checkbox) => checkbox.addEventListener('change', syncState));
+            syncCompatibility();
         });
     </script>
 @endsection

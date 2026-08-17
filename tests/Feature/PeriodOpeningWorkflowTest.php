@@ -431,6 +431,52 @@ class PeriodOpeningWorkflowTest extends TestCase
             ->where('event', 'krs.admin_reopened')->where('actor_id', $data['actor']->id)->count());
     }
 
+    public function test_krs_management_checklists_follow_the_action_and_student_pagination_is_isolated(): void
+    {
+        $data = $this->readyPeriod();
+        $submitted = null;
+
+        for ($index = 1; $index <= 25; $index++) {
+            $submitted = $this->additionalKrs($data, 'PAGE-'.$index, Krs::STATUS_SUBMITTED);
+        }
+
+        $response = $this->actingAs($data['actor'])
+            ->withSession([
+                AcademicPeriodContext::SESSION_KEY => $data['period']->id,
+                '_old_input' => [
+                    'action' => 'approve',
+                    'krs_ids' => [$submitted->id],
+                    'catatan' => 'Catatan pilihan lama.',
+                ],
+            ])
+            ->get(route('web-admin.krs-management.index', ['students_page' => 2]));
+
+        $registration = $submitted->registrasiMahasiswa;
+        $response->assertOk()
+            ->assertSee($registration->mahasiswa->mhs_name)
+            ->assertSee('Menampilkan 26–26 dari 26 mahasiswa')
+            ->assertSee('data-can-approve="1"', false)
+            ->assertSee('data-can-reopen="1"', false)
+            ->assertSee('id="krs-bulk-action"', false)
+            ->assertSee('option value="approve" selected', false)
+            ->assertSee('value="'.$submitted->id.'"', false)
+            ->assertSee('students_page=1', false)
+            ->assertSee(route('web-admin.krs-management.index', [
+                'registration' => $registration->id,
+                'q' => '',
+                'status' => '',
+                'students_page' => 2,
+            ]));
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('web-admin.krs-management.index'))
+            ->assertOk()
+            ->assertSee('data-can-approve="1" data-can-reopen="1"', false)
+            ->assertSee('Mahasiswa belum memiliki KRS.', false)
+            ->assertSee("return checkbox.dataset.canApprove === '1' || checkbox.dataset.canReopen === '1';", false);
+    }
+
     public function test_department_admin_can_preview_and_execute_krs_excel_import(): void
     {
         $data = $this->readyPeriod();
@@ -654,6 +700,89 @@ class PeriodOpeningWorkflowTest extends TestCase
             'taka_id' => $data['period']->id,
         ]);
         $this->assertDatabaseCount('penawaran_mata_kuliahs', 1);
+    }
+
+    public function test_weekly_schedules_can_be_exported_and_imported_for_the_selected_period(): void
+    {
+        $data = $this->readyPeriod();
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('web-admin.master.jadwal-mingguan-index'))
+            ->assertOk()
+            ->assertSee('Import Jadwal')
+            ->assertSee('Export');
+
+        $response = $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('web-admin.master.jadwal-mingguan-export'));
+
+        $response->assertOk();
+        $this->assertStringContainsString(
+            'jadwal-mingguan-'.$data['period']->code,
+            (string) $response->headers->get('content-disposition')
+        );
+        $content = $response->streamedContent();
+        $this->assertNotEmpty($content);
+
+        JadwalMingguan::query()->delete();
+        $file = UploadedFile::fake()->createWithContent('jadwal-mingguan.xlsx', $content);
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('web-admin.master.jadwal-mingguan-import'), [
+                '_form' => 'import-weekly-schedules',
+                'import' => $file,
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Import selesai: 1 jadwal dibuat dan 0 duplikat dilewati.');
+
+        $this->assertDatabaseHas('jadwal_mingguans', [
+            'code' => 'SCH-READY',
+            'penawaran_mata_kuliah_id' => $data['offering']->id,
+            'kelas_id' => $data['classId'],
+            'dosen_id' => $data['advisor']->id,
+            'hari' => 1,
+            'mulai' => '08:00',
+            'selesai' => '09:40',
+        ]);
+    }
+
+    public function test_weekly_schedule_import_rolls_back_all_rows_when_a_schedule_conflicts(): void
+    {
+        $data = $this->readyPeriod();
+        JadwalMingguan::query()->delete();
+        $class = DB::table('kelas')->find($data['classId']);
+        $courseName = $data['offering']->masterMataKuliah->name;
+        $headers = [
+            'Kode Jadwal', 'Kode Periode', 'Kode Penawaran', 'Nama Mata Kuliah',
+            'Kode Kelas', 'Nama Kelas', 'NIDN Dosen', 'Nama Dosen', 'Kode Ruang',
+            'Nama Ruang', 'Hari', 'Jam Mulai', 'Jam Selesai', 'Alasan Pengecualian',
+        ];
+        $first = [
+            'SCH-IMPORT-1', $data['period']->code, $data['offering']->code, $courseName,
+            $class->code, $class->name, $data['advisor']->dsn_nidn, $data['advisor']->dsn_name,
+            'R01', 'Ruang', 'Senin', '08:00', '09:40', '',
+        ];
+        $second = [
+            'SCH-IMPORT-2', $data['period']->code, $data['offering']->code, $courseName,
+            $class->code, $class->name, $data['advisor']->dsn_nidn, $data['advisor']->dsn_name,
+            'R01', 'Ruang', 'Senin', '09:00', '10:30', '',
+        ];
+        $file = UploadedFile::fake()->createWithContent(
+            'jadwal-mingguan.csv',
+            implode(',', $headers)."\n".implode(',', $first)."\n".implode(',', $second)
+        );
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('web-admin.master.jadwal-mingguan-import'), [
+                '_form' => 'import-weekly-schedules',
+                'import' => $file,
+            ])
+            ->assertSessionHasErrors(['dosen_id', 'kelas_id', 'ruang_id']);
+
+        $this->assertDatabaseCount('jadwal_mingguans', 0);
     }
 
     private function readyPeriod(): array
