@@ -7,30 +7,74 @@ use App\Helper\roleTrait;
 use App\Http\Controllers\Controller;
 use App\Models\Dosen;
 use App\Models\Kelas;
+use App\Models\Krs;
 use App\Models\Kurikulum;
-use App\Models\Mahasiswa;
 use App\Models\MasterMataKuliah;
 use App\Models\MataKuliah;
-use App\Models\NilaiMahasiswa;
+use App\Models\PenawaranMataKuliah;
 use App\Models\ProgramStudi;
 use App\Models\Settings\webSettings;
 use App\Services\Academic\AcademicPeriodContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use RealRashid\SweetAlert\Facades\Alert as FacadesAlert;
 
 class MataKuliahController extends Controller
 {
     use roleTrait;
 
-    public function index(AcademicPeriodContext $context): View
+    public function index(Request $request, AcademicPeriodContext $context): View
     {
-        return view('user.admin.master.admin-matkul-index', $this->formData($context));
+        $period = $context->current($request->user());
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'pstudi_id' => ['nullable', 'integer', 'exists:program_studis,id'],
+            'kelas_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('kelas', 'id')->where(
+                    fn ($query) => $query->where('taka_id', $period?->id ?? 0)
+                ),
+            ],
+        ]);
+        $offerings = PenawaranMataKuliah::query()
+            ->forAcademicPeriod($period)
+            ->with(['masterMataKuliah', 'pstudi', 'kelas', 'dosenUtama'])
+            ->withCount([
+                'krsItems as peserta_count' => fn ($query) => $query->whereHas(
+                    'krs',
+                    fn ($krs) => $krs->whereIn('status', [Krs::STATUS_APPROVED, Krs::STATUS_LOCKED])
+                ),
+                'nilais as nilai_terisi_count' => fn ($query) => $query->whereNotNull('nilai'),
+            ])
+            ->when($filters['q'] ?? null, function ($query, string $keyword): void {
+                $query->where(function ($query) use ($keyword): void {
+                    $query->where('code', 'like', "%{$keyword}%")
+                        ->orWhereHas('masterMataKuliah', fn ($master) => $master
+                            ->where('name', 'like', "%{$keyword}%")
+                            ->orWhere('code', 'like', "%{$keyword}%"))
+                        ->orWhereHas('kelas', fn ($class) => $class->where('name', 'like', "%{$keyword}%"));
+                });
+            })
+            ->when($filters['pstudi_id'] ?? null, fn ($query, $programId) => $query->where('pstudi_id', $programId))
+            ->when($filters['kelas_id'] ?? null, fn ($query, $classId) => $query->where('kelas_id', $classId))
+            ->orderBy('code')
+            ->get();
+
+        return view('user.admin.master.admin-matkul-index', [
+            'web' => webSettings::where('id', 1)->first(),
+            'prefix' => $this->setPrefix(),
+            'selectedPeriod' => $period,
+            'offerings' => $offerings,
+            'programs' => ProgramStudi::query()->orderBy('name')->get(),
+            'classes' => Kelas::query()
+                ->forAcademicPeriod($period)
+                ->when($filters['pstudi_id'] ?? null, fn ($query, $programId) => $query->where('pstudi_id', $programId))
+                ->orderBy('name')
+                ->get(),
+            'filters' => $filters,
+        ]);
     }
 
     public function create(AcademicPeriodContext $context): View
@@ -88,90 +132,6 @@ class MataKuliahController extends Controller
         Alert::success('Berhasil', 'Mata kuliah berhasil dihapus.');
 
         return back();
-    }
-
-    public function nilai(int $mataKuliahId, AcademicPeriodContext $context): View
-    {
-        $period = $context->requireCurrent(auth()->user());
-        $mataKuliah = MataKuliah::query()
-            ->forAcademicPeriod($period)
-            ->with('kelas')
-            ->findOrFail($mataKuliahId);
-        $kelas = $mataKuliah->kelas_id
-            ? Kelas::query()->forAcademicPeriod($period)->find($mataKuliah->kelas_id)
-            : null;
-
-        return view('user.admin.master.admin-matkul-nilai', [
-            'web' => webSettings::where('id', 1)->first(),
-            'prefix' => $this->setPrefix(),
-            'mataKuliah' => $mataKuliah,
-            'period' => $period,
-            'canManageNilai' => $period->isWritable() && $kelas !== null,
-            'mahasiswas' => $kelas ? $this->participantQuery($mataKuliah, $period->id, $kelas->id)->get() : collect(),
-            'existingNilais' => NilaiMahasiswa::query()
-                ->forAcademicPeriod($period)
-                ->where('mata_kuliah_id', $mataKuliahId)
-                ->when($kelas, fn ($query) => $query->where('kelas_id', $kelas->id))
-                ->get()
-                ->keyBy('mahasiswa_id'),
-        ]);
-    }
-
-    public function storenilai(Request $request, AcademicPeriodContext $context): RedirectResponse
-    {
-        $period = $context->requireWritableCurrent($request->user());
-        $mataKuliah = MataKuliah::query()
-            ->forAcademicPeriod($period)
-            ->findOrFail($request->integer('mata_kuliah_id'));
-        $kelas = $mataKuliah->kelas_id
-            ? Kelas::query()->forAcademicPeriod($period)->find($mataKuliah->kelas_id)
-            : null;
-
-        if (! $kelas) {
-            throw ValidationException::withMessages([
-                'kelas_id' => 'Mata kuliah harus terhubung dengan kelas pada periode yang sedang dipilih.',
-            ]);
-        }
-
-        $allowedStudentIds = $this->participantQuery($mataKuliah, $period->id, $kelas->id)
-            ->pluck('id')
-            ->all();
-
-        $validated = $request->validate([
-            'nilai' => ['required', 'array'],
-            'nilai.*.mahasiswa_id' => [
-                'required',
-                'integer',
-                Rule::in($allowedStudentIds),
-            ],
-            'nilai.*.nilai' => ['nullable', 'in:A,B,C,D,E'],
-        ], [
-            'nilai.*.mahasiswa_id.exists' => 'Mahasiswa harus terdaftar pada kelas mata kuliah di periode ini.',
-        ]);
-
-        DB::transaction(function () use ($validated, $period, $mataKuliah, $kelas): void {
-            foreach ($validated['nilai'] as $data) {
-                NilaiMahasiswa::updateOrCreate(
-                    [
-                        'mahasiswa_id' => $data['mahasiswa_id'],
-                        'mata_kuliah_id' => $mataKuliah->id,
-                        'kelas_id' => $kelas->id,
-                    ],
-                    [
-                        'taka_id' => $period->id,
-                        ...(Schema::hasColumn('nilai_mahasiswas', 'penawaran_mata_kuliah_id')
-                            ? ['penawaran_mata_kuliah_id' => $mataKuliah->penawaran?->id]
-                            : []),
-                        'dosen_id' => $mataKuliah->dosen_1,
-                        'nilai' => $data['nilai'] ?? null,
-                    ]
-                );
-            }
-        });
-
-        FacadesAlert::success('Berhasil', 'Nilai berhasil disimpan untuk mata kuliah '.$mataKuliah->name.'.');
-
-        return redirect()->route($this->setPrefix().'master.matkul-index');
     }
 
     private function formData(AcademicPeriodContext $context): array
@@ -232,17 +192,5 @@ class MataKuliahController extends Controller
             'requ_id.exists' => 'Mata kuliah prasyarat harus berasal dari periode dan program studi yang sedang dipilih.',
             'requ_id.not_in' => 'Mata kuliah tidak dapat menjadi prasyarat bagi dirinya sendiri.',
         ]);
-    }
-
-    private function participantQuery(MataKuliah $mataKuliah, int $periodId, int $classId)
-    {
-        if (Schema::hasTable('penawaran_mata_kuliahs')) {
-            $offering = $mataKuliah->penawaran()->first();
-            if ($offering) {
-                return Mahasiswa::query()->forApprovedOffering($offering);
-            }
-        }
-
-        return Mahasiswa::query()->forAcademicClass($periodId, $classId);
     }
 }

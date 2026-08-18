@@ -19,12 +19,19 @@
         <div class="row">
             <div class="col-lg-12 col-12">
                 <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title">
-                            @yield('menu')
-                        </h5>
+                    <div class="card-header d-flex justify-content-between align-items-center gap-3">
+                        <div>
+                            <h5 class="card-title mb-1">@yield('menu')</h5>
+                            <small class="text-muted">Periode: {{ $selectedPeriod?->name ?? 'Belum tersedia' }}</small>
+                        </div>
+                        <span class="badge bg-primary">Jadwal Anda</span>
                     </div>
                     <div class="card-body">
+                        @include('base.partials.schedule-filter', [
+                            'filterRoute' => 'dosen.akademik.jadwal-index',
+                            'filterContext' => 'mengajar Anda',
+                        ])
+
                         <table class="table table-striped" id="table1">
                             <thead>
                                 <tr>
@@ -36,11 +43,11 @@
                                     <th class="text-center">Lokasi Perkuliahan</th>
                                     <th class="text-center">Tanggal Perkuliahan</th>
                                     <th class="text-center">Waktu Perkuliahan</th>
-                                    <th class="text-center">Button</th>
+                                    <th class="text-center">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($jadkul as $key => $item)
+                                @forelse ($jadkul as $key => $item)
                                     <tr>
                                         <td data-label="Number">{{ ++$key }}</td>
                                         <td data-label="Nama Kelas">{{ $item->kelas->code }}</td>
@@ -58,7 +65,13 @@
 
                                         </td>
                                     </tr>
-                                @endforeach
+                                @empty
+                                    <tr>
+                                        <td colspan="9" class="py-4 text-center text-muted">
+                                            Tidak ada jadwal mengajar yang sesuai dengan filter.
+                                        </td>
+                                    </tr>
+                                @endforelse
 
                             </tbody>
                         </table>

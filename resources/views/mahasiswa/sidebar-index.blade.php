@@ -34,7 +34,7 @@
 <li class="sidebar-item {{ Route::is('mahasiswa.akademik.nilai-*') ? 'active' : '' }}">
     <a href="{{ route('mahasiswa.akademik.nilai-index') }}" class='sidebar-link'>
         <i class="fa-solid fa-list-check"></i>
-        <span>Nilai</span>
+        <span>Mata Kuliah &amp; Nilai</span>
     </a>
 </li>
 

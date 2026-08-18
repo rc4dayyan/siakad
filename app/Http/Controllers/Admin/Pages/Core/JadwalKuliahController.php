@@ -29,9 +29,33 @@ class JadwalKuliahController extends Controller
 {
     use roleTrait;
 
-    public function index(AcademicPeriodContext $context): View
+    public function index(Request $request, AcademicPeriodContext $context): View
     {
-        return view('user.admin.master.admin-jadkul-index', $this->formData($context));
+        $period = $context->current(auth()->user());
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'pstudi_id' => ['nullable', 'integer', 'exists:program_studis,id'],
+            'kelas_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('kelas', 'id')->where(fn ($query) => $query->where('taka_id', $period?->id ?? 0)),
+            ],
+            'dosen_id' => ['nullable', 'integer', 'exists:dosens,id'],
+            'ruang_id' => ['nullable', 'integer', 'exists:ruangs,id'],
+            'meth_id' => ['nullable', 'integer', 'in:0,1'],
+            'days_id' => ['nullable', 'integer', 'between:0,6'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => [
+                'nullable',
+                'date',
+                Rule::when($request->filled('date_from'), ['after_or_equal:date_from']),
+            ],
+        ], [
+            'kelas_id.exists' => 'Kelas tidak tersedia pada periode akademik yang dipilih.',
+            'date_to.after_or_equal' => 'Tanggal akhir harus sama atau setelah tanggal awal.',
+        ]);
+
+        return view('user.admin.master.admin-jadkul-index', $this->formData($context, $filters));
     }
 
     public function create(AcademicPeriodContext $context): View
@@ -141,9 +165,37 @@ class JadwalKuliahController extends Controller
         return back();
     }
 
-    private function formData(AcademicPeriodContext $context): array
+    private function formData(AcademicPeriodContext $context, array $filters = []): array
     {
         $period = $context->current(auth()->user());
+
+        $schedules = JadwalKuliah::query()
+            ->forAcademicPeriod($period)
+            ->with(['matkul', 'kelas.pstudi.fakultas', 'dosen', 'ruang.gedung'])
+            ->when($filters['q'] ?? null, function ($query, string $keyword) {
+                $query->where(function ($query) use ($keyword) {
+                    $query->where('code', 'like', "%{$keyword}%")
+                        ->orWhereHas('matkul', fn ($query) => $query
+                            ->where('name', 'like', "%{$keyword}%")
+                            ->orWhere('code', 'like', "%{$keyword}%"))
+                        ->orWhereHas('kelas', fn ($query) => $query
+                            ->where('name', 'like', "%{$keyword}%")
+                            ->orWhere('code', 'like', "%{$keyword}%"))
+                        ->orWhereHas('dosen', fn ($query) => $query->where('dsn_name', 'like', "%{$keyword}%"));
+                });
+            })
+            ->when($filters['pstudi_id'] ?? null, fn ($query, $studyProgramId) => $query
+                ->whereHas('kelas', fn ($class) => $class->where('pstudi_id', $studyProgramId)))
+            ->when($filters['kelas_id'] ?? null, fn ($query, $classId) => $query->where('kelas_id', $classId))
+            ->when($filters['dosen_id'] ?? null, fn ($query, $lecturerId) => $query->where('dosen_id', $lecturerId))
+            ->when($filters['ruang_id'] ?? null, fn ($query, $roomId) => $query->where('ruang_id', $roomId))
+            ->when(isset($filters['meth_id']) && $filters['meth_id'] !== null, fn ($query) => $query->where('meth_id', $filters['meth_id']))
+            ->when(isset($filters['days_id']) && $filters['days_id'] !== null, fn ($query) => $query->where('days_id', $filters['days_id']))
+            ->when($filters['date_from'] ?? null, fn ($query, $date) => $query->whereDate('date', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->whereDate('date', '<=', $date))
+            ->orderBy('date')
+            ->orderBy('start')
+            ->get();
 
         return [
             'web' => webSettings::where('id', 1)->first(),
@@ -152,21 +204,26 @@ class JadwalKuliahController extends Controller
             'canManageJadwal' => $period?->isWritable() ?? false,
             'kuri' => Kurikulum::all(),
             'taka' => $period ? collect([$period]) : collect(),
-            'dosen' => Dosen::all(),
-            'pstudi' => ProgramStudi::all(),
+            'dosen' => Dosen::query()->orderBy('dsn_name')->get(),
+            'pstudi' => ProgramStudi::query()->orderBy('name')->get(),
             'matkul' => MataKuliah::query()->forAcademicPeriod($period)->with(['dosen1', 'dosen2', 'dosen3'])->get(),
-            'jadkul' => JadwalKuliah::query()
-                ->forAcademicPeriod($period)
-                ->with(['matkul', 'kelas.pstudi.fakultas', 'dosen', 'ruang.gedung'])
-                ->latest()
-                ->get(),
-            'ruang' => Ruang::all(),
-            'kelas' => Kelas::query()->forAcademicPeriod($period)->get(),
+            'jadkul' => $schedules,
+            'ruang' => Ruang::query()->orderBy('name')->get(),
+            'kelas' => Kelas::query()->forAcademicPeriod($period)->orderBy('name')->get(),
+            'filters' => $filters,
         ];
     }
 
     private function validateSchedule(Request $request, int $periodId): array
     {
+        foreach (['start', 'ended'] as $timeField) {
+            $time = $request->input($timeField);
+
+            if (is_string($time) && preg_match('/^\d{2}:\d{2}:\d{2}$/', $time)) {
+                $request->merge([$timeField => substr($time, 0, 5)]);
+            }
+        }
+
         $validated = $request->validate([
             'bsks' => ['required', 'integer', 'min:1', 'max:8'],
             'makul_id' => ['required', 'integer', Rule::exists('mata_kuliahs', 'id')->where(fn ($query) => $query->where('taka_id', $periodId))],

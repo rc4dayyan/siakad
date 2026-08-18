@@ -75,6 +75,26 @@ class JadwalAcademicPeriodTest extends TestCase
         $this->assertDatabaseMissing('jadwal_kuliahs', ['kelas_id' => $this->oldClassId, 'makul_id' => $this->activeCourseId]);
     }
 
+    public function test_staff_can_update_schedule_when_database_time_contains_seconds(): void
+    {
+        $schedule = $this->schedule('JADWAL-EDIT-WAKTU', $this->activeCourseId, $this->activeClassId);
+        $payload = $this->schedulePayload($this->activeCourseId, $this->activeClassId);
+        $payload['start'] = '08:15:00';
+        $payload['ended'] = '10:15:00';
+
+        $response = $this
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $this->activePeriod->id])
+            ->actingAs($this->academicUser())
+            ->patch(route('academic.master.jadkul-update', $schedule->code), $payload);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('jadwal_kuliahs', [
+            'id' => $schedule->id,
+            'start' => '08:15',
+            'ended' => '10:15',
+        ]);
+    }
+
     public function test_staff_direct_access_to_old_schedule_and_attendance_is_rejected(): void
     {
         $old = $this->schedule('JADWAL-LAMA-AKSES', $this->oldCourseId, $this->oldClassId);

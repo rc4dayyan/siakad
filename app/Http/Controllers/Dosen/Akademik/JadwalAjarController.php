@@ -7,27 +7,70 @@ use App\Http\Controllers\Controller;
 use App\Models\AbsensiMahasiswa;
 use App\Models\FeedBack\FBPerkuliahan;
 use App\Models\JadwalKuliah;
+use App\Models\Kelas;
+use App\Models\Ruang;
 use App\Models\Settings\webSettings;
 use App\Services\Academic\AcademicPeriodContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class JadwalAjarController extends Controller
 {
-    public function index(AcademicPeriodContext $context): View
+    public function index(Request $request, AcademicPeriodContext $context): View
     {
         $dosen = auth('dosen')->user();
         $period = $context->published();
+        $baseQuery = JadwalKuliah::query()
+            ->forAcademicPeriod($period)
+            ->forLecturer($dosen->id);
+        $classIds = (clone $baseQuery)->distinct()->pluck('kelas_id');
+        $roomIds = (clone $baseQuery)->distinct()->pluck('ruang_id');
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'kelas_id' => ['nullable', 'integer', Rule::in($classIds->all())],
+            'ruang_id' => ['nullable', 'integer', Rule::in($roomIds->all())],
+            'meth_id' => ['nullable', 'integer', 'in:0,1'],
+            'days_id' => ['nullable', 'integer', 'between:0,6'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => [
+                'nullable',
+                'date',
+                Rule::when($request->filled('date_from'), ['after_or_equal:date_from']),
+            ],
+        ]);
+
+        $schedules = (clone $baseQuery)
+            ->with(['matkul', 'kelas', 'dosen', 'ruang.gedung'])
+            ->when($filters['q'] ?? null, function ($query, string $keyword) {
+                $query->where(function ($query) use ($keyword) {
+                    $query->where('code', 'like', "%{$keyword}%")
+                        ->orWhereHas('matkul', fn ($course) => $course
+                            ->where('name', 'like', "%{$keyword}%")
+                            ->orWhere('code', 'like', "%{$keyword}%"))
+                        ->orWhereHas('kelas', fn ($class) => $class
+                            ->where('name', 'like', "%{$keyword}%")
+                            ->orWhere('code', 'like', "%{$keyword}%"));
+                });
+            })
+            ->when($filters['kelas_id'] ?? null, fn ($query, $classId) => $query->where('kelas_id', $classId))
+            ->when($filters['ruang_id'] ?? null, fn ($query, $roomId) => $query->where('ruang_id', $roomId))
+            ->when(isset($filters['meth_id']) && $filters['meth_id'] !== null, fn ($query) => $query->where('meth_id', $filters['meth_id']))
+            ->when(isset($filters['days_id']) && $filters['days_id'] !== null, fn ($query) => $query->where('days_id', $filters['days_id']))
+            ->when($filters['date_from'] ?? null, fn ($query, $date) => $query->whereDate('date', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->whereDate('date', '<=', $date))
+            ->orderBy('date')
+            ->orderBy('start')
+            ->get();
 
         return view('dosen.pages.jadwal-index', [
             'web' => webSettings::where('id', 1)->first(),
-            'jadkul' => JadwalKuliah::query()
-                ->forAcademicPeriod($period)
-                ->forLecturer($dosen->id)
-                ->with(['matkul', 'kelas', 'dosen', 'ruang.gedung'])
-                ->latest()
-                ->get(),
+            'jadkul' => $schedules,
+            'filters' => $filters,
+            'filterClasses' => Kelas::query()->whereIn('id', $classIds)->orderBy('name')->get(),
+            'filterRooms' => Ruang::query()->whereIn('id', $roomIds)->orderBy('name')->get(),
+            'selectedPeriod' => $period,
         ]);
     }
 

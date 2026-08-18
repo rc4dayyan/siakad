@@ -115,8 +115,6 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::get('/master/data-matkul/create',[App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'create'])->name('master.matkul-create');
         Route::post('/master/data-matkul/store',[App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'store'])->name('master.matkul-store');
         Route::patch('/master/data-matkul/{code}/update',[App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'update'])->name('master.matkul-update');
-        Route::get('/master/data-matkul/{code}/nilai', [App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'nilai'])->name('master.matkul-nilai');
-        Route::post('/master/data-matkul/storenilai', [App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'storenilai'])->name('master.matkul-storenilai');
         Route::delete('/master/data-matkul/{code}/destroy',[App\Http\Controllers\Admin\Pages\Core\MataKuliahController::class, 'destroy'])->name('master.matkul-destroy');
         Route::get('/master/penawaran-matkul', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'index'])->name('master.penawaran-index');
         Route::post('/master/penawaran-matkul', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'store'])->name('master.penawaran-store');
@@ -128,6 +126,10 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::post('/master/penawaran-matkul/salin/pratinjau', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'copyPreview'])->name('master.penawaran-copy-preview');
         Route::post('/master/penawaran-matkul/salin/eksekusi', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'copyExecute'])->name('master.penawaran-copy-execute');
         Route::get('/master/penawaran-matkul/{penawaran}/peserta', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'participants'])->name('master.penawaran-participants');
+        Route::get('/master/penawaran-matkul/{penawaran}/nilai', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'grades'])->name('master.penawaran-grades');
+        Route::post('/master/penawaran-matkul/{penawaran}/nilai', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'storeGrades'])->name('master.penawaran-grades-store');
+        Route::get('/master/penawaran-matkul/{penawaran}/nilai/export', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'exportGrades'])->name('master.penawaran-grades-export');
+        Route::post('/master/penawaran-matkul/{penawaran}/nilai/import', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'importGrades'])->name('master.penawaran-grades-import');
         Route::get('/services/convert/export-matkul', [App\Http\Controllers\Services\Convert\ExportController::class, 'exportMataKuliah'])->name('services.convert.export-matkul');
         // MENU KHUSUS DATA MASTER => DATA JADWAL KULIAH
         Route::get('/master/data-jadkul',[App\Http\Controllers\Admin\Pages\Core\JadwalKuliahController::class, 'index'])->name('master.jadkul-index');

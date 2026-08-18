@@ -67,6 +67,10 @@ Route::group(['prefix' => 'academic', 'middleware' => ['user-access:Departement 
         Route::post('/master/penawaran-matkul/salin/pratinjau', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'copyPreview'])->name('master.penawaran-copy-preview');
         Route::post('/master/penawaran-matkul/salin/eksekusi', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'copyExecute'])->name('master.penawaran-copy-execute');
         Route::get('/master/penawaran-matkul/{penawaran}/peserta', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'participants'])->name('master.penawaran-participants');
+        Route::get('/master/penawaran-matkul/{penawaran}/nilai', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'grades'])->name('master.penawaran-grades');
+        Route::post('/master/penawaran-matkul/{penawaran}/nilai', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'storeGrades'])->name('master.penawaran-grades-store');
+        Route::get('/master/penawaran-matkul/{penawaran}/nilai/export', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'exportGrades'])->name('master.penawaran-grades-export');
+        Route::post('/master/penawaran-matkul/{penawaran}/nilai/import', [App\Http\Controllers\Admin\PenawaranMataKuliahController::class, 'importGrades'])->name('master.penawaran-grades-import');
         Route::get('/services/convert/export-matkul', [App\Http\Controllers\Services\Convert\ExportController::class, 'exportMataKuliah'])->name('services.convert.export-matkul');
 
         // MENU KHUSUS DATA MASTER => DATA JADWAL KULIAH

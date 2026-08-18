@@ -357,14 +357,14 @@
                             </div>
                             <div class="form-group col-lg-3 col-12">
                                 <label for="start">Waktu Mulai Perkuliahan</label>
-                                <input type="time" name="start" id="start" class="form-control" value="{{ $item->start }}">
+                                <input type="time" name="start" id="start" class="form-control" value="{{ \Carbon\Carbon::parse($item->start)->format('H:i') }}">
                                 @error('start')
                                     <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
                             <div class="form-group col-lg-3 col-12">
                                 <label for="ended">Waktu Selesai Perkuliahan</label>
-                                <input type="time" name="ended" id="ended" class="form-control" value="{{ $item->ended }}">
+                                <input type="time" name="ended" id="ended" class="form-control" value="{{ \Carbon\Carbon::parse($item->ended)->format('H:i') }}">
                                 @error('ended')
                                     <small class="text-danger">{{ $message }}</small>
                                 @enderror

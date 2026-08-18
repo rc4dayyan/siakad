@@ -23,6 +23,13 @@ Route::group(['prefix' => 'dosen', 'middleware' => ['dsn-access:Dosen Aktif'], '
     Route::get('/data-akademik/jadwal/{code}/feedback', [App\Http\Controllers\Dosen\Akademik\JadwalAjarController::class, 'viewFeedBack'])->name('akademik.jadwal-view-feedback');
     Route::patch('/data-akademik/jadwal/absen/{code}/update', [App\Http\Controllers\Dosen\Akademik\JadwalAjarController::class, 'updateAbsen'])->name('akademik.jadwal-absen-update');
 
+    // PRIVATE FUNCTION => MATA KULIAH PER KELAS DAN NILAI AKHIR
+    Route::get('/data-akademik/mata-kuliah', [App\Http\Controllers\Dosen\Akademik\MataKuliahController::class, 'index'])->name('akademik.matkul-index');
+    Route::get('/data-akademik/mata-kuliah/{penawaran}/nilai', [App\Http\Controllers\Dosen\Akademik\MataKuliahController::class, 'grades'])->name('akademik.matkul-nilai');
+    Route::post('/data-akademik/mata-kuliah/{penawaran}/nilai', [App\Http\Controllers\Dosen\Akademik\MataKuliahController::class, 'storeGrades'])->name('akademik.matkul-nilai-store');
+    Route::get('/data-akademik/mata-kuliah/{penawaran}/nilai/export', [App\Http\Controllers\Dosen\Akademik\MataKuliahController::class, 'exportGrades'])->name('akademik.matkul-nilai-export');
+    Route::post('/data-akademik/mata-kuliah/{penawaran}/nilai/import', [App\Http\Controllers\Dosen\Akademik\MataKuliahController::class, 'importGrades'])->name('akademik.matkul-nilai-import');
+
     // PRIVATE FUNCTION => PERSETUJUAN KRS MAHASISWA BIMBINGAN
     Route::get('/data-akademik/krs', [App\Http\Controllers\Dosen\Akademik\KrsApprovalController::class, 'index'])->name('akademik.krs-index');
     Route::patch('/data-akademik/krs/{krs}/keputusan', [App\Http\Controllers\Dosen\Akademik\KrsApprovalController::class, 'decide'])->name('akademik.krs-decide');

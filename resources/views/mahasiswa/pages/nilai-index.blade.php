@@ -1,17 +1,17 @@
 @extends('base.base-dash-index')
 @section('title')
-Data Nilai Kuliah - Siakad By Internal Developer
+Mata Kuliah dan Nilai - SIAKAD
 @endsection
 @section('menu')
-Data Nilai Kuliah
+Mata Kuliah & Nilai
 @endsection
 @section('submenu')
-Data
+Mata Kuliah Saya
 @endsection
 @section('urlmenu')
 @endsection
 @section('subdesc')
-Halaman untuk melihat data Nilai Kuliah
+Daftar mata kuliah per kelas dan nilai berdasarkan KRS yang telah disetujui
 @endsection
 @section('content')
 <section class="section">
@@ -36,26 +36,43 @@ Halaman untuk melihat data Nilai Kuliah
                         <th class="text-center">Periode</th>
                         <th class="text-center">Kelas</th>
                         <th class="text-center">Mata Kuliah</th>
+                        <th class="text-center">SKS</th>
                         <th class="text-center">Nama Dosen</th>
+                        <th class="text-center">Status</th>
                         <th class="text-center">Nilai</th>
-                        <!-- <th class="text-center">Button</th> -->
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($nilai as $key => $item)
                     <tr>
                         <td data-label="Number">{{ ++$key }}</td>
-                        <td data-label="Periode">{{ $item->taka?->name ?? $item->mataKuliah?->taka?->name ?? '-' }}</td>
-                        <td data-label="Judul Tugas">{{ $item->kelas?->name ?? '-' }}</td>
-                        <td data-label="Mata Kuliah">{{ $item->mataKuliah->name ?? '' }}</td>
-                        <td data-label="Nama Dosen">{{ $item->dosen?->dsn_name ?? '-' }}</td>
-                        <td data-label="Nilai">{{ $item->nilai }}</td>
-                        <!-- <td class="d-flex justify-content-center align-items-center">
-                            <a href="{{ route('mahasiswa.akademik.nilai-view', $item->id) }}" class="btn btn-primary"><i class="fa-solid fa-eye"></i></a>
-                        </td> -->
+                        <td data-label="Periode">{{ $item['periode'] }}</td>
+                        <td data-label="Kelas">{{ $item['kelas'] }}</td>
+                        <td data-label="Mata Kuliah">
+                            <div class="fw-semibold">{{ $item['mata_kuliah'] }}</div>
+                            @if (filled($item['kode_mata_kuliah']))
+                                <small class="text-muted">{{ $item['kode_mata_kuliah'] }}</small>
+                            @endif
+                        </td>
+                        <td data-label="SKS">{{ $item['sks'] ?? '-' }}</td>
+                        <td data-label="Nama Dosen">{{ $item['dosen'] }}</td>
+                        <td data-label="Status">
+                            @if (($item['status'] ?? null) === 'KRS Disetujui')
+                                <span class="badge bg-light-success text-success">KRS Disetujui</span>
+                            @else
+                                <span class="badge bg-light-secondary text-secondary">{{ $item['status'] ?? '-' }}</span>
+                            @endif
+                        </td>
+                        <td data-label="Nilai">
+                            @if (filled($item['nilai']))
+                                <span class="badge bg-success px-3 py-2">{{ $item['nilai'] }}</span>
+                            @else
+                                <span class="badge bg-light-secondary text-secondary px-3 py-2">Belum dinilai</span>
+                            @endif
+                        </td>
                     </tr>
                     @empty
-                    <tr><td colspan="6" class="text-center text-muted">Belum ada nilai untuk cakupan yang dipilih.</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted">Belum ada mata kuliah yang diikuti pada cakupan ini.</td></tr>
                     @endforelse
 
                 </tbody>

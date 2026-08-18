@@ -21,21 +21,46 @@ class KelasController extends Controller
 {
     use roleTrait;
 
-    public function index(AcademicPeriodContext $context): View
+    public function index(Request $request, AcademicPeriodContext $context): View
     {
         $period = $context->current(auth()->user());
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'pstudi_id' => ['nullable', 'integer', 'exists:program_studis,id'],
+            'proku_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('program_kuliahs', 'id')->where(
+                    fn ($query) => $query->where('taka_id', $period?->id ?? 0)
+                ),
+            ],
+            'dosen_id' => ['nullable', 'integer', 'exists:dosens,id'],
+        ]);
+
+        $kelas = Kelas::query()
+            ->forAcademicPeriod($period)
+            ->with(['taka', 'pstudi', 'proku', 'dosen'])
+            ->withCount(['registrasiMahasiswas as mahasiswas_count' => fn ($query) => $query->where('taka_id', $period?->id)])
+            ->when($filters['q'] ?? null, function ($query, string $keyword) {
+                $query->where(function ($query) use ($keyword) {
+                    $query->where('name', 'like', "%{$keyword}%")
+                        ->orWhere('code', 'like', "%{$keyword}%")
+                        ->orWhereHas('proku', fn ($query) => $query->where('name', 'like', "%{$keyword}%"));
+                });
+            })
+            ->when($filters['pstudi_id'] ?? null, fn ($query, $studyProgramId) => $query->where('pstudi_id', $studyProgramId))
+            ->when($filters['proku_id'] ?? null, fn ($query, $programId) => $query->where('proku_id', $programId))
+            ->when($filters['dosen_id'] ?? null, fn ($query, $lecturerId) => $query->where('dosen_id', $lecturerId))
+            ->orderBy('name')
+            ->get();
 
         return view('user.admin.master.admin-kelas-index', [
             'web' => webSettings::where('id', 1)->first(),
             'prefix' => $this->setPrefix(),
             'selectedPeriod' => $period,
             'canManageClasses' => $period?->isWritable() ?? false,
-            'kelas' => Kelas::query()
-                ->forAcademicPeriod($period)
-                ->with(['taka', 'pstudi', 'proku', 'dosen'])
-                ->withCount(['registrasiMahasiswas as mahasiswas_count' => fn ($query) => $query->where('taka_id', $period?->id)])
-                ->orderBy('name')
-                ->get(),
+            'kelas' => $kelas,
+            'filters' => $filters,
             'pstudi' => ProgramStudi::query()->orderBy('name')->get(),
             'proku' => ProgramKuliah::query()
                 ->when($period, fn ($query) => $query->where('taka_id', $period->id))

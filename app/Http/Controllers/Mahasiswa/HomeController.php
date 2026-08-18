@@ -11,6 +11,7 @@ use App\Models\Dosen;
 use App\Models\FeedBack\FBPerkuliahan;
 use App\Models\HistoryTagihan;
 use App\Models\JadwalKuliah;
+use App\Models\Kelas;
 use App\Models\Kurikulum;
 // SECTION ADDONS EXTERNAL
 use App\Models\MataKuliah;
@@ -31,6 +32,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
 use PDF;
@@ -85,28 +87,69 @@ class HomeController extends Controller
 
     }
 
-    public function jadkulIndex(AcademicPeriodContext $context, StudentAcademicContext $studentContext)
+    public function jadkulIndex(Request $request, AcademicPeriodContext $context, StudentAcademicContext $studentContext)
     {
         $period = $context->published();
         $student = Auth::guard('mahasiswa')->user();
         $academicClass = $studentContext->classFor($student, $period);
-        $data['kuri'] = Kurikulum::all();
-        $data['taka'] = $period ? collect([$period]) : collect();
-        // $data['dosen'] = MataKuliah::where('dosen');
-        $data['pstudi'] = ProgramStudi::all();
-        $data['matkul'] = MataKuliah::query()->forAcademicPeriod($period)->get();
-        $data['jadkul'] = JadwalKuliah::query()
+        $baseQuery = JadwalKuliah::query()
             ->forAcademicPeriod($period)
             ->when(
                 Schema::hasColumn('jadwal_kuliahs', 'penawaran_mata_kuliah_id'),
                 fn ($query) => $query->forApprovedStudent($student->id),
                 fn ($query) => $query->when($academicClass, fn ($query) => $query->forStudentClass($academicClass->id))
             )
-            ->when(! $academicClass, fn ($query) => $query->whereRaw('1 = 0'))
+            ->when(! $academicClass, fn ($query) => $query->whereRaw('1 = 0'));
+        $classIds = (clone $baseQuery)->distinct()->pluck('kelas_id');
+        $lecturerIds = (clone $baseQuery)->distinct()->pluck('dosen_id');
+        $roomIds = (clone $baseQuery)->distinct()->pluck('ruang_id');
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'kelas_id' => ['nullable', 'integer', Rule::in($classIds->all())],
+            'dosen_id' => ['nullable', 'integer', Rule::in($lecturerIds->all())],
+            'ruang_id' => ['nullable', 'integer', Rule::in($roomIds->all())],
+            'meth_id' => ['nullable', 'integer', 'in:0,1'],
+            'days_id' => ['nullable', 'integer', 'between:0,6'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => [
+                'nullable',
+                'date',
+                Rule::when($request->filled('date_from'), ['after_or_equal:date_from']),
+            ],
+        ]);
+        $data['kuri'] = Kurikulum::all();
+        $data['taka'] = $period ? collect([$period]) : collect();
+        $data['pstudi'] = ProgramStudi::all();
+        $data['matkul'] = MataKuliah::query()->forAcademicPeriod($period)->get();
+        $data['jadkul'] = (clone $baseQuery)
             ->with(['matkul', 'kelas', 'dosen', 'ruang.gedung'])
+            ->when($filters['q'] ?? null, function ($query, string $keyword) {
+                $query->where(function ($query) use ($keyword) {
+                    $query->where('code', 'like', "%{$keyword}%")
+                        ->orWhereHas('matkul', fn ($course) => $course
+                            ->where('name', 'like', "%{$keyword}%")
+                            ->orWhere('code', 'like', "%{$keyword}%"))
+                        ->orWhereHas('kelas', fn ($class) => $class
+                            ->where('name', 'like', "%{$keyword}%")
+                            ->orWhere('code', 'like', "%{$keyword}%"))
+                        ->orWhereHas('dosen', fn ($lecturer) => $lecturer->where('dsn_name', 'like', "%{$keyword}%"));
+                });
+            })
+            ->when($filters['kelas_id'] ?? null, fn ($query, $classId) => $query->where('kelas_id', $classId))
+            ->when($filters['dosen_id'] ?? null, fn ($query, $lecturerId) => $query->where('dosen_id', $lecturerId))
+            ->when($filters['ruang_id'] ?? null, fn ($query, $roomId) => $query->where('ruang_id', $roomId))
+            ->when(isset($filters['meth_id']) && $filters['meth_id'] !== null, fn ($query) => $query->where('meth_id', $filters['meth_id']))
+            ->when(isset($filters['days_id']) && $filters['days_id'] !== null, fn ($query) => $query->where('days_id', $filters['days_id']))
+            ->when($filters['date_from'] ?? null, fn ($query, $date) => $query->whereDate('date', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->whereDate('date', '<=', $date))
+            ->orderBy('date')
+            ->orderBy('start')
             ->get();
-        $data['ruang'] = Ruang::all();
-        $data['kelas'] = $academicClass ? collect([$academicClass]) : collect();
+        $data['filters'] = $filters;
+        $data['filterClasses'] = Kelas::query()->whereIn('id', $classIds)->orderBy('name')->get();
+        $data['filterLecturers'] = Dosen::query()->whereIn('id', $lecturerIds)->orderBy('dsn_name')->get();
+        $data['filterRooms'] = Ruang::query()->whereIn('id', $roomIds)->orderBy('name')->get();
+        $data['selectedPeriod'] = $period;
         $data['web'] = webSettings::where('id', 1)->first();
 
         return view('mahasiswa.pages.mhs-jadkul-index', $data);

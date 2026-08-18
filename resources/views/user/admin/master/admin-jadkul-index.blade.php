@@ -15,31 +15,245 @@ Data Master Jadwal Kuliah
 Halaman untuk mengelola Jadwal Kuliah
 @endsection
 @section('custom-css')
+<style>
+    .schedule-filter-panel {
+        margin-bottom: 22px;
+        padding: 18px;
+        border: 1px solid #dce9e4;
+        border-radius: 13px;
+        background: linear-gradient(135deg, #f6fbf9 0%, #ffffff 100%);
+    }
+
+    .schedule-filter-panel__heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 15px;
+    }
+
+    .schedule-filter-panel__title {
+        margin: 0 0 3px;
+        color: #263d36;
+        font-size: 15px;
+        font-weight: 700;
+    }
+
+    .schedule-filter-panel__description {
+        margin: 0;
+        color: #71837d;
+        font-size: 12px;
+    }
+
+    .schedule-filter-panel .form-label {
+        margin-bottom: 6px;
+        color: #415a52;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .schedule-filter-panel .form-control,
+    .schedule-filter-panel .form-select,
+    .schedule-filter-panel .input-group-text {
+        min-height: 40px;
+        border-color: #d7e4df;
+    }
+
+    .schedule-filter-panel .form-control,
+    .schedule-filter-panel .form-select {
+        border-radius: 9px;
+    }
+
+    .schedule-filter-panel .input-group-text {
+        border-radius: 9px 0 0 9px;
+    }
+
+    .schedule-filter-panel .input-group .form-control {
+        border-radius: 0 9px 9px 0;
+    }
+
+    .schedule-action-dropdown .dropdown-toggle {
+        min-width: 96px;
+        border-radius: 8px;
+        font-weight: 600;
+    }
+
+    .schedule-action-dropdown .dropdown-menu {
+        min-width: 205px;
+        padding: 7px;
+        border: 1px solid #e6ece9;
+        border-radius: 10px;
+        box-shadow: 0 10px 28px rgba(38, 61, 54, 0.14);
+    }
+
+    .schedule-action-dropdown .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 11px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        font-size: 13px;
+    }
+
+    .schedule-action-dropdown .dropdown-item i {
+        width: 16px;
+        text-align: center;
+    }
+
+    @media (max-width: 767.98px) {
+        .schedule-filter-panel__heading,
+        .schedule-page-header {
+            align-items: flex-start !important;
+            flex-direction: column;
+        }
+    }
+</style>
 
 @endsection
 @section('content')
 <section class="section">
     <div class="card">
-        <div class="card-header">
-            <h5 class="card-title d-flex justify-content-between align-items-center">
-                <span>@yield('submenu') <small class="text-muted">— {{ $selectedPeriod?->name ?? 'Periode belum dipilih' }}</small></span>
-                <div class="">
+        <div class="card-header schedule-page-header d-flex justify-content-between align-items-center gap-3">
+            <div>
+                <h5 class="card-title mb-1">@yield('submenu')</h5>
+                <small class="text-muted">Periode: {{ $selectedPeriod?->name ?? 'Belum dipilih' }}</small>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
                     @if (Route::has($prefix.'master.jadwal-mingguan-index'))
-                        <a href="{{ route($prefix.'master.jadwal-mingguan-index') }}" class="btn btn-outline-dark">Jadwal Mingguan</a>
+                        <a href="{{ route($prefix.'master.jadwal-mingguan-index') }}" class="btn btn-outline-dark">
+                            <i class="fas fa-calendar-week me-1"></i> Jadwal Mingguan
+                        </a>
                     @endif
                     @if ($canManageJadwal)
-                        <a href="{{ route($prefix.'master.jadkul-create') }}" class="btn btn-outline-primary"><i class="fa-solid fa-plus"></i></a>
-                        <a href="#" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importJadwalKuliah"><i class="fa-solid fa-file-import"></i></a>
+                        <a href="{{ route($prefix.'master.jadkul-create') }}" class="btn btn-primary">
+                            <i class="fa-solid fa-plus me-1"></i> Tambah Jadwal
+                        </a>
+                        <a href="#" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importJadwalKuliah">
+                            <i class="fa-solid fa-file-import me-1"></i> Import
+                        </a>
                     @elseif ($selectedPeriod)
                         <span class="badge bg-secondary">Mode hanya baca</span>
                     @endif
                     @if ($selectedPeriod)
-                        <a href="{{ route($prefix.'services.convert.export-jadkul') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-export"></i></a>
+                        <a href="{{ route($prefix.'services.convert.export-jadkul') }}" class="btn btn-outline-success">
+                            <i class="fa-solid fa-file-export me-1"></i> Export
+                        </a>
                     @endif
-                </div>
-            </h5>
+            </div>
         </div>
         <div class="card-body">
+            <div class="schedule-filter-panel">
+                <div class="schedule-filter-panel__heading">
+                    <div>
+                        <h6 class="schedule-filter-panel__title">
+                            <i class="fas fa-sliders-h text-primary me-2"></i>Filter Jadwal Kuliah
+                        </h6>
+                        <p class="schedule-filter-panel__description">
+                            Cari jadwal berdasarkan mata kuliah, kelas, dosen, metode, hari, atau rentang tanggal.
+                        </p>
+                    </div>
+                    <span class="badge bg-primary rounded-pill px-3 py-2">{{ $jadkul->count() }} data ditemukan</span>
+                </div>
+
+                <form method="GET" action="{{ route($prefix.'master.jadkul-index') }}" class="row g-3 align-items-end">
+                    <div class="col-xl-4 col-md-6">
+                        <label for="schedule_filter_keyword" class="form-label">Pencarian</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                            <input type="search" name="q" id="schedule_filter_keyword"
+                                class="form-control border-start-0 ps-0" value="{{ $filters['q'] ?? '' }}"
+                                placeholder="Mata kuliah, kelas, dosen, atau kode jadwal">
+                        </div>
+                    </div>
+                    <div class="col-xl-2 col-md-6">
+                        <label for="schedule_filter_study_program" class="form-label">Program Studi</label>
+                        <select name="pstudi_id" id="schedule_filter_study_program" class="form-select">
+                            <option value="">Semua program studi</option>
+                            @foreach ($pstudi as $studyProgram)
+                                <option value="{{ $studyProgram->id }}" @selected(($filters['pstudi_id'] ?? null) == $studyProgram->id)>
+                                    {{ $studyProgram->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <label for="schedule_filter_class" class="form-label">Kelas</label>
+                        <select name="kelas_id" id="schedule_filter_class" class="form-select">
+                            <option value="">Semua kelas</option>
+                            @foreach ($kelas as $class)
+                                <option value="{{ $class->id }}" @selected(($filters['kelas_id'] ?? null) == $class->id)>
+                                    {{ $class->name }} ({{ $class->code }})
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <label for="schedule_filter_lecturer" class="form-label">Dosen Pengajar</label>
+                        <select name="dosen_id" id="schedule_filter_lecturer" class="form-select">
+                            <option value="">Semua dosen</option>
+                            @foreach ($dosen as $lecturer)
+                                <option value="{{ $lecturer->id }}" @selected(($filters['dosen_id'] ?? null) == $lecturer->id)>
+                                    {{ $lecturer->dsn_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-xl-2 col-md-4">
+                        <label for="schedule_filter_method" class="form-label">Metode</label>
+                        <select name="meth_id" id="schedule_filter_method" class="form-select">
+                            <option value="">Semua metode</option>
+                            <option value="0" @selected(isset($filters['meth_id']) && (int) $filters['meth_id'] === 0)>Tatap Muka</option>
+                            <option value="1" @selected(isset($filters['meth_id']) && (int) $filters['meth_id'] === 1)>Teleconference</option>
+                        </select>
+                    </div>
+                    <div class="col-xl-2 col-md-4">
+                        <label for="schedule_filter_day" class="form-label">Hari</label>
+                        <select name="days_id" id="schedule_filter_day" class="form-select">
+                            <option value="">Semua hari</option>
+                            @foreach (['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', "Jum'at", 'Sabtu'] as $dayId => $dayName)
+                                <option value="{{ $dayId }}" @selected(isset($filters['days_id']) && (int) $filters['days_id'] === $dayId)>{{ $dayName }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-xl-2 col-md-4">
+                        <label for="schedule_filter_room" class="form-label">Ruangan</label>
+                        <select name="ruang_id" id="schedule_filter_room" class="form-select">
+                            <option value="">Semua ruangan</option>
+                            @foreach ($ruang as $room)
+                                <option value="{{ $room->id }}" @selected(($filters['ruang_id'] ?? null) == $room->id)>
+                                    {{ $room->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-xl-2 col-md-6">
+                        <label for="schedule_filter_date_from" class="form-label">Tanggal Mulai</label>
+                        <input type="date" name="date_from" id="schedule_filter_date_from" class="form-control"
+                            value="{{ $filters['date_from'] ?? '' }}">
+                    </div>
+                    <div class="col-xl-2 col-md-6">
+                        <label for="schedule_filter_date_to" class="form-label">Tanggal Akhir</label>
+                        <input type="date" name="date_to" id="schedule_filter_date_to" class="form-control"
+                            value="{{ $filters['date_to'] ?? '' }}">
+                    </div>
+                    <div class="col-xl-2 col-md-6">
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary flex-grow-1">
+                                <i class="fas fa-filter me-1"></i> Terapkan
+                            </button>
+                            @if (collect($filters)->filter(fn ($value) => filled($value))->isNotEmpty())
+                                <a href="{{ route($prefix.'master.jadkul-index') }}" class="btn btn-outline-secondary"
+                                    title="Reset filter" aria-label="Reset filter">
+                                    <i class="fas fa-undo"></i>
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                </form>
+            </div>
+
             <table class="table table-striped" id="table1">
                 <thead>
                     <tr>
@@ -51,7 +265,7 @@ Halaman untuk mengelola Jadwal Kuliah
                         <th class="text-center">Metode Perkuliahan</th>
                         <th class="text-center">Tanggal Perkuliahan</th>
                         <th class="text-center">Waktu Perkuliahan</th>
-                        <th class="text-center">Button</th>
+                        <th class="text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -66,29 +280,42 @@ Halaman untuk mengelola Jadwal Kuliah
                         <td data-label="Metode">{{ $item->meth_id }}</td>
                         <td data-label="Tanggal Kuliah">{{ $item->days_id }} <br> - <br> {{ \Carbon\Carbon::parse($item->date)->format('d M Y') }}</td>
                         <td data-label="Waktu Perkuliahan">{{ $item->start }} <br> - <br> {{ $item->ended }}</td>
-                        <td>
-                            <div class="d-flex justify-content-center align-items-center w-100" style="padding: 10px;">
-                                @if ($canManageJadwal)
-                                <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#updateJadkul{{ $item->code }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
-                                @endif
-                                <a href="{{ route($prefix.'master.jadkul-absen-view', $item->code) }}" style="margin-right: 10px" class="btn btn-outline-info"><i class="fa-solid fa-user-check"></i></a>
-                                @if ($canManageJadwal)
-                                <form id="delete-form-{{ $item->code }}"
-                                    action="{{ route($prefix.'master.jadkul-destroy', $item->code) }}" method="POST">
-                                    @csrf
-                                    @method('DELETE')
-                                    <a type="button" class="bs-tooltip btn btn-rounded btn-outline-danger"
-                                        data-bs-toggle="tooltip" data-bs-placement="top" title="Delete"
-                                        data-original-title="Delete"
-                                        data-url="{{ route($prefix.'master.jadkul-destroy', $item->code) }}"
-                                        data-name="{{ $item->name }}"
-                                        onclick="deleteData('{{ $item->code }}')">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                </form>
-                                @endif
+                        <td class="text-center" data-label="Aksi">
+                            <div class="dropdown schedule-action-dropdown d-inline-block">
+                                <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle"
+                                    id="schedule-action-{{ $item->code }}" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-cog me-1"></i> Aksi
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="schedule-action-{{ $item->code }}">
+                                    <li>
+                                        <a href="{{ route($prefix.'master.jadkul-absen-view', $item->code) }}" class="dropdown-item text-info">
+                                            <i class="fa-solid fa-user-check"></i> Lihat Absensi
+                                        </a>
+                                    </li>
+                                    @if ($canManageJadwal)
+                                        <li>
+                                            <button type="button" class="dropdown-item text-primary" data-bs-toggle="modal"
+                                                data-bs-target="#updateJadkul{{ $item->code }}">
+                                                <i class="fas fa-edit"></i> Edit Jadwal
+                                            </button>
+                                        </li>
+                                        <li><hr class="dropdown-divider my-1"></li>
+                                        <li>
+                                            <form id="delete-form-{{ $item->code }}"
+                                                action="{{ route($prefix.'master.jadkul-destroy', $item->code) }}" method="POST">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="button" class="dropdown-item text-danger"
+                                                    data-url="{{ route($prefix.'master.jadkul-destroy', $item->code) }}"
+                                                    data-name="{{ $item->matkul->name ?? 'jadwal ini' }}"
+                                                    onclick="deleteData('{{ $item->code }}')">
+                                                    <i class="fas fa-trash"></i> Hapus Jadwal
+                                                </button>
+                                            </form>
+                                        </li>
+                                    @endif
+                                </ul>
                             </div>
-
                         </td>
                     </tr>
                     @empty
@@ -246,14 +473,14 @@ Halaman untuk mengelola Jadwal Kuliah
                             </div>
                             <div class="form-group col-lg-3 col-12">
                                 <label for="start">Waktu Mulai Perkuliahan</label>
-                                <input type="time" name="start" id="start" class="form-control" value="{{ $item->start }}">
+                                <input type="time" name="start" id="start" class="form-control" value="{{ \Carbon\Carbon::parse($item->start)->format('H:i') }}">
                                 @error('start')
                                 <small class="text-danger">{{ $message }}</small>
                                 @enderror
                             </div>
                             <div class="form-group col-lg-3 col-12">
                                 <label for="ended">Waktu Selesai Perkuliahan</label>
-                                <input type="time" name="ended" id="ended" class="form-control" value="{{ $item->ended }}">
+                                <input type="time" name="ended" id="ended" class="form-control" value="{{ \Carbon\Carbon::parse($item->ended)->format('H:i') }}">
                                 @error('ended')
                                 <small class="text-danger">{{ $message }}</small>
                                 @enderror

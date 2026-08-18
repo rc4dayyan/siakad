@@ -52,10 +52,62 @@
     @endif
     <div class="card"><div class="card-header d-flex justify-content-between align-items-center"><h5 class="card-title">Daftar Penawaran — {{ $period?->name ?? 'Belum ada periode' }}</h5><div class="d-flex gap-2">@if($period)<a class="btn btn-outline-success" href="{{ route($prefix.'master.penawaran-export', array_filter($filters)) }}"><i class="fa-solid fa-file-export me-1"></i> Export</a>@endif @if($canManage)<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importOfferingModal"><i class="fa-solid fa-file-import me-1"></i> Import</button><button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createOfferingModal"><i class="fas fa-plus me-1"></i> Tambah Penawaran</button>@endif</div></div><div class="card-body table-responsive">
         <form method="GET" class="row g-2 mb-3"><div class="col-md-4"><select name="pstudi_id" class="form-select"><option value="">Semua program studi</option>@foreach($programs as $item)<option value="{{ $item->id }}" @selected(($filters['pstudi_id'] ?? null) == $item->id)>{{ $item->name }}</option>@endforeach</select></div><div class="col-md-4"><select name="kuri_id" class="form-select"><option value="">Semua kurikulum</option>@foreach($curricula as $item)<option value="{{ $item->id }}" @selected(($filters['kuri_id'] ?? null) == $item->id)>{{ $item->name }}</option>@endforeach</select></div><div class="col-md-2"><button class="btn btn-outline-primary">Filter</button></div></form>
-        <table class="table table-striped"><thead><tr><th>Kode</th><th>Mata Kuliah</th><th>Kelas</th><th>Dosen</th><th>SKS</th><th>Kapasitas</th><th>Aksi</th></tr></thead><tbody>
-        @forelse($offerings as $item)<tr><td>{{ $item->code }}</td><td>{{ $item->masterMataKuliah->name }}</td><td>{{ $item->kelas->name }}</td><td>{{ $item->dosenUtama->dsn_name }}</td><td>{{ $item->sks }}</td><td>{{ $item->krsItems()->count() }} / {{ $item->kapasitas }}</td><td class="d-flex gap-1"><a class="btn btn-sm btn-outline-info" href="{{ route($prefix.'master.penawaran-participants', $item) }}">Peserta</a>@if($canManage)<button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editOffering{{ $item->id }}">Edit</button><form method="POST" action="{{ route($prefix.'master.penawaran-destroy', $item) }}">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger" onclick="return confirm('Hapus penawaran?')">Hapus</button></form>@endif</td></tr>
-        @empty<tr><td colspan="7" class="text-center text-muted">Belum ada penawaran.</td></tr>@endforelse
-        </tbody></table>
+        <table class="table table-striped">
+            <thead><tr><th>Kode</th><th>Mata Kuliah</th><th>Kelas</th><th>Dosen</th><th>SKS</th><th>Kapasitas</th><th class="text-center">Aksi</th></tr></thead>
+            <tbody>
+                @forelse($offerings as $item)
+                    <tr>
+                        <td>{{ $item->code }}</td>
+                        <td>{{ $item->masterMataKuliah->name }}</td>
+                        <td>{{ $item->kelas->name }}</td>
+                        <td>{{ $item->dosenUtama->dsn_name }}</td>
+                        <td>{{ $item->sks }}</td>
+                        <td>{{ $item->krs_items_count }} / {{ $item->kapasitas }}</td>
+                        <td class="text-center">
+                            <div class="dropdown d-inline-block">
+                                <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle"
+                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-cog me-1"></i> Aksi
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <a class="dropdown-item" href="{{ route($prefix.'master.penawaran-grades', $item) }}">
+                                            <i class="fas fa-graduation-cap text-success me-2"></i>Kelola Nilai
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{{ route($prefix.'master.penawaran-participants', $item) }}">
+                                            <i class="fas fa-users text-info me-2"></i>Lihat Peserta
+                                        </a>
+                                    </li>
+                                    @if($canManage)
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal"
+                                                data-bs-target="#editOffering{{ $item->id }}">
+                                                <i class="fas fa-edit text-primary me-2"></i>Edit Penawaran
+                                            </button>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <form method="POST" action="{{ route($prefix.'master.penawaran-destroy', $item) }}">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="dropdown-item text-danger"
+                                                    onclick="return confirm('Hapus penawaran?')">
+                                                    <i class="fas fa-trash-alt me-2"></i>Hapus Penawaran
+                                                </button>
+                                            </form>
+                                        </li>
+                                    @endif
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="7" class="text-center text-muted">Belum ada penawaran.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
         @if($canManage) @foreach($offerings as $item)
         <div class="modal fade" id="editOffering{{ $item->id }}" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><form method="POST" action="{{ route($prefix.'master.penawaran-update', $item) }}">@csrf @method('PATCH')
             <div class="modal-header"><h5 class="modal-title">Edit {{ $item->masterMataKuliah->name }} — {{ $item->kelas->name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body row g-3">

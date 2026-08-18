@@ -107,6 +107,11 @@ Halaman untuk melihat Jadwal Kuliah
             </h5>
         </div>
         <div class="card-body">
+            @include('base.partials.schedule-filter', [
+                'filterRoute' => 'mahasiswa.home-jadkul-index',
+                'filterContext' => 'kuliah Anda',
+            ])
+
             <table class="table table-striped" id="table1">
                 <thead>
                     <tr>
@@ -119,11 +124,11 @@ Halaman untuk melihat Jadwal Kuliah
                         <th class="text-center">Lokasi Perkuliahan</th>
                         <th class="text-center">Tanggal Perkuliahan</th>
                         <th class="text-center">Waktu Perkuliahan</th>
-                        <th class="text-center">Button</th>
+                        <th class="text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($jadkul as $key => $item)
+                    @forelse ($jadkul as $key => $item)
 
                     <tr>
                         <td data-label="Number">{{ ++$key }}</td>
@@ -141,7 +146,13 @@ Halaman untuk melihat Jadwal Kuliah
 
                         </td>
                     </tr>
-                    @endforeach
+                    @empty
+                    <tr>
+                        <td colspan="9" class="py-4 text-center text-muted">
+                            Tidak ada jadwal kuliah yang sesuai dengan filter.
+                        </td>
+                    </tr>
+                    @endforelse
 
                 </tbody>
             </table>

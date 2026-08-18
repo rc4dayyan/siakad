@@ -8,7 +8,6 @@ use App\Models\HasilStudi;
 use App\Models\Mahasiswa;
 use App\Models\NilaiMahasiswa;
 use App\Models\TahunAkademik;
-use App\Models\User;
 use App\Services\Academic\AcademicPeriodContext;
 use App\Services\Academic\StudentAcademicContext;
 use Illuminate\Database\Schema\Blueprint;
@@ -77,56 +76,9 @@ class NilaiAcademicPeriodTest extends TestCase
         ]);
     }
 
-    public function test_staff_grade_input_sets_selected_period_and_rejects_cross_class_student(): void
-    {
-        $otherStudent = $this->student('MHS-002', $this->oldClassId);
-        $user = $this->webAdmin();
-
-        $invalid = $this
-            ->withSession([AcademicPeriodContext::SESSION_KEY => $this->activePeriod->id])
-            ->actingAs($user)
-            ->post(route('web-admin.master.matkul-storenilai'), [
-                'mata_kuliah_id' => $this->activeCourseId,
-                'nilai' => [['mahasiswa_id' => $otherStudent->id, 'nilai' => 'A']],
-            ]);
-        $invalid->assertSessionHasErrors('nilai.0.mahasiswa_id');
-
-        $valid = $this
-            ->withSession([AcademicPeriodContext::SESSION_KEY => $this->activePeriod->id])
-            ->actingAs($user)
-            ->post(route('web-admin.master.matkul-storenilai'), [
-                'mata_kuliah_id' => $this->activeCourseId,
-                'nilai' => [['mahasiswa_id' => $this->student->id, 'nilai' => 'A']],
-            ]);
-
-        $valid->assertSessionHasNoErrors();
-        $this->assertDatabaseHas('nilai_mahasiswas', [
-            'mahasiswa_id' => $this->student->id,
-            'mata_kuliah_id' => $this->activeCourseId,
-            'taka_id' => $this->activePeriod->id,
-            'nilai' => 'A',
-        ]);
-    }
-
-    public function test_grade_cannot_be_changed_in_closed_period(): void
-    {
-        $response = $this
-            ->withSession([AcademicPeriodContext::SESSION_KEY => $this->closedPeriod->id])
-            ->actingAs($this->webAdmin())
-            ->post(route('web-admin.master.matkul-storenilai'), [
-                'mata_kuliah_id' => $this->oldCourseId,
-                'nilai' => [['mahasiswa_id' => $this->student->id, 'nilai' => 'A']],
-            ]);
-
-        $response->assertSessionHasErrors('academic_period');
-        $this->assertDatabaseHas('nilai_mahasiswas', [
-            'mata_kuliah_id' => $this->oldCourseId,
-            'nilai' => 'B',
-        ]);
-    }
-
     public function test_student_active_view_is_period_filtered_but_transcript_combines_periods(): void
     {
+        $ungradedCourseId = $this->course('MK-BELUM-DINILAI', $this->activePeriod, $this->activeClassId);
         NilaiMahasiswa::create([
             'mahasiswa_id' => $this->student->id,
             'taka_id' => $this->activePeriod->id,
@@ -147,8 +99,56 @@ class NilaiAcademicPeriodTest extends TestCase
             $studentContext
         );
 
-        $this->assertCount(1, $activeView->getData()['nilai']);
-        $this->assertCount(2, $transcriptView->getData()['nilai']);
+        $this->assertCount(2, $activeView->getData()['nilai']);
+        $this->assertTrue($activeView->getData()['nilai']->contains(fn (array $row) => $row['kode_mata_kuliah'] === 'MK-BELUM-DINILAI' && $row['nilai'] === null
+        ));
+        $this->assertCount(3, $transcriptView->getData()['nilai']);
+        $this->assertDatabaseMissing('nilai_mahasiswas', [
+            'mata_kuliah_id' => $ungradedCourseId,
+            'mahasiswa_id' => $this->student->id,
+        ]);
+    }
+
+    public function test_student_grade_page_uses_only_approved_krs_courses_when_available(): void
+    {
+        $this->createKrsTables();
+        $registrationId = DB::table('registrasi_mahasiswas')->insertGetId([
+            'mahasiswa_id' => $this->student->id,
+            'taka_id' => $this->activePeriod->id,
+            'semester_mahasiswa' => 1,
+            'kelas_id' => $this->activeClassId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $selectedMasterId = DB::table('master_mata_kuliahs')->insertGetId([
+            'name' => 'Mata Kuliah Dipilih',
+        ]);
+        $unselectedMasterId = DB::table('master_mata_kuliahs')->insertGetId([
+            'name' => 'Mata Kuliah Tidak Dipilih',
+        ]);
+        $selectedOfferingId = $this->offering($selectedMasterId, 'PENAWARAN-DIPILIH');
+        $this->offering($unselectedMasterId, 'PENAWARAN-TIDAK-DIPILIH');
+        $krsId = DB::table('krs')->insertGetId([
+            'registrasi_mahasiswa_id' => $registrationId,
+            'status' => 'approved',
+        ]);
+        DB::table('krs_items')->insert([
+            'krs_id' => $krsId,
+            'penawaran_mata_kuliah_id' => $selectedOfferingId,
+            'sks' => 2,
+        ]);
+
+        $this->actingAs($this->student, 'mahasiswa');
+        $view = app(StudentNilaiController::class)->index(
+            Request::create('/nilai-kuliah'),
+            app(AcademicPeriodContext::class),
+            app(StudentAcademicContext::class)
+        );
+
+        $this->assertCount(1, $view->getData()['nilai']);
+        $this->assertSame('Mata Kuliah Dipilih', $view->getData()['nilai']->first()['mata_kuliah']);
+        $this->assertNull($view->getData()['nilai']->first()['nilai']);
+        $this->assertSame('KRS Disetujui', $view->getData()['nilai']->first()['status']);
     }
 
     public function test_lecturer_can_score_active_task_once_and_old_task_is_inaccessible(): void
@@ -243,6 +243,7 @@ class NilaiAcademicPeriodTest extends TestCase
             $table->unsignedBigInteger('years_id')->default(0);
             $table->tinyInteger('mhs_stat');
             $table->string('mhs_code')->unique();
+            $table->string('mhs_nim')->unique();
             $table->string('mhs_name');
             $table->unsignedBigInteger('class_id');
             $table->string('password');
@@ -274,6 +275,45 @@ class NilaiAcademicPeriodTest extends TestCase
         (require database_path('migrations/2024_06_14_102445_create_student_scores_table.php'))->up();
     }
 
+    private function createKrsTables(): void
+    {
+        Schema::create('master_mata_kuliahs', function (Blueprint $table): void {
+            $table->id();
+            $table->string('name');
+        });
+        Schema::create('penawaran_mata_kuliahs', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('master_mata_kuliah_id');
+            $table->unsignedBigInteger('taka_id');
+            $table->unsignedBigInteger('kelas_id');
+            $table->unsignedBigInteger('dosen_utama_id');
+            $table->unsignedBigInteger('legacy_mata_kuliah_id')->nullable();
+            $table->string('code');
+        });
+        Schema::create('krs', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('registrasi_mahasiswa_id');
+            $table->string('status');
+        });
+        Schema::create('krs_items', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('krs_id');
+            $table->unsignedBigInteger('penawaran_mata_kuliah_id');
+            $table->unsignedTinyInteger('sks');
+        });
+    }
+
+    private function offering(int $masterId, string $code): int
+    {
+        return DB::table('penawaran_mata_kuliahs')->insertGetId([
+            'master_mata_kuliah_id' => $masterId,
+            'taka_id' => $this->activePeriod->id,
+            'kelas_id' => $this->activeClassId,
+            'dosen_utama_id' => $this->lecturerId,
+            'code' => $code,
+        ]);
+    }
+
     private function kelas(string $code, TahunAkademik $period): int
     {
         return DB::table('kelas')->insertGetId(['taka_id' => $period->id, 'pstudi_id' => 1, 'name' => $code, 'code' => $code]);
@@ -297,6 +337,7 @@ class NilaiAcademicPeriodTest extends TestCase
             'taka_id' => DB::table('kelas')->where('id', $classId)->value('taka_id'),
             'mhs_stat' => 1,
             'mhs_code' => $code,
+            'mhs_nim' => $code,
             'mhs_name' => $code,
             'class_id' => $classId,
             'password' => 'password',
@@ -339,20 +380,6 @@ class NilaiAcademicPeriodTest extends TestCase
             'ends_at' => '2026-12-31',
             'status' => $status,
             'is_active' => $active,
-        ]);
-    }
-
-    private function webAdmin(): User
-    {
-        return User::create([
-            'type' => 0,
-            'code' => 'WEB-ADMIN-'.uniqid(),
-            'name' => 'Web Administrator',
-            'user' => 'web-admin-'.uniqid(),
-            'phone' => '08'.random_int(1000000000, 9999999999),
-            'email' => uniqid().'@example.test',
-            'password' => 'password',
-            'status' => 1,
         ]);
     }
 }

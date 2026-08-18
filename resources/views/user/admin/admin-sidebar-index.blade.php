@@ -29,23 +29,23 @@
         <span>Mahasiswa</span>
     </a>
 </li>
-<li class="sidebar-item has-sub {{ Route::is('web-admin.master.kelas-*', 'web-admin.master.kurikulum-*', 'web-admin.master.master-matkul-*', 'web-admin.master.matkul-*', 'web-admin.master.jadkul-*') ? 'active' : '' }}">
+<li class="sidebar-item has-sub {{ Route::is('web-admin.master.proku-*', 'web-admin.master.taka-*', 'web-admin.master.kelas-*', 'web-admin.master.kurikulum-*', 'web-admin.master.master-matkul-*', 'web-admin.master.matkul-*', 'web-admin.master.jadkul-*') ? 'active' : '' }}">
     <a href="#" class="sidebar-link">
         <i class="fa-solid fa-book-open"></i>
         <span>Perkuliahan</span>
     </a>
     <ul class="submenu">
-        <li class="submenu-item {{ Route::is('web-admin.master.kurikulum-*') ? 'active' : '' }}">
-            <a href="{{ route('web-admin.master.kurikulum-index') }}" class="submenu-link">Kurikulum</a>
+        <li class="submenu-item {{ Route::is('web-admin.master.taka-*') ? 'active' : '' }}">
+            <a href="{{ route('web-admin.master.taka-index') }}" class="submenu-link">Tahun Akademik</a>
         </li>
-        <li class="submenu-item {{ Route::is('web-admin.master.master-matkul-*') ? 'active' : '' }}">
-            <a href="{{ route('web-admin.master.master-matkul-index') }}" class="submenu-link">Master Mata Kuliah</a>
+        <li class="submenu-item {{ Route::is('web-admin.master.proku-*') ? 'active' : '' }}">
+            <a href="{{ route('web-admin.master.proku-index') }}" class="submenu-link">Program Kuliah</a>
         </li>
         <li class="submenu-item {{ Route::is('web-admin.master.kelas-*') ? 'active' : '' }}">
             <a href="{{ route('web-admin.master.kelas-index') }}" class="submenu-link">Kelas</a>
         </li>
         <li class="submenu-item {{ Route::is('web-admin.master.matkul-*') ? 'active' : '' }}">
-            <a href="{{ route('web-admin.master.matkul-index') }}" class="submenu-link">Mata Kuliah Periode</a>
+            <a href="{{ route('web-admin.master.matkul-index') }}" class="submenu-link">Mata Kuliah per Kelas</a>
         </li>
         <li class="submenu-item {{ Route::is('web-admin.master.jadkul-*') ? 'active' : '' }}">
             <a href="{{ route('web-admin.master.jadkul-index') }}" class="submenu-link">Jadwal Kuliah</a>
@@ -55,24 +55,24 @@
 
 {{-- Referensi yang relatif jarang berubah --}}
 <li class="sidebar-title">Referensi</li>
-<li class="sidebar-item has-sub {{ Route::is('web-admin.master.fakultas-*', 'web-admin.master.pstudi-*', 'web-admin.master.proku-*', 'web-admin.master.taka-*', 'web-admin.master.wilayah-*') ? 'active' : '' }}">
+<li class="sidebar-item has-sub {{ Route::is('web-admin.master.kurikulum-*', 'web-admin.master.master-matkul-*', 'web-admin.master.fakultas-*', 'web-admin.master.pstudi-*', 'web-admin.master.wilayah-*') ? 'active' : '' }}">
     <a href="#" class="sidebar-link">
         <i class="fa-solid fa-building-columns"></i>
-        <span>Struktur Akademik</span>
+        <span>Master Data</span>
     </a>
     <ul class="submenu">
+        <li class="submenu-item {{ Route::is('web-admin.master.kurikulum-*') ? 'active' : '' }}">
+            <a href="{{ route('web-admin.master.kurikulum-index') }}" class="submenu-link">Kurikulum</a>
+        </li>
+        <li class="submenu-item {{ Route::is('web-admin.master.master-matkul-*') ? 'active' : '' }}">
+            <a href="{{ route('web-admin.master.master-matkul-index') }}" class="submenu-link">Master Mata Kuliah</a>
+        </li>
         <li class="submenu-item {{ Route::is('web-admin.master.fakultas-*') ? 'active' : '' }}">
             <a href="{{ route('web-admin.master.fakultas-index') }}" class="submenu-link">Fakultas</a>
         </li>
         <li class="submenu-item {{ Route::is('web-admin.master.pstudi-*') ? 'active' : '' }}">
             <a href="{{ route('web-admin.master.pstudi-index') }}" class="submenu-link">Program Studi</a>
-        </li>
-        <li class="submenu-item {{ Route::is('web-admin.master.taka-*') ? 'active' : '' }}">
-            <a href="{{ route('web-admin.master.taka-index') }}" class="submenu-link">Tahun Akademik</a>
-        </li>
-        <li class="submenu-item {{ Route::is('web-admin.master.proku-*') ? 'active' : '' }}">
-            <a href="{{ route('web-admin.master.proku-index') }}" class="submenu-link">Program Kuliah</a>
-        </li>
+        </li> 
         <li class="submenu-item {{ Route::is('web-admin.master.wilayah-*') ? 'active' : '' }}">
             <a href="{{ route('web-admin.master.wilayah-index') }}" class="submenu-link">Wilayah</a>
         </li>

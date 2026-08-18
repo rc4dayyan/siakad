@@ -8,7 +8,9 @@ use App\Models\Dosen;
 use App\Models\KalenderAkademik;
 use App\Models\Kelas;
 use App\Models\Kurikulum;
+use App\Models\Mahasiswa;
 use App\Models\MasterMataKuliah;
+use App\Models\NilaiMahasiswa;
 use App\Models\PenawaranMataKuliah;
 use App\Models\ProgramStudi;
 use App\Models\TahunAkademik;
@@ -48,7 +50,10 @@ class PenawaranMataKuliahController extends Controller
             'offerings' => PenawaranMataKuliah::query()->forAcademicPeriod($period)
                 ->when($request->integer('pstudi_id'), fn ($query, $programId) => $query->where('pstudi_id', $programId))
                 ->when($request->integer('kuri_id'), fn ($query, $curriculumId) => $query->where('kuri_id', $curriculumId))
-                ->with(['masterMataKuliah', 'kelas', 'pstudi', 'kurikulum', 'dosenUtama'])->orderBy('code')->get(),
+                ->with(['masterMataKuliah', 'kelas', 'pstudi', 'kurikulum', 'dosenUtama'])
+                ->withCount('krsItems')
+                ->orderBy('code')
+                ->get(),
             'masters' => MasterMataKuliah::query()
                 ->when($selectedProgram, fn ($query, $program) => $query->whereIn(
                     'program_studi',
@@ -373,13 +378,218 @@ class PenawaranMataKuliahController extends Controller
             ->with('success', "Salin selesai: {$result['copied']} berhasil, {$result['skipped']} duplikat dilewati, {$result['failed']} gagal referensi.");
     }
 
-    public function participants(PenawaranMataKuliah $penawaran): View
+    public function participants(PenawaranMataKuliah $penawaran, AcademicPeriodContext $context): View
     {
+        $period = $context->requireCurrent(auth()->user());
+        abort_unless($penawaran->taka_id === $period->id, 404);
+
         return view('user.admin.master.penawaran-matkul-participants', [
             'prefix' => $this->setPrefix(),
             'penawaran' => $penawaran->load(['masterMataKuliah', 'taka', 'kelas', 'dosenUtama']),
             'students' => $penawaran->pesertaDisetujui()->orderBy('mhs_name')->get(),
         ]);
+    }
+
+    public function grades(PenawaranMataKuliah $penawaran, AcademicPeriodContext $context): View
+    {
+        $period = $context->requireCurrent(auth()->user());
+        abort_unless($penawaran->taka_id === $period->id, 404);
+        $penawaran->load(['masterMataKuliah', 'taka', 'kelas', 'dosenUtama']);
+
+        return view('user.admin.master.admin-matkul-nilai', [
+            'prefix' => $this->setPrefix(),
+            'penawaran' => $penawaran,
+            'period' => $period,
+            'canManageNilai' => $period->isWritable(),
+            'mahasiswas' => $this->approvedParticipants($penawaran)->orderBy('mhs_name')->get(),
+            'existingNilais' => NilaiMahasiswa::query()
+                ->forAcademicPeriod($period)
+                ->where('penawaran_mata_kuliah_id', $penawaran->id)
+                ->get()
+                ->keyBy('mahasiswa_id'),
+        ]);
+    }
+
+    public function storeGrades(
+        Request $request,
+        PenawaranMataKuliah $penawaran,
+        AcademicPeriodContext $context
+    ): RedirectResponse {
+        $period = $context->requireWritableCurrent($request->user());
+        abort_unless($penawaran->taka_id === $period->id, 404);
+        $allowedStudentIds = $this->approvedParticipants($penawaran)->pluck('mahasiswas.id')->all();
+
+        $validated = $request->validate([
+            'nilai' => ['required', 'array'],
+            'nilai.*.mahasiswa_id' => ['required', 'integer', Rule::in($allowedStudentIds)],
+            'nilai.*.nilai' => ['nullable', 'in:A,B,C,D,E'],
+        ], [
+            'nilai.*.mahasiswa_id.in' => 'Mahasiswa harus tercatat pada KRS yang telah disetujui untuk penawaran ini.',
+        ]);
+
+        DB::transaction(fn () => $this->persistOfferingGrades($validated['nilai'], $period->id, $penawaran));
+
+        return redirect()->route($this->setPrefix().'master.penawaran-grades', $penawaran)
+            ->with('success', 'Nilai mahasiswa berhasil disimpan.');
+    }
+
+    public function exportGrades(
+        PenawaranMataKuliah $penawaran,
+        AcademicPeriodContext $context
+    ) {
+        $period = $context->requireCurrent(auth()->user());
+        abort_unless($penawaran->taka_id === $period->id, 404);
+        $penawaran->load(['masterMataKuliah', 'kelas']);
+        $grades = NilaiMahasiswa::query()
+            ->forAcademicPeriod($period)
+            ->where('penawaran_mata_kuliah_id', $penawaran->id)
+            ->pluck('nilai', 'mahasiswa_id');
+        $participants = $this->approvedParticipants($penawaran)->orderBy('mhs_nim')->get();
+        $filename = 'nilai-'.$penawaran->code.'-'.$penawaran->kelas->code.'-'.$period->code.'.xlsx';
+
+        return (new FastExcel($participants))->download(
+            $filename,
+            fn (Mahasiswa $student) => [
+                'NIM' => (string) $student->mhs_nim,
+                'Nama Mahasiswa' => $student->mhs_name,
+                'Nilai' => $grades->get($student->id),
+            ]
+        );
+    }
+
+    public function importGrades(
+        Request $request,
+        PenawaranMataKuliah $penawaran,
+        AcademicPeriodContext $context
+    ): RedirectResponse {
+        $period = $context->requireWritableCurrent($request->user());
+        abort_unless($penawaran->taka_id === $period->id, 404);
+        $request->validate([
+            '_form' => ['required', 'in:import-nilai'],
+            'import' => [
+                'required',
+                'file',
+                'extensions:xlsx,csv',
+                'mimetypes:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-zip-compressed,text/csv,text/plain,application/csv',
+                'max:5120',
+            ],
+        ], [
+            'import.required' => 'File nilai wajib dipilih.',
+            'import.extensions' => 'File harus berformat XLSX atau CSV.',
+            'import.mimetypes' => 'Isi file harus berupa XLSX atau CSV yang valid.',
+            'import.max' => 'Ukuran file maksimal 5 MB.',
+        ]);
+
+        $path = $request->file('import')->store('excel-files', 'local');
+
+        try {
+            $rows = (new FastExcel)->import(Storage::disk('local')->path($path));
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                'import' => 'File tidak dapat dibaca. Gunakan file hasil ekspor nilai berformat XLSX atau CSV.',
+            ]);
+        } finally {
+            Storage::disk('local')->delete($path);
+        }
+
+        if ($rows->isEmpty()) {
+            throw ValidationException::withMessages(['import' => 'File import tidak berisi data nilai.']);
+        }
+
+        $requiredHeaders = ['NIM', 'Nama Mahasiswa', 'Nilai'];
+        $missingHeaders = array_diff($requiredHeaders, array_keys($rows->first()));
+
+        if ($missingHeaders !== []) {
+            throw ValidationException::withMessages([
+                'import' => 'Kolom wajib tidak ditemukan: '.implode(', ', $missingHeaders).'.',
+            ]);
+        }
+
+        $participants = $this->approvedParticipants($penawaran)
+            ->get(['mahasiswas.id', 'mhs_nim'])
+            ->keyBy(fn (Mahasiswa $student) => trim((string) $student->mhs_nim));
+        $prepared = [];
+        $seen = [];
+        $errors = [];
+
+        foreach ($rows as $index => $row) {
+            $rowNumber = $index + 2;
+            $nim = trim((string) ($row['NIM'] ?? ''));
+            $grade = strtoupper(trim((string) ($row['Nilai'] ?? '')));
+
+            if ($nim === '') {
+                $errors[] = "Baris {$rowNumber}: NIM wajib diisi.";
+
+                continue;
+            }
+
+            if (isset($seen[$nim])) {
+                $errors[] = "Baris {$rowNumber}: NIM {$nim} muncul lebih dari satu kali.";
+
+                continue;
+            }
+
+            $seen[$nim] = true;
+            $student = $participants->get($nim);
+
+            if (! $student) {
+                $errors[] = "Baris {$rowNumber}: NIM {$nim} bukan peserta KRS penawaran ini.";
+
+                continue;
+            }
+
+            if ($grade !== '' && ! in_array($grade, ['A', 'B', 'C', 'D', 'E'], true)) {
+                $errors[] = "Baris {$rowNumber}: nilai {$grade} tidak valid. Gunakan A, B, C, D, E, atau kosong.";
+
+                continue;
+            }
+
+            $prepared[] = [
+                'mahasiswa_id' => $student->id,
+                'nilai' => $grade !== '' ? $grade : null,
+            ];
+        }
+
+        if ($errors !== []) {
+            $message = implode(' ', array_slice($errors, 0, 5));
+            if (count($errors) > 5) {
+                $message .= ' Serta '.(count($errors) - 5).' kesalahan lainnya.';
+            }
+
+            throw ValidationException::withMessages(['import' => $message]);
+        }
+
+        DB::transaction(fn () => $this->persistOfferingGrades($prepared, $period->id, $penawaran));
+
+        return redirect()->route($this->setPrefix().'master.penawaran-grades', $penawaran)
+            ->with('success', count($prepared).' nilai mahasiswa berhasil diimpor.');
+    }
+
+    private function approvedParticipants(PenawaranMataKuliah $penawaran)
+    {
+        return Mahasiswa::query()->forApprovedOffering($penawaran);
+    }
+
+    private function persistOfferingGrades(
+        array $grades,
+        int $periodId,
+        PenawaranMataKuliah $penawaran
+    ): void {
+        foreach ($grades as $grade) {
+            NilaiMahasiswa::updateOrCreate(
+                [
+                    'mahasiswa_id' => $grade['mahasiswa_id'],
+                    'penawaran_mata_kuliah_id' => $penawaran->id,
+                ],
+                [
+                    'taka_id' => $periodId,
+                    'mata_kuliah_id' => $penawaran->legacy_mata_kuliah_id,
+                    'kelas_id' => $penawaran->kelas_id,
+                    'dosen_id' => $penawaran->dosen_utama_id,
+                    'nilai' => $grade['nilai'] ?? null,
+                ]
+            );
+        }
     }
 
     /**
