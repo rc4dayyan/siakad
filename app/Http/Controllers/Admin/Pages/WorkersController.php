@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Models\Dosen;
 use App\Models\Kelas;
 use App\Models\Mahasiswa;
+use App\Models\ProgramStudi;
 use App\Models\RegistrasiMahasiswa;
 use App\Models\Settings\webSettings;
 use App\Services\Academic\AcademicPeriodContext;
@@ -620,6 +621,7 @@ class WorkersController extends Controller
     {
         $filters = $request->validate([
             'angkatan' => ['nullable', 'integer', 'min:1900', 'max:'.(now()->year + 1)],
+            'prodi_id' => ['nullable', 'integer', 'exists:program_studis,id'],
             'kelas_id' => ['nullable', 'integer', 'exists:kelas,id'],
         ]);
 
@@ -646,17 +648,37 @@ class WorkersController extends Controller
 
                 $query->where('class_id', $kelasId);
             })
+            ->when($filters['prodi_id'] ?? null, function ($query, $programId) use ($data): void {
+                $query->where(function ($query) use ($data, $programId): void {
+                    if ($data['academicPeriod']) {
+                        $query->whereHas('registrasiAkademik', fn ($registration) => $registration
+                            ->where('taka_id', $data['academicPeriod']->id)
+                            ->whereHas('kelas', fn ($class) => $class->where('pstudi_id', $programId)))
+                            ->orWhere(function ($legacy) use ($data, $programId): void {
+                                $legacy->where('taka_id', $data['academicPeriod']->id)
+                                    ->whereHas('kelas', fn ($class) => $class->where('pstudi_id', $programId))
+                                    ->whereDoesntHave('registrasiAkademik', fn ($registration) => $registration
+                                        ->where('taka_id', $data['academicPeriod']->id));
+                            });
+
+                        return;
+                    }
+
+                    $query->whereHas('kelas', fn ($class) => $class->where('pstudi_id', $programId));
+                });
+            })
             ->with([
-                'kelas',
+                'kelas.pstudi',
                 'registrasiAkademik' => fn ($query) => $query
                     ->where('taka_id', $data['academicPeriod']?->id)
-                    ->with('kelas'),
+                    ->with('kelas.pstudi'),
             ])
             ->get();
         $data['kelas'] = Kelas::query()->orderBy('name')->get();
         $data['filterKelas'] = $data['academicPeriod']
             ? Kelas::query()->forAcademicPeriod($data['academicPeriod'])->orderBy('name')->get()
             : $data['kelas'];
+        $data['programStudi'] = ProgramStudi::query()->orderBy('name')->get();
         $data['angkatan'] = $studentAngkatan->filter()->unique()->sortDesc()->values();
         $data['filters'] = $filters;
 

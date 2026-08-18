@@ -42,9 +42,16 @@ class StudentIndexFilterTest extends TestCase
             $table->string('code')->unique();
         });
         DB::table('program_studis')->insert([
-            'id' => 1,
-            'name' => 'Pendidikan Agama Islam',
-            'code' => 'PAI',
+            [
+                'id' => 1,
+                'name' => 'Pendidikan Agama Islam',
+                'code' => 'PAI',
+            ],
+            [
+                'id' => 2,
+                'name' => 'Pendidikan Bahasa Arab',
+                'code' => 'PBA',
+            ],
         ]);
         DB::table('wilayahs')->insert([
             'code' => '021614',
@@ -173,6 +180,62 @@ class StudentIndexFilterTest extends TestCase
         $response->assertSessionHasErrors('angkatan');
     }
 
+    public function test_students_can_be_filtered_by_study_program_in_the_current_period(): void
+    {
+        $previousPeriod = $this->period(
+            '2025-GANJIL',
+            TahunAkademik::STATUS_CLOSED,
+            false,
+            2025,
+            '2025-08-01'
+        );
+        $period = $this->period();
+        $paiClass = $this->kelas($period, 'PAI A');
+        $pbaClass = $this->kelas($period, 'PBA A', 2);
+        $previousPbaClass = $this->kelas($previousPeriod, 'PBA Lama', 2);
+
+        $paiStudent = Mahasiswa::factory()->create(['class_id' => $pbaClass->id]);
+        $pbaStudent = Mahasiswa::factory()->create(['class_id' => $paiClass->id]);
+        $historicalPbaStudent = Mahasiswa::factory()->create();
+
+        $this->registration($paiStudent, $previousPeriod, $previousPbaClass);
+        $this->registration($paiStudent, $period, $paiClass);
+        $this->registration($pbaStudent, $period, $pbaClass);
+        $this->registration($historicalPbaStudent, $previousPeriod, $previousPbaClass);
+
+        $response = $this
+            ->actingAs($this->webAdmin())
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $period->id])
+            ->get(route('web-admin.workers.student-index', ['prodi_id' => 2]));
+
+        $response->assertOk();
+        $response->assertViewHas('student', function ($students) use ($pbaStudent): bool {
+            return $students->modelKeys() === [$pbaStudent->id];
+        });
+        $response->assertViewHas('programStudi', function ($programs): bool {
+            return $programs->pluck('name')->all() === [
+                'Pendidikan Agama Islam',
+                'Pendidikan Bahasa Arab',
+            ];
+        });
+        $response->assertSee('Filter Data Mahasiswa');
+        $response->assertSee('Pendidikan Bahasa Arab');
+        $response->assertSee('1 mahasiswa ditemukan');
+    }
+
+    public function test_invalid_study_program_filter_is_rejected(): void
+    {
+        $period = $this->period();
+
+        $response = $this
+            ->actingAs($this->webAdmin())
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $period->id])
+            ->get(route('web-admin.workers.student-index', ['prodi_id' => 999]));
+
+        $response->assertRedirect();
+        $response->assertSessionHasErrors('prodi_id');
+    }
+
     private function period(
         string $code = '2026-GANJIL',
         string $status = TahunAkademik::STATUS_ACTIVE,
@@ -185,6 +248,8 @@ class StudentIndexFilterTest extends TestCase
             'code' => $code,
             'year_start' => $yearStart,
             'year_end' => $yearStart + 1,
+            'term' => TahunAkademik::TERM_GANJIL,
+            'semester' => 1,
             'status' => $status,
             'is_active' => $isActive,
             'starts_at' => $startsAt,
@@ -192,11 +257,11 @@ class StudentIndexFilterTest extends TestCase
         ]);
     }
 
-    private function kelas(TahunAkademik $period, string $name): Kelas
+    private function kelas(TahunAkademik $period, string $name, int $programId = 1): Kelas
     {
         return Kelas::create([
             'taka_id' => $period->id,
-            'pstudi_id' => 1,
+            'pstudi_id' => $programId,
             'capacity' => 30,
             'name' => $name,
             'code' => str_replace(' ', '-', strtoupper($name)),

@@ -50,6 +50,7 @@ class ExportController extends Controller
     {
         $filters = $request->validate([
             'angkatan' => ['nullable', 'integer', 'min:1900', 'max:'.(now()->year + 1)],
+            'prodi_id' => ['nullable', 'integer', 'exists:program_studis,id'],
             'kelas_id' => ['nullable', 'integer', 'exists:kelas,id'],
         ]);
 
@@ -68,6 +69,8 @@ class ExportController extends Controller
         $registrations = RegistrasiMahasiswa::query()
             ->forAcademicPeriod($period)
             ->when($studentIds !== null, fn ($query) => $query->whereIn('mahasiswa_id', $studentIds))
+            ->when($filters['prodi_id'] ?? null, fn ($query, $programId) => $query
+                ->whereHas('kelas', fn ($class) => $class->where('pstudi_id', $programId)))
             ->when($filters['kelas_id'] ?? null, fn ($query, $kelasId) => $query->where('kelas_id', $kelasId))
             ->with(['mahasiswa.registrasiAwal.taka', 'kelas.pstudi', 'taka'])
             ->get();

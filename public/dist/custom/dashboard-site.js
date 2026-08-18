@@ -185,7 +185,7 @@
                 perPageSelect: [10, 25, 50, 100],
                 labels: {
                     placeholder: 'Cari data...',
-                    perPage: 'data per halaman',
+                    perPage: '',
                     noRows: 'Belum ada data yang tersedia',
                     info: 'Menampilkan {start}–{end} dari {rows} data'
                 }
