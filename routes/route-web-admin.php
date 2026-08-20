@@ -92,6 +92,8 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::delete('/master/data-taka/{code}/destroy',[App\Http\Controllers\Admin\Pages\Core\TahunAkademikController::class, 'destroy'])->name('master.taka-destroy');
         // MENU KHUSUS DATA MASTER => DATA PROGRAM KULIAH
         Route::get('/master/data-proku',[App\Http\Controllers\Admin\Pages\Core\ProgramKuliahController::class, 'index'])->name('master.proku-index');
+        Route::get('/master/data-proku/export', [App\Http\Controllers\Admin\Pages\Core\ProgramKuliahController::class, 'export'])->name('master.proku-export');
+        Route::post('/master/data-proku/import', [App\Http\Controllers\Admin\Pages\Core\ProgramKuliahController::class, 'import'])->name('master.proku-import');
         Route::post('/master/data-proku/store',[App\Http\Controllers\Admin\Pages\Core\ProgramKuliahController::class, 'store'])->name('master.proku-store');
         Route::patch('/master/data-proku/{code}/update',[App\Http\Controllers\Admin\Pages\Core\ProgramKuliahController::class, 'update'])->name('master.proku-update');
         Route::delete('/master/data-proku/{code}/destroy',[App\Http\Controllers\Admin\Pages\Core\ProgramKuliahController::class, 'destroy'])->name('master.proku-destroy');

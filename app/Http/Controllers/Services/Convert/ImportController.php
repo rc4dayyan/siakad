@@ -264,17 +264,6 @@ class ImportController extends Controller
             ]
         );
 
-        $path = $request->file('import')->store('excel-files', 'local');
-
-        try {
-            $rows = (new FastExcel)->import(storage_path('app/'.$path));
-        } catch (\Throwable) {
-            throw ValidationException::withMessages([
-                'import' => 'File tidak dapat dibaca. Pastikan file menggunakan format xlsx atau csv yang valid.',
-            ]);
-        } finally {
-            Storage::disk('local')->delete($path);
-        }
         $requiredHeaders = [
             'Kode Kelas',
             'Nama Kelas',
@@ -284,26 +273,54 @@ class ImportController extends Controller
             'Kode Program Kuliah',
             'NIDN Wali Dosen',
         ];
+        $path = $request->file('import')->store('excel-files', 'local');
+        $rows = null;
+        $headerRow = 1;
+        $firstReadWasEmpty = false;
 
-        if ($rows->isEmpty()) {
+        try {
+            for ($candidateHeaderRow = 1; $candidateHeaderRow <= 10; $candidateHeaderRow++) {
+                $candidateRows = (new FastExcel)
+                    ->startRow($candidateHeaderRow)
+                    ->import(storage_path('app/'.$path));
+
+                if ($candidateHeaderRow === 1) {
+                    $firstReadWasEmpty = $candidateRows->isEmpty();
+                }
+
+                if ($candidateRows->isNotEmpty()
+                    && array_diff($requiredHeaders, array_keys($candidateRows->first())) === []) {
+                    $rows = $candidateRows;
+                    $headerRow = $candidateHeaderRow;
+
+                    break;
+                }
+            }
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                'import' => 'File tidak dapat dibaca. Pastikan file menggunakan format xlsx atau csv yang valid.',
+            ]);
+        } finally {
+            Storage::disk('local')->delete($path);
+        }
+
+        if ($firstReadWasEmpty) {
             throw ValidationException::withMessages([
                 'import' => 'File import tidak berisi data kelas.',
             ]);
         }
 
-        $missingHeaders = array_diff($requiredHeaders, array_keys($rows->first()));
-
-        if ($missingHeaders !== []) {
+        if ($rows === null) {
             throw ValidationException::withMessages([
-                'import' => 'Kolom wajib tidak ditemukan: '.implode(', ', $missingHeaders).'.',
+                'import' => 'Baris header tidak ditemukan pada 10 baris pertama. Kolom wajib: '.implode(', ', $requiredHeaders).'.',
             ]);
         }
 
-        $totalSavedData = $this->runImport($request, function () use ($rows, $period) {
+        $totalSavedData = $this->runImport($request, function () use ($rows, $period, $headerRow) {
             $totalSavedData = 0;
 
             foreach ($rows as $index => $line) {
-                $rowNumber = $index + 2;
+                $rowNumber = $index + $headerRow + 1;
                 $code = trim((string) $line['Kode Kelas']);
                 $name = trim((string) $line['Nama Kelas']);
                 $capacity = filter_var($line['Kapasitas'], FILTER_VALIDATE_INT);
@@ -312,9 +329,9 @@ class ImportController extends Controller
                 $prokuCode = trim((string) $line['Kode Program Kuliah']);
                 $dosenNidn = trim((string) $line['NIDN Wali Dosen']);
 
-                if ($code === '' || strlen($code) > 255 || $name === '' || strlen($name) > 255 || $capacity === false || $capacity < 1 || $capacity > 35) {
+                if ($code === '' || strlen($code) > 255 || $name === '' || strlen($name) > 255 || $capacity === false || $capacity < 1 || $capacity > 100) {
                     throw ValidationException::withMessages([
-                        'import' => "Baris {$rowNumber}: kode, nama, dan kapasitas kelas wajib diisi dengan benar.",
+                        'import' => "Baris {$rowNumber}: kode dan nama wajib diisi, serta kapasitas harus antara 1 sampai 100.",
                     ]);
                 }
 

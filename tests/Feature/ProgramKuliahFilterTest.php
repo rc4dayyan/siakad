@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\ProgramKuliah;
 use App\Models\TahunAkademik;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -80,6 +81,8 @@ class ProgramKuliahFilterTest extends TestCase
             return $programs->modelKeys() === [$matching->id];
         });
         $response->assertSee('Filter Program Kuliah');
+        $response->assertSee('Export');
+        $response->assertSee('Import Program Kuliah');
         $response->assertSee('2026-GANJIL');
         $response->assertSee('1 data ditemukan');
     }
@@ -92,6 +95,76 @@ class ProgramKuliahFilterTest extends TestCase
 
         $response->assertRedirect();
         $response->assertSessionHasErrors('taka_id');
+    }
+
+    public function test_web_admin_can_export_programs_using_active_filters(): void
+    {
+        $currentPeriod = $this->period('2026-GANJIL', 2026);
+        $this->program($currentPeriod, 1, 'Reguler Pagi', 'Gelombang I');
+        $this->program($currentPeriod, 2, 'Reguler Sore', 'Gelombang II');
+
+        $response = $this
+            ->actingAs($this->webAdmin())
+            ->get(route('web-admin.master.proku-export', [
+                'taka_id' => $currentPeriod->id,
+                'pstudi_id' => 1,
+                'wave' => 'Gelombang I',
+            ]));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $this->assertStringContainsString('program-kuliah-', (string) $response->headers->get('content-disposition'));
+    }
+
+    public function test_web_admin_can_import_programs_and_duplicate_codes_are_skipped(): void
+    {
+        $period = $this->period('2026-GANJIL', 2026);
+        $this->program($period, 1, 'Program Lama', 'Gelombang I');
+        $csv = implode("\n", [
+            'Kode Program Kuliah,Nama Program Kuliah,Kode Tahun Akademik,Kode Program Studi,Gelombang,Tanggal Mulai Pendaftaran,Tanggal Akhir Pendaftaran',
+            'PROGRAM-LAMA-'.$period->id.',Program Duplikat,2026-GANJIL,PAI,Gelombang I,2026-01-01,2026-03-31',
+            'G2-RS-2026,Reguler Sore,2026-GANJIL,PBA,Gelombang II,2026-04-01,2026-06-30',
+        ]);
+
+        $response = $this
+            ->actingAs($this->webAdmin())
+            ->from(route('web-admin.master.proku-index'))
+            ->post(route('web-admin.master.proku-import'), [
+                '_form' => 'import-proku',
+                'import' => UploadedFile::fake()->createWithContent('program-kuliah.csv', $csv),
+            ]);
+
+        $response->assertRedirect(route('web-admin.master.proku-index'));
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('program_kuliahs', [
+            'code' => 'G2-RS-2026',
+            'name' => 'Reguler Sore',
+            'taka_id' => $period->id,
+            'pstudi_id' => 2,
+        ]);
+        $this->assertSame(2, ProgramKuliah::query()->count());
+    }
+
+    public function test_invalid_import_rolls_back_all_program_rows(): void
+    {
+        $this->period('2026-GANJIL', 2026);
+        $csv = implode("\n", [
+            'Kode Program Kuliah,Nama Program Kuliah,Kode Tahun Akademik,Kode Program Studi,Gelombang,Tanggal Mulai Pendaftaran,Tanggal Akhir Pendaftaran',
+            'G1-RP-2026,Reguler Pagi,2026-GANJIL,PAI,Gelombang I,2026-01-01,2026-03-31',
+            'G2-RS-2026,Reguler Sore,2026-GANJIL,TIDAK-ADA,Gelombang II,2026-04-01,2026-06-30',
+        ]);
+
+        $response = $this
+            ->actingAs($this->webAdmin())
+            ->from(route('web-admin.master.proku-index'))
+            ->post(route('web-admin.master.proku-import'), [
+                '_form' => 'import-proku',
+                'import' => UploadedFile::fake()->createWithContent('program-kuliah.csv', $csv),
+            ]);
+
+        $response->assertRedirect(route('web-admin.master.proku-index'));
+        $response->assertSessionHasErrors('import');
+        $this->assertDatabaseCount('program_kuliahs', 0);
     }
 
     private function period(string $code, int $year): TahunAkademik

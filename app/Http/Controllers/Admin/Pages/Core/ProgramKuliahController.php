@@ -12,7 +12,14 @@ use App\Models\ProgramKuliah;
 use App\Models\ProgramStudi;
 use App\Models\Settings\webSettings;
 use App\Models\TahunAkademik;
+use Carbon\Carbon;
+use DateTimeInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use Rap2hpoutre\FastExcel\FastExcel;
 
 class ProgramKuliahController extends Controller
 {
@@ -20,11 +27,7 @@ class ProgramKuliahController extends Controller
 
     public function index(Request $request)
     {
-        $filters = $request->validate([
-            'taka_id' => ['nullable', 'integer', 'exists:tahun_akademiks,id'],
-            'pstudi_id' => ['nullable', 'integer', 'exists:program_studis,id'],
-            'wave' => ['nullable', 'string', 'max:255'],
-        ]);
+        $filters = $this->validateFilters($request);
 
         $data['web'] = webSettings::where('id', 1)->first();
         $data['prefix'] = $this->setPrefix();
@@ -36,10 +39,7 @@ class ProgramKuliahController extends Controller
             ->distinct()
             ->orderBy('wave')
             ->pluck('wave');
-        $data['proku'] = ProgramKuliah::query()
-            ->when($filters['taka_id'] ?? null, fn ($query, $periodId) => $query->where('taka_id', $periodId))
-            ->when($filters['pstudi_id'] ?? null, fn ($query, $programId) => $query->where('pstudi_id', $programId))
-            ->when($filters['wave'] ?? null, fn ($query, $wave) => $query->where('wave', $wave))
+        $data['proku'] = $this->filteredQuery($filters)
             ->with(['taka', 'pstudi'])
             ->orderByDesc('taka_id')
             ->orderBy('name')
@@ -47,6 +47,141 @@ class ProgramKuliahController extends Controller
         $data['filters'] = $filters;
 
         return view('user.admin.master.admin-proku-index', $data);
+    }
+
+    public function export(Request $request)
+    {
+        $programs = $this->filteredQuery($this->validateFilters($request))
+            ->with(['taka', 'pstudi'])
+            ->orderByDesc('taka_id')
+            ->orderBy('name')
+            ->get();
+
+        $response = (new FastExcel($programs))->download(
+            'program-kuliah-'.now()->format('YmdHis').'.xlsx',
+            fn (ProgramKuliah $program): array => [
+                'Kode Program Kuliah' => $program->code,
+                'Nama Program Kuliah' => $program->name,
+                'Kode Tahun Akademik' => $program->taka?->code,
+                'Kode Program Studi' => $program->pstudi?->code,
+                'Gelombang' => $program->wave,
+                'Tanggal Mulai Pendaftaran' => $this->formatDate($program->wave_start),
+                'Tanggal Akhir Pendaftaran' => $this->formatDate($program->wave_ended),
+            ]
+        );
+
+        $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        return $response;
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            '_form' => ['nullable', 'in:import-proku'],
+            'import' => ['required', 'file', 'mimes:xlsx,csv', 'max:2048'],
+        ], [
+            'import.required' => 'File harus diunggah.',
+            'import.mimes' => 'File harus dalam format xlsx atau csv.',
+            'import.max' => 'Ukuran file tidak boleh melebihi 2MB.',
+        ]);
+
+        $path = $request->file('import')->store('excel-files', 'local');
+
+        try {
+            $rows = (new FastExcel)->import(storage_path('app/'.$path));
+        } catch (\Throwable) {
+            throw ValidationException::withMessages([
+                'import' => 'File tidak dapat dibaca. Pastikan format xlsx atau csv valid.',
+            ]);
+        } finally {
+            Storage::disk('local')->delete($path);
+        }
+
+        $requiredHeaders = [
+            'Kode Program Kuliah',
+            'Nama Program Kuliah',
+            'Kode Tahun Akademik',
+            'Kode Program Studi',
+            'Gelombang',
+            'Tanggal Mulai Pendaftaran',
+            'Tanggal Akhir Pendaftaran',
+        ];
+
+        if ($rows->isEmpty()) {
+            throw ValidationException::withMessages(['import' => 'File import tidak berisi data program kuliah.']);
+        }
+
+        $missingHeaders = array_diff($requiredHeaders, array_keys($rows->first()));
+
+        if ($missingHeaders !== []) {
+            throw ValidationException::withMessages([
+                'import' => 'Kolom wajib tidak ditemukan: '.implode(', ', $missingHeaders).'.',
+            ]);
+        }
+
+        $result = DB::transaction(function () use ($rows): array {
+            $created = 0;
+            $skipped = 0;
+
+            foreach ($rows as $index => $line) {
+                $rowNumber = $index + 2;
+                $code = trim((string) $line['Kode Program Kuliah']);
+                $name = trim((string) $line['Nama Program Kuliah']);
+                $periodCode = trim((string) $line['Kode Tahun Akademik']);
+                $studyProgramCode = trim((string) $line['Kode Program Studi']);
+                $wave = trim((string) $line['Gelombang']);
+
+                if ($code === '' || $name === '' || $periodCode === '' || $studyProgramCode === '' || $wave === '') {
+                    $this->rejectImportRow($rowNumber, 'semua kolom wajib diisi.');
+                }
+
+                if (mb_strlen($code) > 255 || mb_strlen($name) > 255 || mb_strlen($wave) > 255) {
+                    $this->rejectImportRow($rowNumber, 'kode, nama, dan gelombang maksimal 255 karakter.');
+                }
+
+                if (ProgramKuliah::query()->where('code', $code)->exists()) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $period = TahunAkademik::query()->where('code', $periodCode)->first();
+                $studyProgram = ProgramStudi::query()->where('code', $studyProgramCode)->first();
+
+                if (! $period) {
+                    $this->rejectImportRow($rowNumber, "kode tahun akademik {$periodCode} tidak ditemukan.");
+                }
+
+                if (! $studyProgram) {
+                    $this->rejectImportRow($rowNumber, "kode program studi {$studyProgramCode} tidak ditemukan.");
+                }
+
+                $start = $this->parseImportDate($line['Tanggal Mulai Pendaftaran'], $rowNumber, 'Tanggal Mulai Pendaftaran');
+                $end = $this->parseImportDate($line['Tanggal Akhir Pendaftaran'], $rowNumber, 'Tanggal Akhir Pendaftaran');
+
+                if ($end->lt($start)) {
+                    $this->rejectImportRow($rowNumber, 'tanggal akhir pendaftaran harus sama dengan atau setelah tanggal mulai.');
+                }
+
+                ProgramKuliah::create([
+                    'taka_id' => $period->id,
+                    'pstudi_id' => $studyProgram->id,
+                    'name' => $name,
+                    'code' => $code,
+                    'wave' => $wave,
+                    'wave_start' => $start->toDateString(),
+                    'wave_ended' => $end->toDateString(),
+                ]);
+                $created++;
+            }
+
+            return compact('created', 'skipped');
+        });
+
+        Alert::success('Sukses', "Import selesai: {$result['created']} program kuliah dibuat dan {$result['skipped']} kode duplikat dilewati.");
+
+        return back();
     }
 
     public function store(Request $request)
@@ -113,5 +248,53 @@ class ProgramKuliahController extends Controller
         Alert::success('success', 'Data telah berhasil dihapus');
 
         return back();
+    }
+
+    private function validateFilters(Request $request): array
+    {
+        return $request->validate([
+            'taka_id' => ['nullable', 'integer', 'exists:tahun_akademiks,id'],
+            'pstudi_id' => ['nullable', 'integer', 'exists:program_studis,id'],
+            'wave' => ['nullable', 'string', 'max:255'],
+        ]);
+    }
+
+    private function filteredQuery(array $filters): Builder
+    {
+        return ProgramKuliah::query()
+            ->when($filters['taka_id'] ?? null, fn (Builder $query, $periodId) => $query->where('taka_id', $periodId))
+            ->when($filters['pstudi_id'] ?? null, fn (Builder $query, $programId) => $query->where('pstudi_id', $programId))
+            ->when($filters['wave'] ?? null, fn (Builder $query, $wave) => $query->where('wave', $wave));
+    }
+
+    private function parseImportDate(mixed $value, int $rowNumber, string $column): Carbon
+    {
+        try {
+            if ($value instanceof DateTimeInterface) {
+                return Carbon::instance($value)->startOfDay();
+            }
+
+            $date = Carbon::createFromFormat('!Y-m-d', trim((string) $value));
+
+            if ($date === false || $date->format('Y-m-d') !== trim((string) $value)) {
+                throw new \RuntimeException;
+            }
+
+            return $date;
+        } catch (\Throwable) {
+            $this->rejectImportRow($rowNumber, "{$column} harus menggunakan format YYYY-MM-DD.");
+        }
+    }
+
+    private function formatDate(mixed $value): ?string
+    {
+        return $value ? Carbon::parse($value)->toDateString() : null;
+    }
+
+    private function rejectImportRow(int $rowNumber, string $message): never
+    {
+        throw ValidationException::withMessages([
+            'import' => "Baris {$rowNumber}: {$message}",
+        ]);
     }
 }

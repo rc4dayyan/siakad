@@ -287,6 +287,7 @@
 <div class="me-1 mb-1 d-inline-block">
     <form action="{{ route($prefix.'services.convert.import-kelas') }}" method="POST" enctype="multipart/form-data">
         @csrf
+        <input type="hidden" name="_form" value="import-kelas">
         <div class="modal fade text-left w-100" id="importKelas" tabindex="-1" role="dialog"
             aria-labelledby="importKelasLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg" role="document">
@@ -305,7 +306,7 @@
                     <div class="modal-body">
                         <p class="text-muted">
                             Gunakan hasil export sebagai template. Kolom legacy "Kode Tahun Akademik" berisi kode Periode Akademik dan setiap baris harus
-                            <strong>{{ $selectedPeriod?->code }}</strong>. Kode kelas yang sudah ada akan dilewati.
+                            <strong>{{ $selectedPeriod?->code }}</strong>. Kapasitas dapat diisi antara 1 sampai 100. Kode kelas yang sudah ada akan dilewati.
                         </p>
                         <div class="form-group">
                             <label for="import_kelas">Import Files (xlsx, csv)</label>
@@ -515,6 +516,9 @@
 </div>
 @endsection
 @section('custom-js')
+    @if ($errors->any() && old('_form') === 'import-kelas')
+        <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('importKelas')).show());</script>
+    @endif
     @if ($errors->any() && old('_form') === 'create-kelas')
         <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('tambahKelas')).show());</script>
     @endif

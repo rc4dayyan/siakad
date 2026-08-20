@@ -252,6 +252,103 @@ class KelasAcademicPeriodTest extends TestCase
         $this->assertStringNotContainsString('LAMA-EXPORT', $content);
     }
 
+    public function test_exported_class_file_can_be_imported_again_by_web_admin(): void
+    {
+        $this->activePeriod->update([
+            'status' => TahunAkademik::STATUS_DRAFT,
+            'is_active' => false,
+        ]);
+        $studyProgramId = DB::table('program_studis')->insertGetId([
+            'name' => 'Pendidikan Agama Islam',
+            'code' => 'PAI',
+        ]);
+        $programId = DB::table('program_kuliahs')->insertGetId([
+            'taka_id' => $this->activePeriod->id,
+            'pstudi_id' => $studyProgramId,
+            'name' => 'Reguler Pagi',
+            'code' => 'REG-PAGI-2026',
+        ]);
+        $lecturerId = DB::table('dosens')->insertGetId([
+            'dsn_nidn' => '0123456789',
+            'dsn_name' => 'Dosen Wali',
+        ]);
+        $class = Kelas::create([
+            'name' => 'Kelas Export Import',
+            'code' => 'PAI-2026-EI',
+            'capacity' => 100,
+            'taka_id' => $this->activePeriod->id,
+            'pstudi_id' => $studyProgramId,
+            'proku_id' => $programId,
+            'dosen_id' => $lecturerId,
+        ]);
+        $user = $this->webAdmin();
+
+        $export = $this
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $this->activePeriod->id])
+            ->actingAs($user)
+            ->get(route('web-admin.services.convert.export-kelas'));
+
+        $export->assertOk();
+        $content = $export->streamedContent();
+        $class->delete();
+
+        $import = $this
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $this->activePeriod->id])
+            ->actingAs($user)
+            ->from(route('web-admin.master.kelas-index'))
+            ->post(route('web-admin.services.convert.import-kelas'), [
+                '_form' => 'import-kelas',
+                'import' => UploadedFile::fake()->createWithContent('export-kelas.csv', $content),
+            ]);
+
+        $import->assertRedirect(route('web-admin.master.kelas-index'));
+        $import->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('kelas', [
+            'code' => 'PAI-2026-EI',
+            'name' => 'Kelas Export Import',
+            'capacity' => 100,
+            'taka_id' => $this->activePeriod->id,
+            'pstudi_id' => $studyProgramId,
+            'proku_id' => $programId,
+            'dosen_id' => $lecturerId,
+        ]);
+    }
+
+    public function test_import_detects_the_header_after_an_export_title_row(): void
+    {
+        $this->activePeriod->update([
+            'status' => TahunAkademik::STATUS_DRAFT,
+            'is_active' => false,
+        ]);
+        DB::table('program_studis')->insert([
+            'name' => 'Pendidikan Agama Islam',
+            'code' => '86208',
+        ]);
+        $csv = implode("\n", [
+            'export-kelas-202501-6a867385f0b25,,,,,,',
+            'Kode Kelas,Nama Kelas,Kapasitas,Kode Tahun Akademik,Kode Program Studi,Kode Program Kuliah,NIDN Wali Dosen',
+            'PAI-Reg-202501-B,PAI II B,20,'.$this->activePeriod->code.',86208,,',
+        ]);
+
+        $response = $this
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $this->activePeriod->id])
+            ->actingAs($this->webAdmin())
+            ->from(route('web-admin.master.kelas-index'))
+            ->post(route('web-admin.services.convert.import-kelas'), [
+                '_form' => 'import-kelas',
+                'import' => UploadedFile::fake()->createWithContent('export-kelas-dengan-judul.csv', $csv),
+            ]);
+
+        $response->assertRedirect(route('web-admin.master.kelas-index'));
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('kelas', [
+            'code' => 'PAI-Reg-202501-B',
+            'name' => 'PAI II B',
+            'capacity' => 20,
+            'taka_id' => $this->activePeriod->id,
+        ]);
+    }
+
     private function createTables(): void
     {
         Schema::create('users', function (Blueprint $table): void {
@@ -331,6 +428,20 @@ class KelasAcademicPeriodTest extends TestCase
             'user' => 'academic',
             'phone' => '081234567890',
             'email' => 'academic@example.test',
+            'password' => 'password',
+            'status' => 1,
+        ]);
+    }
+
+    private function webAdmin(): User
+    {
+        return User::create([
+            'type' => 0,
+            'code' => 'WEB-ADMIN',
+            'name' => 'Web Administrator',
+            'user' => 'web.admin',
+            'phone' => '081234567891',
+            'email' => 'web.admin@example.test',
             'password' => 'password',
             'status' => 1,
         ]);

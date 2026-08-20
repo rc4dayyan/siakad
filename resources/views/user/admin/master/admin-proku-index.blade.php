@@ -105,7 +105,15 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title">@yield('submenu')</h5>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProkuModal"><i class="fas fa-plus me-1"></i> Tambah Program Kuliah</button>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ route($prefix.'master.proku-export', array_filter($filters, fn ($value) => filled($value))) }}" class="btn btn-outline-success">
+                        <i class="fas fa-file-export me-1"></i> Export
+                    </a>
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importProkuModal">
+                        <i class="fas fa-file-import me-1"></i> Import
+                    </button>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProkuModal"><i class="fas fa-plus me-1"></i> Tambah Program Kuliah</button>
+                </div>
             </div>
             <div class="card-body">
                 <div class="program-filter-panel">
@@ -243,6 +251,32 @@
     </div>
 
 </section>
+<form action="{{ route($prefix.'master.proku-import') }}" method="POST" enctype="multipart/form-data">
+    @csrf
+    <input type="hidden" name="_form" value="import-proku">
+    <div class="modal fade" id="importProkuModal" tabindex="-1" aria-labelledby="importProkuModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="importProkuModalLabel">Import Program Kuliah</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        Gunakan hasil Export sebagai template. Kolom tanggal wajib memakai format <strong>YYYY-MM-DD</strong>. Data dengan kode program kuliah yang sudah ada akan dilewati.
+                    </div>
+                    <label for="import-proku-file" class="form-label">File program kuliah</label>
+                    <input type="file" class="form-control @error('import') is-invalid @enderror" name="import" id="import-proku-file" accept=".xlsx,.csv" required>
+                    @error('import')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-file-import me-1"></i> Import</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
 <form action="{{ route($prefix.'master.proku-store') }}" method="POST">
     @csrf
     <input type="hidden" name="_form" value="create-proku">
@@ -354,6 +388,9 @@
 </div>
 @endsection
 @section('custom-js')
+    @if ($errors->any() && old('_form') === 'import-proku')
+        <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('importProkuModal')).show());</script>
+    @endif
     @if ($errors->any() && old('_form') === 'create-proku')
         <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('createProkuModal')).show());</script>
     @endif
