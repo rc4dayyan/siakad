@@ -203,7 +203,7 @@ class ImportController extends Controller
 
                 if ($periodCode !== $period->code) {
                     throw ValidationException::withMessages([
-                        'import' => "Baris {$rowNumber}: kode tahun akademik harus {$period->code}.",
+                        'import' => "Baris {$rowNumber}: kode periode akademik harus {$period->code}.",
                     ]);
                 }
 
@@ -320,7 +320,7 @@ class ImportController extends Controller
 
                 if ($takaCode !== $period->code) {
                     throw ValidationException::withMessages([
-                        'import' => "Baris {$rowNumber}: kode tahun akademik harus {$period->code} sesuai periode yang sedang dipilih.",
+                        'import' => "Baris {$rowNumber}: kode periode akademik harus {$period->code} sesuai periode yang sedang dipilih.",
                     ]);
                 }
 
@@ -453,7 +453,7 @@ class ImportController extends Controller
 
                 if ($periodCode !== $period->code) {
                     throw ValidationException::withMessages([
-                        'import' => "Baris {$rowNumber}: kode tahun akademik harus {$period->code}.",
+                        'import' => "Baris {$rowNumber}: kode periode akademik harus {$period->code}.",
                     ]);
                 }
 

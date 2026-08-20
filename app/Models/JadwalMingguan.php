@@ -14,9 +14,9 @@ class JadwalMingguan extends Model
         return ['hari' => 'integer'];
     }
 
-    public function scopeForAcademicPeriod(Builder $query, TahunAkademik|int|null $period): Builder
+    public function scopeForAcademicPeriod(Builder $query, PeriodeAkademik|int|null $period): Builder
     {
-        $periodId = $period instanceof TahunAkademik ? $period->id : $period;
+        $periodId = $period instanceof PeriodeAkademik ? $period->id : $period;
 
         return $periodId ? $query->where(function (Builder $query) use ($periodId): void {
             $query->whereHas('penawaranMataKuliah', fn (Builder $offering) => $offering->where('taka_id', $periodId))

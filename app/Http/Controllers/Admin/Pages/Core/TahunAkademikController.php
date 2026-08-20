@@ -7,6 +7,7 @@ use App\Helper\roleTrait;
 use App\Http\Controllers\Controller;
 use App\Models\Settings\webSettings;
 use App\Models\TahunAkademik;
+use App\Models\TahunAkademikInduk;
 use App\Services\Academic\AcademicAuditService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,8 +25,13 @@ class TahunAkademikController extends Controller
         $data['web'] = webSettings::where('id', 1)->first();
         $data['prefix'] = $this->setPrefix();
         $data['taka'] = TahunAkademik::query()
+            ->with('tahunAkademik')
             ->orderByDesc('year_start')
             ->orderByDesc('starts_at')
+            ->get();
+        $data['academicYears'] = TahunAkademikInduk::query()
+            ->withCount('periodeAkademiks')
+            ->orderByDesc('year_start')
             ->get();
         $data['terms'] = TahunAkademik::terms();
 
@@ -36,12 +42,14 @@ class TahunAkademikController extends Controller
     {
         $validated = $this->validatePeriod($request);
 
-        TahunAkademik::create([
-            ...$validated,
-            'semester' => $this->legacySemesterValue($validated['term']),
-            'is_active' => false,
-            'status' => TahunAkademik::STATUS_DRAFT,
-        ]);
+        DB::transaction(function () use ($validated): void {
+            TahunAkademik::create([
+                ...$validated,
+                'semester' => $this->legacySemesterValue($validated['term']),
+                'is_active' => false,
+                'status' => TahunAkademik::STATUS_DRAFT,
+            ]);
+        });
 
         Alert::success('Berhasil', 'Periode akademik berhasil disimpan sebagai draft.');
 
@@ -60,10 +68,12 @@ class TahunAkademikController extends Controller
 
         $validated = $this->validatePeriod($request, $taka);
 
-        $taka->update([
-            ...$validated,
-            'semester' => $this->legacySemesterValue($validated['term']),
-        ]);
+        DB::transaction(function () use ($taka, $validated): void {
+            $taka->update([
+                ...$validated,
+                'semester' => $this->legacySemesterValue($validated['term']),
+            ]);
+        });
 
         Alert::success('Berhasil', 'Periode akademik berhasil diperbarui.');
 
@@ -86,7 +96,9 @@ class TahunAkademikController extends Controller
             return back();
         }
 
-        if (! $taka->term || ! $taka->year_end || ! $taka->starts_at || ! $taka->ends_at) {
+        $missingAcademicYear = Schema::hasColumn('tahun_akademiks', 'tid') && ! $taka->tid;
+
+        if ($missingAcademicYear || ! $taka->term || ! $taka->year_end || ! $taka->starts_at || ! $taka->ends_at) {
             Alert::error('Data belum lengkap', 'Lengkapi jenis dan rentang periode sebelum aktivasi.');
 
             return back();
@@ -153,7 +165,13 @@ class TahunAkademikController extends Controller
 
     private function validatePeriod(Request $request, ?TahunAkademik $taka = null): array
     {
-        return $request->validate([
+        $request->merge([
+            'name' => trim((string) $request->input('name')),
+            'code' => strtoupper(trim((string) $request->input('code'))),
+        ]);
+
+        $validated = $request->validate([
+            'tid' => ['required', 'integer', Rule::exists('tahun_akademik', 'id')],
             'name' => ['required', 'string', 'max:255'],
             'code' => [
                 'required',
@@ -162,18 +180,30 @@ class TahunAkademikController extends Controller
                 'regex:/^[A-Za-z0-9-]+$/',
                 Rule::unique('tahun_akademiks', 'code')->ignore($taka?->id),
             ],
-            'term' => ['required', Rule::in(TahunAkademik::terms())],
-            'year_start' => ['required', 'integer', 'between:2000,2100'],
-            'year_end' => ['required', 'integer', 'between:2000,2101', 'gte:year_start'],
+            'term' => [
+                'required',
+                Rule::in(TahunAkademik::terms()),
+                Rule::unique('tahun_akademiks', 'term')
+                    ->where(fn ($query) => $query->where('tid', $request->integer('tid')))
+                    ->ignore($taka?->id),
+            ],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after_or_equal:starts_at'],
         ], [
+            'tid.required' => 'Tahun akademik wajib dipilih.',
+            'tid.exists' => 'Tahun akademik yang dipilih tidak tersedia.',
             'code.regex' => 'Kode periode hanya boleh berisi huruf, angka, dan tanda hubung.',
             'code.unique' => 'Kode periode akademik sudah digunakan.',
             'term.in' => 'Jenis periode akademik tidak valid.',
-            'year_end.gte' => 'Tahun selesai tidak boleh sebelum tahun mulai.',
+            'term.unique' => 'Jenis periode tersebut sudah tersedia pada tahun akademik yang dipilih.',
             'ends_at.after_or_equal' => 'Tanggal selesai tidak boleh sebelum tanggal mulai.',
         ]);
+
+        $academicYear = TahunAkademikInduk::findOrFail($validated['tid']);
+        $validated['year_start'] = $academicYear->year_start;
+        $validated['year_end'] = $academicYear->year_end;
+
+        return $validated;
     }
 
     private function legacySemesterValue(string $term): int

@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class RegistrasiMahasiswa extends Model
 {
     /** @use HasFactory<RegistrasiMahasiswaFactory> */
-    use HasFactory;
+    use Concerns\HasPeriodeAkademik, HasFactory;
 
     public const STATUS_AKADEMIK_AKTIF = 'aktif';
 
@@ -110,9 +110,9 @@ class RegistrasiMahasiswa extends Model
         return in_array($status, $this->allowedAcademicStatusTransitions(), true);
     }
 
-    public function scopeForAcademicPeriod(Builder $query, TahunAkademik|int|null $period): Builder
+    public function scopeForAcademicPeriod(Builder $query, PeriodeAkademik|int|null $period): Builder
     {
-        $periodId = $period instanceof TahunAkademik ? $period->getKey() : $period;
+        $periodId = $period instanceof PeriodeAkademik ? $period->getKey() : $period;
 
         return $periodId
             ? $query->where('taka_id', $periodId)

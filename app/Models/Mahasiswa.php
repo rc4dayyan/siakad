@@ -13,7 +13,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  */
 class Mahasiswa extends Authenticatable
 {
-    use HasFactory;
+    use Concerns\HasPeriodeAkademik, HasFactory;
 
     protected $guard = 'admin';
 
@@ -113,11 +113,11 @@ class Mahasiswa extends Authenticatable
 
     public function scopeForAcademicClass(
         Builder $query,
-        TahunAkademik|int|null $period,
+        PeriodeAkademik|int|null $period,
         int $classId,
         bool $withLegacyFallback = true
     ): Builder {
-        $periodId = $period instanceof TahunAkademik ? $period->id : $period;
+        $periodId = $period instanceof PeriodeAkademik ? $period->id : $period;
 
         if (! $periodId) {
             return $query->whereRaw('1 = 0');

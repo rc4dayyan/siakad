@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TemplateTagihan extends Model
 {
+    use Concerns\HasPeriodeAkademik;
+
     protected $guarded = [];
 
     protected function casts(): array
@@ -21,9 +23,9 @@ class TemplateTagihan extends Model
         ];
     }
 
-    public function scopeForAcademicPeriod(Builder $query, TahunAkademik|int|null $period): Builder
+    public function scopeForAcademicPeriod(Builder $query, PeriodeAkademik|int|null $period): Builder
     {
-        $periodId = $period instanceof TahunAkademik ? $period->getKey() : $period;
+        $periodId = $period instanceof PeriodeAkademik ? $period->getKey() : $period;
 
         return $periodId ? $query->where('taka_id', $periodId) : $query->whereRaw('1 = 0');
     }

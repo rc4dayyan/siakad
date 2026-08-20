@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class PenawaranMataKuliah extends Model
 {
+    use Concerns\HasPeriodeAkademik;
+
     protected $guarded = [];
 
     protected function casts(): array
@@ -14,9 +16,9 @@ class PenawaranMataKuliah extends Model
         return ['sks' => 'integer', 'kapasitas' => 'integer'];
     }
 
-    public function scopeForAcademicPeriod(Builder $query, TahunAkademik|int|null $period): Builder
+    public function scopeForAcademicPeriod(Builder $query, PeriodeAkademik|int|null $period): Builder
     {
-        $periodId = $period instanceof TahunAkademik ? $period->id : $period;
+        $periodId = $period instanceof PeriodeAkademik ? $period->id : $period;
 
         return $periodId ? $query->where('taka_id', $periodId) : $query->whereRaw('1 = 0');
     }

@@ -135,7 +135,7 @@
                                 <div class="card btn btn-outline-success">
                                     <div class="card-body d-flex justify-content-around align-items-center p-1">
                                         <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-calendar" style="font-size: 32px"></i></span>
-                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\Kurikulum::all()->count() }}<br>Tahun Akademik</span>
+                                        <span class="text-putih" style="margin-left: 10px; font-size: 14px;">{{ \App\Models\Kurikulum::all()->count() }}<br>Kurikulum</span>
                                     </div>
                                 </div>
                             </a>

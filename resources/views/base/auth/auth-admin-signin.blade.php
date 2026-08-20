@@ -8,5 +8,7 @@
         'forgotRoute' => route('admin.auth-forgot-page'),
         'loginLabel' => 'Username, nomor telepon, atau email',
         'loginPlaceholder' => 'Masukkan username, nomor telepon, atau email',
+        'periodStatusLabel' => 'Aktif internal',
+        'periodEmptyMessage' => 'Belum ada periode akademik yang aktif.',
     ])
 @endsection

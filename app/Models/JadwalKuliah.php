@@ -12,9 +12,9 @@ class JadwalKuliah extends Model
 
     protected $guarded = [];
 
-    public function scopeForAcademicPeriod(Builder $query, TahunAkademik|int|null $period): Builder
+    public function scopeForAcademicPeriod(Builder $query, PeriodeAkademik|int|null $period): Builder
     {
-        $periodId = $period instanceof TahunAkademik ? $period->getKey() : $period;
+        $periodId = $period instanceof PeriodeAkademik ? $period->getKey() : $period;
 
         if (! $periodId) {
             return $query->whereRaw('1 = 0');

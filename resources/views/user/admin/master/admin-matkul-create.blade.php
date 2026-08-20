@@ -97,7 +97,7 @@
                         @enderror
                     </div>
                     <div class="form-group col-lg-4 col-12">
-                        <label for="selected-period">Tahun Akademik</label>
+                        <label for="selected-period">Periode Akademik</label>
                         <input id="selected-period" class="form-control" value="{{ $selectedPeriod?->name ?? 'Belum dipilih' }}" readonly>
                     </div>
                     <div class="form-group col-lg-4 col-12">

@@ -39,5 +39,16 @@ class AppServiceProvider extends ServiceProvider
                 'activeAcademicPeriod' => $context->active(),
             ]);
         });
+
+        View::composer([
+            'base.auth.auth-mhs-signin',
+            'base.auth.auth-dsn-signin',
+        ], function ($view): void {
+            $view->with('academicPeriod', app(AcademicPeriodContext::class)->published());
+        });
+
+        View::composer('base.auth.auth-admin-signin', function ($view): void {
+            $view->with('academicPeriod', app(AcademicPeriodContext::class)->active());
+        });
     }
 }

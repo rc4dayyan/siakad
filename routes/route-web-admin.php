@@ -78,7 +78,13 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::post('/master/data-pstudi/store',[App\Http\Controllers\Admin\Pages\Core\ProgramStudiController::class, 'store'])->name('master.pstudi-store');
         Route::patch('/master/data-pstudi/{code}/update',[App\Http\Controllers\Admin\Pages\Core\ProgramStudiController::class, 'update'])->name('master.pstudi-update');
         Route::delete('/master/data-pstudi/{code}/destroy',[App\Http\Controllers\Admin\Pages\Core\ProgramStudiController::class, 'destroy'])->name('master.pstudi-destroy');
-        // MENU KHUSUS DATA MASTER => DATA TAHUN AKADEMIK
+        // MASTER TAHUN AKADEMIK (INDUK PERIODE)
+        Route::get('/master/tahun-akademik', [App\Http\Controllers\Admin\Pages\Core\TahunAkademikIndukController::class, 'index'])->name('master.tahun-akademik-index');
+        Route::post('/master/tahun-akademik/store', [App\Http\Controllers\Admin\Pages\Core\TahunAkademikIndukController::class, 'store'])->name('master.tahun-akademik-store');
+        Route::patch('/master/tahun-akademik/{code}/update', [App\Http\Controllers\Admin\Pages\Core\TahunAkademikIndukController::class, 'update'])->name('master.tahun-akademik-update');
+        Route::delete('/master/tahun-akademik/{code}/destroy', [App\Http\Controllers\Admin\Pages\Core\TahunAkademikIndukController::class, 'destroy'])->name('master.tahun-akademik-destroy');
+
+        // MENU KHUSUS DATA MASTER => DATA PERIODE AKADEMIK
         Route::get('/master/data-taka',[App\Http\Controllers\Admin\Pages\Core\TahunAkademikController::class, 'index'])->name('master.taka-index');
         Route::post('/master/data-taka/store',[App\Http\Controllers\Admin\Pages\Core\TahunAkademikController::class, 'store'])->name('master.taka-store');
         Route::patch('/master/data-taka/{code}/update',[App\Http\Controllers\Admin\Pages\Core\TahunAkademikController::class, 'update'])->name('master.taka-update');

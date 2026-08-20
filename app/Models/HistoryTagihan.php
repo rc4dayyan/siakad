@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HistoryTagihan extends Model
 {
-    use HasFactory;
+    use Concerns\HasPeriodeAkademik, HasFactory;
 
     public const STATUS_PENDING = 'pending';
 

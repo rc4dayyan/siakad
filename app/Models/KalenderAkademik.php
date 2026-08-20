@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class KalenderAkademik extends Model
 {
+    use Concerns\HasPeriodeAkademik;
+
     public const KATEGORI_KRS = 'krs';
 
     protected $guarded = [];

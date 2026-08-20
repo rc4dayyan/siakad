@@ -154,9 +154,9 @@ Halaman untuk melihat data pengguna Karyawan
                             @enderror
                         </div>
                         <div class="form-group col-lg-4 col-12">
-                            <label for="taka_id">Tahun Akademik</label>
+                            <label for="taka_id">Periode Akademik</label>
                             <select name="taka_id" id="taka_id" class="form-select" name="taka_id" id="taka_id">
-                                <option value="" selected>Pilih Tahun Akademik</option>
+                                <option value="" selected>Pilih Periode Akademik</option>
                                 @foreach ($taka as $item_t)
                                 <option value="{{ $item_t->id }}" {{ $item->taka_id == $item_t->id ? 'selected' : '' }}>{{ $item_t->name . ' - ' . $item_t->semester }}</option>
                                 @endforeach

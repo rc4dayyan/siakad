@@ -42,7 +42,7 @@ class BillingTargetService
         };
 
         if (! $belongsToPeriod) {
-            $this->fail('Target tidak terdaftar pada tahun akademik template.');
+            $this->fail('Target tidak terdaftar pada periode akademik template.');
         }
     }
 

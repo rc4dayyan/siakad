@@ -114,16 +114,16 @@
                             <h6 class="program-filter-panel__title">
                                 <i class="fas fa-sliders-h text-primary me-2"></i>Filter Program Kuliah
                             </h6>
-                            <p class="program-filter-panel__description">Saring berdasarkan tahun akademik, program studi, atau gelombang pendaftaran.</p>
+                            <p class="program-filter-panel__description">Saring berdasarkan periode akademik, program studi, atau gelombang pendaftaran.</p>
                         </div>
                         <span class="badge bg-primary rounded-pill px-3 py-2">{{ $proku->count() }} data ditemukan</span>
                     </div>
 
                     <form method="GET" action="{{ route($prefix.'master.proku-index') }}" class="row g-3 align-items-end">
                         <div class="col-lg-3 col-md-6">
-                            <label for="filter_taka_id" class="form-label">Tahun Akademik</label>
+                            <label for="filter_taka_id" class="form-label">Periode Akademik</label>
                             <select name="taka_id" id="filter_taka_id" class="form-select">
-                                <option value="">Semua tahun akademik</option>
+                                <option value="">Semua periode akademik</option>
                                 @foreach ($taka as $period)
                                     <option value="{{ $period->id }}" @selected(($filters['taka_id'] ?? null) == $period->id)>
                                         {{ $period->name }}
@@ -172,7 +172,7 @@
                         <tr>
                             <th class="text-center">#</th>
                             <th class="text-center">Program Kuliah</th>
-                            <th class="text-center">Tahun Akademik</th>
+                            <th class="text-center">Periode Akademik</th>
                             <th class="text-center">Program Studi</th>
                             <th class="text-center">Periode Pendaftaran</th>
                             <th class="text-center">Aksi</th>
@@ -183,7 +183,7 @@
                             <tr>
                                 <td data-label="Number">{{ ++$key }}</td>
                                 <td data-label="Program Kuliah">{{ $item->name }}</td>
-                                <td data-label="Tahun Akademik">
+                                <td data-label="Periode Akademik">
                                     <span class="program-period-badge">
                                         <i class="fas fa-calendar-alt"></i> {{ $item->taka?->name ?? '-' }}
                                     </span>
@@ -249,7 +249,7 @@
     <div class="modal fade" id="createProkuModal" tabindex="-1" aria-labelledby="createProkuModalLabel" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
         <div class="modal-header"><h5 class="modal-title" id="createProkuModalLabel">Tambah Data Program Kuliah</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
         <div class="modal-body">
-            <div class="form-group"><label for="create-proku-period">Tahun Akademik</label><select name="taka_id" id="create-proku-period" class="form-select"><option value="">Pilih Tahun Akademik</option>@foreach ($taka as $item)<option value="{{ $item->id }}" @selected(old('taka_id') == $item->id)>{{ $item->name }}</option>@endforeach</select>@error('taka_id')<small class="text-danger">{{ $message }}</small>@enderror</div>
+            <div class="form-group"><label for="create-proku-period">Periode Akademik</label><select name="taka_id" id="create-proku-period" class="form-select"><option value="">Pilih Periode Akademik</option>@foreach ($taka as $item)<option value="{{ $item->id }}" @selected(old('taka_id') == $item->id)>{{ $item->name }}</option>@endforeach</select>@error('taka_id')<small class="text-danger">{{ $message }}</small>@enderror</div>
             <div class="form-group"><label for="create-proku-study-program">Program Studi</label><select name="pstudi_id" id="create-proku-study-program" class="form-select"><option value="">Pilih Program Studi</option>@foreach ($pstudi as $item)<option value="{{ $item->id }}" @selected(old('pstudi_id') == $item->id)>{{ $item->name }}</option>@endforeach</select>@error('pstudi_id')<small class="text-danger">{{ $message }}</small>@enderror</div>
             @foreach (['name' => 'Nama Program Kuliah', 'code' => 'Kode Program Kuliah', 'wave' => 'Gelombang Program Kuliah'] as $field => $label)<div class="form-group"><label for="create-proku-{{ $field }}">{{ $label }}</label><input type="text" class="form-control" name="{{ $field }}" id="create-proku-{{ $field }}" value="{{ old($field) }}" maxlength="20">@error($field)<small class="text-danger">{{ $message }}</small>@enderror</div>@endforeach
             <div class="form-group"><label for="create-proku-start">Periode Mulai Pendaftaran</label><input type="date" class="form-control" name="wave_start" id="create-proku-start" value="{{ old('wave_start') }}">@error('wave_start')<small class="text-danger">{{ $message }}</small>@enderror</div>
@@ -286,9 +286,9 @@
                     <div class="modal-body">
                         <div class="row">
                             <div class="form-group">
-                                <label for="taka_id">Tahun Akademik</label>
+                                <label for="taka_id">Periode Akademik</label>
                                 <select name="taka_id" id="taka_id" class="form-select">
-                                    <option value="" selected>Pilih Tahun Akademik</option>
+                                    <option value="" selected>Pilih Periode Akademik</option>
                                     @foreach ($taka as $tk)
                                         <option value="{{ $tk->id }}" {{ $item->taka_id == $tk->id ? 'selected' : '' }}>{{ $tk->name }}</option>
                                     @endforeach

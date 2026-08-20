@@ -12,7 +12,7 @@ class AbsensiMahasiswa extends Model
 
     protected $guarded = [];
 
-    public function scopeForAcademicPeriod(Builder $query, TahunAkademik|int|null $period): Builder
+    public function scopeForAcademicPeriod(Builder $query, PeriodeAkademik|int|null $period): Builder
     {
         return $query->whereHas('jadkul', fn (Builder $query) => $query->forAcademicPeriod($period));
     }

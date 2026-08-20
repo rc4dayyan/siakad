@@ -29,14 +29,17 @@
         <span>Mahasiswa</span>
     </a>
 </li>
-<li class="sidebar-item has-sub {{ Route::is('web-admin.master.proku-*', 'web-admin.master.taka-*', 'web-admin.master.kelas-*', 'web-admin.master.kurikulum-*', 'web-admin.master.master-matkul-*', 'web-admin.master.matkul-*', 'web-admin.master.jadkul-*') ? 'active' : '' }}">
+<li class="sidebar-item has-sub {{ Route::is('web-admin.master.tahun-akademik-*', 'web-admin.master.proku-*', 'web-admin.master.taka-*', 'web-admin.master.kelas-*', 'web-admin.master.kurikulum-*', 'web-admin.master.master-matkul-*', 'web-admin.master.matkul-*', 'web-admin.master.jadkul-*') ? 'active' : '' }}">
     <a href="#" class="sidebar-link">
         <i class="fa-solid fa-book-open"></i>
         <span>Perkuliahan</span>
     </a>
     <ul class="submenu">
+        <li class="submenu-item {{ Route::is('web-admin.master.tahun-akademik-*') ? 'active' : '' }}">
+            <a href="{{ route('web-admin.master.tahun-akademik-index') }}" class="submenu-link">Tahun Akademik</a>
+        </li>
         <li class="submenu-item {{ Route::is('web-admin.master.taka-*') ? 'active' : '' }}">
-            <a href="{{ route('web-admin.master.taka-index') }}" class="submenu-link">Tahun Akademik</a>
+            <a href="{{ route('web-admin.master.taka-index') }}" class="submenu-link">Periode Akademik</a>
         </li>
         <li class="submenu-item {{ Route::is('web-admin.master.proku-*') ? 'active' : '' }}">
             <a href="{{ route('web-admin.master.proku-index') }}" class="submenu-link">Program Kuliah</a>

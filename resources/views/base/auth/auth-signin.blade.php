@@ -15,6 +15,30 @@
                     {{ strip_tags($web->school_name) }}.
                 </p>
 
+                <div class="auth-period" aria-label="Periode akademik portal">
+                    <span class="auth-period__icon" aria-hidden="true">
+                        <i class="far fa-calendar-alt"></i>
+                    </span>
+                    <div class="auth-period__content">
+                        <div class="auth-period__eyebrow">
+                            <span>Periode Akademik</span>
+                            @if ($academicPeriod)
+                                <span class="auth-period__status">{{ $periodStatusLabel }}</span>
+                            @endif
+                        </div>
+                        @if ($academicPeriod)
+                            <strong>{{ $academicPeriod->name }}</strong>
+                            <small>
+                                Tahun akademik {{ $academicPeriod->year_start }}/{{ $academicPeriod->year_end }}
+                                · {{ $academicPeriod->term_label }}
+                            </small>
+                        @else
+                            <strong>Belum tersedia</strong>
+                            <small>{{ $periodEmptyMessage }}</small>
+                        @endif
+                    </div>
+                </div>
+
                 <div class="auth-benefits" aria-label="Keunggulan portal akademik">
                     <div class="auth-benefit">
                         <span><i class="fas fa-shield-alt" aria-hidden="true"></i></span>

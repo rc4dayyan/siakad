@@ -8,5 +8,7 @@
         'forgotRoute' => route('dosen.auth-forgot-page'),
         'loginLabel' => 'NIDN, nomor telepon, atau email',
         'loginPlaceholder' => 'Masukkan NIDN, nomor telepon, atau email',
+        'periodStatusLabel' => 'Dipublikasikan',
+        'periodEmptyMessage' => 'Belum ada periode yang dibuka untuk dosen.',
     ])
 @endsection

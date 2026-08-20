@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\TahunAkademik;
+use App\Models\TahunAkademikInduk;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -23,14 +24,20 @@ class TahunAkademikTest extends TestCase
         $this->createUsersTable();
         (require database_path('migrations/2024_04_26_060533_create_tahun_akademiks_table.php'))->up();
         (require database_path('migrations/2026_07_17_000003_extend_tahun_akademiks_for_period_lifecycle.php'))->up();
+        (require database_path('migrations/2026_08_20_000001_create_tahun_akademik_and_link_periods.php'))->up();
         $this->createAcademicDependencyTables();
     }
 
     public function test_web_administrator_can_create_a_draft_period(): void
     {
+        $payload = $this->periodPayload();
+        $payload['code'] = '2026-ganjil';
+        $payload['year_start'] = 1999;
+        $payload['year_end'] = 2000;
+
         $response = $this
             ->actingAs($this->staffUser(0, 'WEBADMIN'))
-            ->post(route('web-admin.master.taka-store'), $this->periodPayload());
+            ->post(route('web-admin.master.taka-store'), $payload);
 
         $response->assertSessionHasNoErrors();
         $this->assertDatabaseHas('tahun_akademiks', [
@@ -39,10 +46,19 @@ class TahunAkademikTest extends TestCase
             'semester' => 1,
             'status' => TahunAkademik::STATUS_DRAFT,
             'is_active' => 0,
+            'year_start' => 2026,
+            'year_end' => 2027,
         ]);
+        $this->assertDatabaseHas('tahun_akademik', [
+            'name' => 'Tahun Akademik 2026/2027',
+            'code' => '2026-2027',
+            'year_start' => 2026,
+            'year_end' => 2027,
+        ]);
+        $this->assertNotNull(TahunAkademik::where('code', '2026-GANJIL')->value('tid'));
     }
 
-    public function test_period_validation_rejects_duplicate_code_and_invalid_ranges(): void
+    public function test_period_validation_rejects_duplicate_code_invalid_parent_and_invalid_dates(): void
     {
         TahunAkademik::create([
             ...$this->periodPayload(),
@@ -52,13 +68,62 @@ class TahunAkademikTest extends TestCase
         $response = $this
             ->actingAs($this->staffUser(0, 'WEBADMIN'))
             ->post(route('web-admin.master.taka-store'), $this->periodPayload([
-                'year_end' => 2025,
+                'tid' => 999999,
                 'starts_at' => '2026-12-31',
                 'ends_at' => '2026-08-01',
             ]));
 
-        $response->assertSessionHasErrors(['code', 'year_end', 'ends_at']);
+        $response->assertSessionHasErrors(['code', 'tid', 'ends_at']);
         $this->assertDatabaseCount('tahun_akademiks', 1);
+    }
+
+    public function test_same_term_cannot_be_created_twice_in_one_academic_year(): void
+    {
+        TahunAkademik::create([
+            ...$this->periodPayload(),
+            'semester' => 1,
+        ]);
+
+        $response = $this
+            ->actingAs($this->staffUser(0, 'WEBADMIN'))
+            ->post(route('web-admin.master.taka-store'), $this->periodPayload([
+                'name' => 'Duplikat Ganjil',
+                'code' => '2026-GANJIL-LAIN',
+            ]));
+
+        $response->assertSessionHasErrors('term');
+        $this->assertDatabaseCount('tahun_akademiks', 1);
+    }
+
+    public function test_draft_period_can_move_to_another_academic_year_and_inherits_its_range(): void
+    {
+        $period = TahunAkademik::create([
+            ...$this->periodPayload(),
+            'semester' => 1,
+        ]);
+        $targetYearId = $this->academicYearId(2027, 2028);
+        $payload = $this->periodPayload([
+            'tid' => $targetYearId,
+            'name' => '2027/2028 Genap',
+            'code' => '2027-2028-GENAP',
+            'term' => TahunAkademik::TERM_GENAP,
+        ]);
+        $payload['year_start'] = 1900;
+        $payload['year_end'] = 1901;
+
+        $this
+            ->actingAs($this->staffUser(0, 'WEBADMIN'))
+            ->patch(route('web-admin.master.taka-update', $period->code), $payload)
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('tahun_akademiks', [
+            'id' => $period->id,
+            'tid' => $targetYearId,
+            'year_start' => 2027,
+            'year_end' => 2028,
+            'term' => TahunAkademik::TERM_GENAP,
+            'semester' => 2,
+        ]);
     }
 
     public function test_activating_a_period_closes_the_previous_active_period(): void
@@ -80,6 +145,7 @@ class TahunAkademikTest extends TestCase
         ]);
         $next = TahunAkademik::create([
             ...$this->periodPayload(),
+            'tid' => $this->academicYearId(2026, 2027),
             'semester' => 1,
         ]);
 
@@ -210,9 +276,24 @@ class TahunAkademikTest extends TestCase
         ]);
     }
 
+    private function academicYearId(int $yearStart, int $yearEnd): int
+    {
+        return TahunAkademikInduk::firstOrCreate(
+            ['year_start' => $yearStart, 'year_end' => $yearEnd],
+            [
+                'name' => "Tahun Akademik {$yearStart}/{$yearEnd}",
+                'code' => "{$yearStart}-{$yearEnd}",
+            ]
+        )->id;
+    }
+
     private function periodPayload(array $overrides = []): array
     {
+        $yearStart = $overrides['year_start'] ?? 2026;
+        $yearEnd = $overrides['year_end'] ?? 2027;
+
         return array_merge([
+            'tid' => $this->academicYearId($yearStart, $yearEnd),
             'name' => 'Tahun Akademik 2026/2027 Ganjil',
             'code' => '2026-GANJIL',
             'term' => TahunAkademik::TERM_GANJIL,

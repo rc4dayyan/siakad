@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PenerbitanTagihanBatch extends Model
 {
+    use Concerns\HasPeriodeAkademik;
+
     protected $guarded = [];
 
     protected function casts(): array

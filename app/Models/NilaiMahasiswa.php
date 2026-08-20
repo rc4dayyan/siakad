@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class NilaiMahasiswa extends Model
 {
+    use Concerns\HasPeriodeAkademik;
+
     protected $fillable = [
         'mahasiswa_id',
         'taka_id',
@@ -18,9 +20,9 @@ class NilaiMahasiswa extends Model
         'keterangan',
     ];
 
-    public function scopeForAcademicPeriod(Builder $query, TahunAkademik|int|null $period): Builder
+    public function scopeForAcademicPeriod(Builder $query, PeriodeAkademik|int|null $period): Builder
     {
-        $periodId = $period instanceof TahunAkademik ? $period->getKey() : $period;
+        $periodId = $period instanceof PeriodeAkademik ? $period->getKey() : $period;
 
         return $periodId
             ? $query->where('taka_id', $periodId)

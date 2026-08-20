@@ -7,14 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class ProgramKuliah extends Model
 {
-    use HasFactory;
+    use Concerns\HasPeriodeAkademik, HasFactory;
 
-    protected $guarded=[];
+    protected $guarded = [];
 
     public function taka()
     {
         return $this->belongsTo(TahunAkademik::class, 'taka_id');
     }
+
     public function pstudi()
     {
         return $this->belongsTo(ProgramStudi::class, 'pstudi_id');

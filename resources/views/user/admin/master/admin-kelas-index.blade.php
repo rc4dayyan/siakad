@@ -304,7 +304,7 @@
                     </div>
                     <div class="modal-body">
                         <p class="text-muted">
-                            Gunakan hasil export sebagai template. Kode Tahun Akademik setiap baris harus
+                            Gunakan hasil export sebagai template. Kolom legacy "Kode Tahun Akademik" berisi kode Periode Akademik dan setiap baris harus
                             <strong>{{ $selectedPeriod?->code }}</strong>. Kode kelas yang sudah ada akan dilewati.
                         </p>
                         <div class="form-group">

@@ -65,12 +65,14 @@ class PeriodReadinessService
 
     private function identityCheck(TahunAkademik $period): array
     {
+        $hasAcademicYear = ! Schema::hasColumn('tahun_akademiks', 'tid') || filled($period->tid);
         $complete = filled($period->name) && filled($period->code) && filled($period->term)
             && $period->year_start && $period->year_end && $period->starts_at && $period->ends_at
-            && $period->year_end >= $period->year_start && $period->ends_at->gte($period->starts_at);
+            && $period->year_end > $period->year_start && $period->ends_at->gte($period->starts_at)
+            && $hasAcademicYear;
 
         return $this->result('identitas', 'Identitas dan tanggal periode', $complete ? self::READY : self::FAILED,
-            $complete ? 'Identitas serta rentang tanggal periode lengkap.' : 'Lengkapi identitas, jenis semester, dan rentang tanggal yang valid.',
+            $complete ? 'Tahun akademik, identitas, serta rentang tanggal periode lengkap.' : 'Hubungkan tahun akademik dan lengkapi identitas, jenis semester, serta rentang tanggal yang valid.',
             '/web-admin/master/data-taka');
     }
 
