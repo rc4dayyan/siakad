@@ -183,6 +183,7 @@
             new window.simpleDatatables.DataTable(table, {
                 perPage: 10,
                 perPageSelect: [10, 25, 50, 100],
+                searchable: table.getAttribute('data-dashboard-searchable') !== 'false',
                 labels: {
                     placeholder: 'Cari data...',
                     perPage: '',

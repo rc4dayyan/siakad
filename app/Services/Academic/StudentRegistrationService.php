@@ -8,10 +8,130 @@ use App\Models\Mahasiswa;
 use App\Models\RegistrasiMahasiswa;
 use App\Models\TahunAkademik;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class StudentRegistrationService
 {
+    /**
+     * @return array{registration: RegistrasiMahasiswa, moved: bool, previous_class_id: int|null}
+     */
+    public function assignToClass(
+        Mahasiswa $student,
+        TahunAkademik $period,
+        Kelas $class,
+        ?Dosen $academicAdvisor,
+        int $semester,
+        string $academicStatus,
+        int $creditLimit
+    ): array {
+        return DB::transaction(function () use (
+            $student,
+            $period,
+            $class,
+            $academicAdvisor,
+            $semester,
+            $academicStatus,
+            $creditLimit
+        ): array {
+            $lockedClass = Kelas::query()->lockForUpdate()->findOrFail($class->getKey());
+            $lockedStudent = Mahasiswa::query()->lockForUpdate()->findOrFail($student->getKey());
+            $registration = RegistrasiMahasiswa::query()
+                ->where('mahasiswa_id', $lockedStudent->id)
+                ->where('taka_id', $period->id)
+                ->lockForUpdate()
+                ->first();
+            $previousClassId = $registration?->kelas_id;
+            $sourceClass = $registration?->kelas_id
+                ? Kelas::query()->find($registration->kelas_id)
+                : $lockedStudent->kelas()->first();
+
+            if ((int) $lockedClass->taka_id !== (int) $period->id) {
+                throw ValidationException::withMessages([
+                    'mahasiswa_id' => 'Kelas tujuan tidak berada pada periode akademik yang dipilih.',
+                ]);
+            }
+
+            if ($sourceClass && (int) $sourceClass->pstudi_id !== (int) $lockedClass->pstudi_id) {
+                throw ValidationException::withMessages([
+                    'mahasiswa_id' => 'Mahasiswa hanya dapat ditempatkan pada kelas dari program studi yang sama.',
+                ]);
+            }
+
+            if ($registration && (int) $registration->kelas_id === (int) $lockedClass->id) {
+                throw ValidationException::withMessages([
+                    'mahasiswa_id' => 'Mahasiswa sudah terdaftar pada kelas ini.',
+                ]);
+            }
+
+            $occupancy = Mahasiswa::query()
+                ->forAcademicClass($period, $lockedClass->id)
+                ->where('id', '!=', $lockedStudent->id)
+                ->count();
+            if ($lockedClass->capacity && $occupancy >= (int) $lockedClass->capacity) {
+                throw ValidationException::withMessages([
+                    'mahasiswa_id' => 'Kelas tujuan sudah mencapai kapasitas maksimum.',
+                ]);
+            }
+
+            if ($registration) {
+                if ($registration->hasTerminalAcademicStatus()) {
+                    throw ValidationException::withMessages([
+                        'mahasiswa_id' => 'Mahasiswa dengan status akademik terminal tidak dapat dipindahkan kelas.',
+                    ]);
+                }
+
+                if (Schema::hasTable('krs') && $registration->krs()->whereHas('items')->exists()) {
+                    throw ValidationException::withMessages([
+                        'mahasiswa_id' => 'Mahasiswa tidak dapat dipindahkan karena sudah memiliki mata kuliah pada KRS periode ini.',
+                    ]);
+                }
+
+                $registration->update(['kelas_id' => $lockedClass->id]);
+                $moved = true;
+            } else {
+                if (! $academicAdvisor) {
+                    throw ValidationException::withMessages([
+                        'dosen_wali_id' => 'Dosen wali aktif wajib dipilih untuk registrasi baru.',
+                    ]);
+                }
+
+                $this->validateRegistration(
+                    $lockedStudent,
+                    $period,
+                    $semester,
+                    $academicStatus,
+                    $lockedClass,
+                    $creditLimit
+                );
+
+                $registration = RegistrasiMahasiswa::create([
+                    'mahasiswa_id' => $lockedStudent->id,
+                    'taka_id' => $period->id,
+                    'semester_mahasiswa' => $semester,
+                    'status_akademik' => $academicStatus,
+                    'status_registrasi' => RegistrasiMahasiswa::STATUS_REGISTRASI_TERDAFTAR,
+                    'kelas_id' => $lockedClass->id,
+                    'dosen_wali_id' => $academicAdvisor->id,
+                    'batas_sks' => $creditLimit,
+                ]);
+                $moved = false;
+            }
+
+            // Dipertahankan sampai TA-306 selesai memigrasikan seluruh pembacaan ke registrasi.
+            $lockedStudent->update([
+                'taka_id' => $period->id,
+                'class_id' => $lockedClass->id,
+            ]);
+
+            return [
+                'registration' => $registration->fresh(),
+                'moved' => $moved,
+                'previous_class_id' => $previousClassId,
+            ];
+        });
+    }
+
     public function register(
         Mahasiswa $student,
         TahunAkademik $period,

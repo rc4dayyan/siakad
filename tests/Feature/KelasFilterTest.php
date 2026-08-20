@@ -33,12 +33,36 @@ class KelasFilterTest extends TestCase
         Schema::create('dosens', function ($table): void {
             $table->id();
             $table->string('dsn_name');
+            $table->tinyInteger('dsn_stat')->default(1);
         });
         (require database_path('migrations/2024_04_27_041303_create_kelas_table.php'))->up();
+        Schema::create('mahasiswas', function ($table): void {
+            $table->id();
+            $table->unsignedBigInteger('taka_id')->nullable();
+            $table->unsignedBigInteger('class_id')->nullable();
+            $table->string('mhs_nim')->unique();
+            $table->string('mhs_name');
+            $table->string('mhs_code')->unique();
+            $table->string('mhs_gend')->nullable();
+        });
         Schema::create('registrasi_mahasiswas', function ($table): void {
             $table->id();
+            $table->unsignedBigInteger('mahasiswa_id');
             $table->unsignedBigInteger('kelas_id')->nullable();
             $table->unsignedBigInteger('taka_id');
+            $table->unsignedTinyInteger('semester_mahasiswa')->default(1);
+            $table->string('status_akademik')->default('aktif');
+            $table->string('status_registrasi')->default('terdaftar');
+            $table->unsignedBigInteger('dosen_wali_id')->nullable();
+            $table->unsignedTinyInteger('batas_sks')->default(24);
+        });
+        Schema::create('jadwal_kuliahs', function ($table): void {
+            $table->id();
+            $table->unsignedBigInteger('kelas_id');
+        });
+        Schema::create('absensi_mahasiswas', function ($table): void {
+            $table->id();
+            $table->unsignedBigInteger('author_id');
         });
         Schema::create('notifications', function ($table): void {
             $table->id();
@@ -117,6 +141,57 @@ class KelasFilterTest extends TestCase
 
         $response->assertRedirect();
         $response->assertSessionHasErrors('proku_id');
+    }
+
+    public function test_class_student_page_can_filter_by_keyword_and_gender(): void
+    {
+        $period = $this->activePeriod();
+        $program = $this->program($period, 1, 'Reguler Pagi');
+        $class = $this->kelas($period, $program, 1, 1, 'Kelas Alpha', 'PAI-A');
+        $matchingStudentId = DB::table('mahasiswas')->insertGetId([
+            'taka_id' => $period->id,
+            'class_id' => $class->id,
+            'mhs_nim' => '20260001',
+            'mhs_name' => 'Aisyah Putri',
+            'mhs_code' => 'MHS-AISYAH',
+            'mhs_gend' => 'P',
+        ]);
+        $otherStudentId = DB::table('mahasiswas')->insertGetId([
+            'taka_id' => $period->id,
+            'class_id' => $class->id,
+            'mhs_nim' => '20260002',
+            'mhs_name' => 'Budi Santoso',
+            'mhs_code' => 'MHS-BUDI',
+            'mhs_gend' => 'L',
+        ]);
+        foreach ([$matchingStudentId, $otherStudentId] as $studentId) {
+            DB::table('registrasi_mahasiswas')->insert([
+                'mahasiswa_id' => $studentId,
+                'kelas_id' => $class->id,
+                'taka_id' => $period->id,
+                'semester_mahasiswa' => 1,
+                'status_akademik' => 'aktif',
+                'status_registrasi' => 'terdaftar',
+                'dosen_wali_id' => 1,
+                'batas_sks' => 24,
+            ]);
+        }
+
+        $response = $this
+            ->actingAs($this->webAdmin())
+            ->get(route('web-admin.master.kelas-mahasiswa-view', [
+                'code' => $class->code,
+                'q' => 'Aisyah',
+                'gender' => 'P',
+                'sort' => 'nim_desc',
+            ]));
+
+        $response->assertOk();
+        $response->assertViewHas('mahasiswa', fn ($students): bool => $students->modelKeys() === [$matchingStudentId]);
+        $response->assertViewHas('classStudentCount', 2);
+        $response->assertSee('Filter Daftar Mahasiswa');
+        $response->assertSee('Aisyah Putri');
+        $response->assertDontSee('Budi Santoso');
     }
 
     private function activePeriod(): TahunAkademik

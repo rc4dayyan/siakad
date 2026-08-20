@@ -9,7 +9,9 @@ use App\Models\RegistrasiMahasiswa;
 use App\Models\TahunAkademik;
 use App\Models\User;
 use App\Services\Academic\AcademicPeriodContext;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class StudentRegistrationTest extends TestCase
@@ -29,6 +31,17 @@ class StudentRegistrationTest extends TestCase
         (require database_path('migrations/2024_03_09_024021_create_dosens_table.php'))->up();
         (require database_path('migrations/2024_04_27_041303_create_kelas_table.php'))->up();
         (require database_path('migrations/2026_07_17_000005_create_registrasi_mahasiswas_table.php'))->up();
+        Schema::create('krs', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('registrasi_mahasiswa_id')->unique();
+            $table->string('status')->default('draft');
+            $table->timestamps();
+        });
+        Schema::create('krs_items', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('krs_id');
+            $table->timestamps();
+        });
     }
 
     public function test_staff_can_register_student_to_selected_period(): void
@@ -80,6 +93,126 @@ class StudentRegistrationTest extends TestCase
         $response->assertSessionHasErrors('registration');
         $this->assertSame(1, RegistrasiMahasiswa::query()->where('mahasiswa_id', $student->id)->count());
         $this->assertSame(3, $existing->fresh()->semester_mahasiswa);
+    }
+
+    public function test_staff_can_assign_an_unregistered_student_from_the_class_page(): void
+    {
+        $period = $this->period('2026-GENAP', TahunAkademik::STATUS_ACTIVE, '2026-02-01');
+        $student = Mahasiswa::factory()->create();
+        $advisor = $this->lecturer();
+        $class = $this->kelas($period, $advisor);
+
+        $response = $this->assignRequest($student, $period, $class, $advisor, [
+            'semester_mahasiswa' => 3,
+            'batas_sks' => 20,
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('registrasi_mahasiswas', [
+            'mahasiswa_id' => $student->id,
+            'taka_id' => $period->id,
+            'kelas_id' => $class->id,
+            'semester_mahasiswa' => 3,
+            'batas_sks' => 20,
+        ]);
+        $this->assertSame($class->id, $student->fresh()->class_id);
+    }
+
+    public function test_staff_can_move_a_registration_without_changing_its_academic_details(): void
+    {
+        $period = $this->period('2026-GENAP', TahunAkademik::STATUS_ACTIVE, '2026-02-01');
+        $student = Mahasiswa::factory()->create();
+        $advisor = $this->lecturer();
+        $sourceClass = $this->kelas($period, $advisor);
+        $targetClass = $this->kelas($period, $advisor);
+        $registration = RegistrasiMahasiswa::factory()->create([
+            'mahasiswa_id' => $student->id,
+            'taka_id' => $period->id,
+            'semester_mahasiswa' => 5,
+            'kelas_id' => $sourceClass->id,
+            'dosen_wali_id' => $advisor->id,
+            'batas_sks' => 18,
+        ]);
+        $student->update(['taka_id' => $period->id, 'class_id' => $sourceClass->id]);
+
+        $response = $this
+            ->actingAs($this->webAdmin())
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $period->id])
+            ->post(route('web-admin.master.kelas-mahasiswa-assign', $targetClass->code), [
+                'form' => 'assign_student',
+                'mahasiswa_id' => $student->id,
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('registrasi_mahasiswas', [
+            'id' => $registration->id,
+            'kelas_id' => $targetClass->id,
+            'semester_mahasiswa' => 5,
+            'dosen_wali_id' => $advisor->id,
+            'batas_sks' => 18,
+        ]);
+        $this->assertSame($targetClass->id, $student->fresh()->class_id);
+    }
+
+    public function test_assigning_a_student_to_a_full_class_is_rejected(): void
+    {
+        $period = $this->period('2026-GENAP', TahunAkademik::STATUS_ACTIVE, '2026-02-01');
+        $advisor = $this->lecturer();
+        $class = $this->kelas($period, $advisor);
+        $class->update(['capacity' => 1]);
+        $occupant = Mahasiswa::factory()->create();
+        RegistrasiMahasiswa::factory()->create([
+            'mahasiswa_id' => $occupant->id,
+            'taka_id' => $period->id,
+            'kelas_id' => $class->id,
+            'dosen_wali_id' => $advisor->id,
+        ]);
+        $student = Mahasiswa::factory()->create();
+
+        $response = $this->assignRequest($student, $period, $class, $advisor);
+
+        $response->assertSessionHasErrors('mahasiswa_id');
+        $this->assertDatabaseMissing('registrasi_mahasiswas', [
+            'mahasiswa_id' => $student->id,
+            'taka_id' => $period->id,
+        ]);
+    }
+
+    public function test_registration_with_krs_items_cannot_be_moved_to_another_class(): void
+    {
+        $period = $this->period('2026-GENAP', TahunAkademik::STATUS_ACTIVE, '2026-02-01');
+        $student = Mahasiswa::factory()->create();
+        $advisor = $this->lecturer();
+        $sourceClass = $this->kelas($period, $advisor);
+        $targetClass = $this->kelas($period, $advisor);
+        $registration = RegistrasiMahasiswa::factory()->create([
+            'mahasiswa_id' => $student->id,
+            'taka_id' => $period->id,
+            'kelas_id' => $sourceClass->id,
+            'dosen_wali_id' => $advisor->id,
+        ]);
+        $krsId = DB::table('krs')->insertGetId([
+            'registrasi_mahasiswa_id' => $registration->id,
+            'status' => 'draft',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('krs_items')->insert([
+            'krs_id' => $krsId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this
+            ->actingAs($this->webAdmin())
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $period->id])
+            ->post(route('web-admin.master.kelas-mahasiswa-assign', $targetClass->code), [
+                'form' => 'assign_student',
+                'mahasiswa_id' => $student->id,
+            ]);
+
+        $response->assertSessionHasErrors('mahasiswa_id');
+        $this->assertSame($sourceClass->id, $registration->fresh()->kelas_id);
     }
 
     public function test_unknown_student_returns_not_found(): void
@@ -172,6 +305,26 @@ class StudentRegistrationTest extends TestCase
                 'semester_mahasiswa' => 1,
                 'status_akademik' => RegistrasiMahasiswa::STATUS_AKADEMIK_AKTIF,
                 'kelas_id' => $class->id,
+                'dosen_wali_id' => $advisor->id,
+                'batas_sks' => 24,
+            ], $overrides));
+    }
+
+    private function assignRequest(
+        Mahasiswa $student,
+        TahunAkademik $period,
+        Kelas $class,
+        Dosen $advisor,
+        array $overrides = []
+    ) {
+        return $this
+            ->actingAs($this->webAdmin())
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $period->id])
+            ->post(route('web-admin.master.kelas-mahasiswa-assign', $class->code), array_merge([
+                'form' => 'assign_student',
+                'mahasiswa_id' => $student->id,
+                'semester_mahasiswa' => 1,
+                'status_akademik' => RegistrasiMahasiswa::STATUS_AKADEMIK_AKTIF,
                 'dosen_wali_id' => $advisor->id,
                 'batas_sks' => 24,
             ], $overrides));

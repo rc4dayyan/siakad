@@ -10,8 +10,11 @@ use App\Models\Kelas;
 use App\Models\Mahasiswa;
 use App\Models\ProgramKuliah;
 use App\Models\ProgramStudi;
+use App\Models\RegistrasiMahasiswa;
 use App\Models\Settings\webSettings;
+use App\Services\Academic\AcademicAuditService;
 use App\Services\Academic\AcademicPeriodContext;
+use App\Services\Academic\StudentRegistrationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -71,20 +74,135 @@ class KelasController extends Controller
         ]);
     }
 
-    public function viewMahasiswa(string $code, AcademicPeriodContext $context): View
+    public function viewMahasiswa(Request $request, string $code, AcademicPeriodContext $context): View
     {
         $period = $context->requireCurrent(auth()->user());
         $kelas = Kelas::query()
             ->forAcademicPeriod($period)
             ->where('code', $code)
             ->firstOrFail();
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'gender' => ['nullable', 'string', Rule::in(['L', 'P'])],
+            'sort' => ['nullable', 'string', Rule::in(['name_asc', 'name_desc', 'nim_asc', 'nim_desc'])],
+        ]);
+        $classStudentsQuery = Mahasiswa::query()->forAcademicClass($period, $kelas->id);
+        $classStudentCount = (clone $classStudentsQuery)->count();
+        $classStudents = $classStudentsQuery
+            ->when($filters['q'] ?? null, function ($query, string $keyword): void {
+                $query->where(function ($query) use ($keyword): void {
+                    $query->where('mhs_nim', 'like', "%{$keyword}%")
+                        ->orWhere('mhs_name', 'like', "%{$keyword}%");
+                });
+            })
+            ->when($filters['gender'] ?? null, fn ($query, string $gender) => $query->where('mhs_gend', $gender))
+            ->when(
+                in_array($filters['sort'] ?? 'name_asc', ['nim_asc', 'nim_desc'], true),
+                fn ($query) => $query->orderBy('mhs_nim', ($filters['sort'] ?? null) === 'nim_desc' ? 'desc' : 'asc'),
+                fn ($query) => $query->orderBy('mhs_name', ($filters['sort'] ?? null) === 'name_desc' ? 'desc' : 'asc')
+            )
+            ->get();
+
+        $availableStudents = Mahasiswa::query()
+            ->whereDoesntHave('registrasiAkademik', fn ($query) => $query
+                ->where('taka_id', $period->id)
+                ->where('kelas_id', $kelas->id))
+            ->where(function ($query) use ($period, $kelas): void {
+                $query->whereHas('registrasiAkademik', fn ($registration) => $registration
+                    ->where('taka_id', $period->id)
+                    ->whereHas('kelas', fn ($class) => $class->where('pstudi_id', $kelas->pstudi_id)))
+                    ->orWhere(function ($legacy) use ($period, $kelas): void {
+                        $legacy->whereDoesntHave('registrasiAkademik', fn ($registration) => $registration
+                            ->where('taka_id', $period->id))
+                            ->whereHas('kelas', fn ($class) => $class->where('pstudi_id', $kelas->pstudi_id));
+                    });
+            })
+            ->with([
+                'kelas',
+                'registrasiAkademik' => fn ($query) => $query
+                    ->with(['kelas', 'taka'])
+                    ->orderByDesc('id'),
+            ])
+            ->orderBy('mhs_name')
+            ->get();
 
         return view('user.admin.master.admin-kelas-view-mahasiswa', [
             'web' => webSettings::where('id', 1)->first(),
             'prefix' => $this->setPrefix(),
             'kelas' => $kelas,
-            'mahasiswa' => Mahasiswa::query()->forAcademicClass($period, $kelas->id)->get(),
+            'mahasiswa' => $classStudents,
+            'classStudentCount' => $classStudentCount,
+            'filters' => $filters,
+            'availableStudents' => $availableStudents,
+            'academicAdvisors' => Dosen::query()->where('dsn_stat', 1)->orderBy('dsn_name')->get(),
+            'period' => $period,
+            'canAssignStudents' => $period->isWritable(),
         ]);
+    }
+
+    public function assignMahasiswa(
+        Request $request,
+        string $code,
+        AcademicPeriodContext $context,
+        StudentRegistrationService $registrationService,
+        AcademicAuditService $audit
+    ): RedirectResponse {
+        $period = $context->requireWritableCurrent($request->user());
+        $kelas = Kelas::query()
+            ->forAcademicPeriod($period)
+            ->where('code', $code)
+            ->firstOrFail();
+        $studentData = $request->validate([
+            'mahasiswa_id' => ['required', 'integer', 'exists:mahasiswas,id'],
+        ], [
+            'mahasiswa_id.required' => 'Mahasiswa wajib dipilih.',
+            'mahasiswa_id.exists' => 'Mahasiswa yang dipilih tidak ditemukan.',
+        ]);
+        $student = Mahasiswa::query()->findOrFail($studentData['mahasiswa_id']);
+        $existingRegistration = RegistrasiMahasiswa::query()
+            ->where('mahasiswa_id', $student->id)
+            ->where('taka_id', $period->id)
+            ->with('dosenWali')
+            ->first();
+
+        $validated = $existingRegistration ? [] : $request->validate([
+            'semester_mahasiswa' => ['required', 'integer', 'between:1,14'],
+            'status_akademik' => ['required', 'string', Rule::in(RegistrasiMahasiswa::academicStatuses())],
+            'dosen_wali_id' => ['required', 'integer', Rule::exists('dosens', 'id')->where('dsn_stat', 1)],
+            'batas_sks' => ['required', 'integer', 'between:1,24'],
+        ], [
+            'semester_mahasiswa.between' => 'Semester mahasiswa harus antara 1 sampai 14.',
+            'status_akademik.in' => 'Status akademik yang dipilih tidak valid.',
+            'dosen_wali_id.required' => 'Dosen wali wajib dipilih.',
+            'dosen_wali_id.exists' => 'Dosen wali aktif yang dipilih tidak ditemukan.',
+            'batas_sks.between' => 'Batas SKS harus antara 1 sampai 24.',
+        ]);
+
+        $result = $registrationService->assignToClass(
+            $student,
+            $period,
+            $kelas,
+            $existingRegistration?->dosenWali ?? Dosen::query()->find($validated['dosen_wali_id'] ?? null),
+            (int) ($existingRegistration?->semester_mahasiswa ?? $validated['semester_mahasiswa']),
+            $existingRegistration?->status_akademik ?? $validated['status_akademik'],
+            (int) ($existingRegistration?->batas_sks ?? $validated['batas_sks'])
+        );
+
+        $audit->record(
+            $result['moved'] ? 'student.class_moved' : 'student.registered',
+            $result['registration'],
+            $period->id,
+            $request->user(),
+            ['class_id' => $result['previous_class_id']],
+            ['student_id' => $student->id, 'class_id' => $kelas->id]
+        );
+
+        Alert::success(
+            $result['moved'] ? 'Mahasiswa dipindahkan' : 'Mahasiswa ditambahkan',
+            $student->mhs_name.' berhasil ditempatkan pada kelas '.$kelas->name.'.'
+        );
+
+        return back();
     }
 
     public function cetakMahasiswa(string $code, AcademicPeriodContext $context): View

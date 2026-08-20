@@ -92,6 +92,7 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         // MENU KHUSUS DATA MASTER => DATA KELAS
         Route::get('/master/data-kelas',[App\Http\Controllers\Admin\Pages\Core\KelasController::class, 'index'])->name('master.kelas-index');
         Route::get('/master/data-kelas/{code}/view/mahasiswa',[App\Http\Controllers\Admin\Pages\Core\KelasController::class, 'viewMahasiswa'])->name('master.kelas-mahasiswa-view');
+        Route::post('/master/data-kelas/{code}/mahasiswa',[App\Http\Controllers\Admin\Pages\Core\KelasController::class, 'assignMahasiswa'])->name('master.kelas-mahasiswa-assign');
         Route::post('/master/data-kelas/store',[App\Http\Controllers\Admin\Pages\Core\KelasController::class, 'store'])->name('master.kelas-store');
         Route::post('/master/data-kelas/{code}/cetak/mahasiswa',[App\Http\Controllers\Admin\Pages\Core\KelasController::class, 'cetakMahasiswa'])->name('master.kelas-mahasiswa-cetak');
         Route::patch('/master/data-kelas/{code}/update',[App\Http\Controllers\Admin\Pages\Core\KelasController::class, 'update'])->name('master.kelas-update');
