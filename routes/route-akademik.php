@@ -23,6 +23,8 @@ Route::group(['prefix' => 'academic', 'middleware' => ['user-access:Departement 
         Route::patch('/data-mahasiswa/{code}/update',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'updateStudent'])->name('workers.student-update');
         Route::patch('/data-mahasiswa/{code}/status-akademik',[App\Http\Controllers\Admin\AcademicStatusController::class, 'update'])->name('workers.student-academic-status-update');
         Route::delete('/data-mahasiswa/{code}/destroy',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'destroyStudent'])->name('workers.student-destroy');
+        Route::get('/krs-list', [App\Http\Controllers\Admin\KrsListController::class, 'index'])->name('krs-list.index');
+        Route::get('/krs-list/export', [App\Http\Controllers\Admin\KrsListController::class, 'export'])->name('krs-list.export');
         Route::get('/krs-management', [App\Http\Controllers\Admin\KrsManagementController::class, 'index'])->name('krs-management.index');
         Route::get('/krs-management/import/template', [App\Http\Controllers\Admin\KrsManagementController::class, 'importTemplate'])->name('krs-management.import-template');
         Route::post('/krs-management/import/preview', [App\Http\Controllers\Admin\KrsManagementController::class, 'importPreview'])->name('krs-management.import-preview');

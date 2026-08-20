@@ -36,4 +36,9 @@ class ProgramStudi extends Model
     {
         return $this->belongsTo(Fakultas::class, 'faku_id');
     }
+
+    public function penawarans()
+    {
+        return $this->hasMany(PenawaranMataKuliah::class, 'pstudi_id');
+    }
 }

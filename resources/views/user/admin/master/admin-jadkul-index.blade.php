@@ -102,6 +102,43 @@ Halaman untuk mengelola Jadwal Kuliah
         text-align: center;
     }
 
+    .schedule-table thead th {
+        padding-top: 12px;
+        padding-bottom: 12px;
+        color: #607080;
+        font-size: 11px;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .schedule-table td {
+        padding-top: 14px;
+        padding-bottom: 14px;
+        vertical-align: middle;
+    }
+
+    .schedule-table__primary {
+        display: block;
+        color: #25396f;
+        font-weight: 600;
+    }
+
+    .schedule-table__meta {
+        display: block;
+        margin-top: 3px;
+        color: #7c8a96;
+        font-size: 12px;
+    }
+
+    .schedule-table__course {
+        min-width: 210px;
+    }
+
+    .schedule-table__slot {
+        min-width: 230px;
+    }
+
     @media (max-width: 767.98px) {
         .schedule-filter-panel__heading,
         .schedule-page-header {
@@ -254,76 +291,90 @@ Halaman untuk mengelola Jadwal Kuliah
                 </form>
             </div>
 
-            <table class="table table-striped" id="table1">
-                <thead>
-                    <tr>
-                        <th class="text-center">#</th>
-                        <th class="text-center">Program Studi</th>
-                        <th class="text-center">Nama Kelas</th>
-                        <th class="text-center">Nama Mata Kuliah</th>
-                        <th class="text-center">Dosen Pengajar</th>
-                        <th class="text-center">Metode Perkuliahan</th>
-                        <th class="text-center">Tanggal Perkuliahan</th>
-                        <th class="text-center">Waktu Perkuliahan</th>
-                        <th class="text-center">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($jadkul as $key => $item)
-
-                    <tr>
-                        <td data-label="Number">{{ ++$key }}</td>
-                        <td data-label="Program Studi">{{ $item->kelas->pstudi->fakultas->name ?? '' }} <br> {{ $item->kelas->pstudi->name ?? '' }}</td>
-                        <td data-label="Nama Kelas">{{ $item->kelas->code ?? '' }}</td>
-                        <td data-label="Mata Kuliah">{{ $item->matkul->name ?? '' }} <br> {{ $item->pert_id . ' - ' . $item->bsks . ' SKS' }}</td>
-                        <td data-label="Nama Dosen">{{ $item->dosen->dsn_name ?? '' }}</td>
-                        <td data-label="Metode">{{ $item->meth_id }}</td>
-                        <td data-label="Tanggal Kuliah">{{ $item->days_id }} <br> - <br> {{ \Carbon\Carbon::parse($item->date)->format('d M Y') }}</td>
-                        <td data-label="Waktu Perkuliahan">{{ $item->start }} <br> - <br> {{ $item->ended }}</td>
-                        <td class="text-center" data-label="Aksi">
-                            <div class="dropdown schedule-action-dropdown d-inline-block">
-                                <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle"
-                                    id="schedule-action-{{ $item->code }}" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="fas fa-cog me-1"></i> Aksi
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="schedule-action-{{ $item->code }}">
-                                    <li>
-                                        <a href="{{ route($prefix.'master.jadkul-absen-view', $item->code) }}" class="dropdown-item text-info">
-                                            <i class="fa-solid fa-user-check"></i> Lihat Absensi
-                                        </a>
-                                    </li>
-                                    @if ($canManageJadwal)
-                                        <li>
-                                            <button type="button" class="dropdown-item text-primary" data-bs-toggle="modal"
-                                                data-bs-target="#updateJadkul{{ $item->code }}">
-                                                <i class="fas fa-edit"></i> Edit Jadwal
-                                            </button>
-                                        </li>
-                                        <li><hr class="dropdown-divider my-1"></li>
-                                        <li>
-                                            <form id="delete-form-{{ $item->code }}"
-                                                action="{{ route($prefix.'master.jadkul-destroy', $item->code) }}" method="POST">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="button" class="dropdown-item text-danger"
-                                                    data-url="{{ route($prefix.'master.jadkul-destroy', $item->code) }}"
-                                                    data-name="{{ $item->matkul->name ?? 'jadwal ini' }}"
-                                                    onclick="deleteData('{{ $item->code }}')">
-                                                    <i class="fas fa-trash"></i> Hapus Jadwal
-                                                </button>
-                                            </form>
-                                        </li>
-                                    @endif
-                                </ul>
-                            </div>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr><td colspan="9" class="text-center text-muted">Belum ada jadwal pada periode ini.</td></tr>
-                    @endforelse
-
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table class="table table-hover schedule-table" id="table1">
+                    <thead>
+                        <tr>
+                            <th class="text-center">#</th>
+                            <th>Kelas &amp; Prodi</th>
+                            <th>Mata Kuliah</th>
+                            <th>Dosen</th>
+                            <th>Jadwal</th>
+                            <th class="text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($jadkul as $key => $item)
+                            <tr>
+                                <td class="text-center" data-label="Nomor">{{ ++$key }}</td>
+                                <td data-label="Kelas & Prodi">
+                                    <span class="schedule-table__primary">{{ $item->kelas->name ?? $item->kelas->code ?? '—' }}</span>
+                                    <small class="schedule-table__meta">
+                                        {{ $item->kelas->code ?? '—' }} · {{ $item->kelas->pstudi->name ?? 'Program studi tidak tersedia' }}
+                                    </small>
+                                </td>
+                                <td class="schedule-table__course" data-label="Mata Kuliah">
+                                    <span class="schedule-table__primary">{{ $item->matkul->name ?? '—' }}</span>
+                                    <small class="schedule-table__meta">{{ $item->pert_id }} · {{ $item->bsks }} SKS</small>
+                                </td>
+                                <td data-label="Dosen">
+                                    <span class="schedule-table__primary">{{ $item->dosen->dsn_name ?? 'Belum ditentukan' }}</span>
+                                </td>
+                                <td class="schedule-table__slot" data-label="Jadwal">
+                                    <span class="schedule-table__primary">
+                                        {{ $item->days_id }}, {{ \Carbon\Carbon::parse($item->date)->format('d M Y') }}
+                                    </span>
+                                    <small class="schedule-table__meta">
+                                        <i class="far fa-clock me-1"></i>{{ $item->start }}–{{ $item->ended }}
+                                        <span class="mx-1">·</span>
+                                        <i class="fas fa-map-marker-alt me-1"></i>{{ $item->ruang->name ?? 'Tanpa ruangan' }}
+                                    </small>
+                                    <span class="badge bg-light-primary text-primary mt-2">{{ $item->meth_id }}</span>
+                                </td>
+                                <td class="text-center" data-label="Aksi">
+                                    <div class="dropdown schedule-action-dropdown d-inline-block">
+                                        <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle"
+                                            id="schedule-action-{{ $item->code }}" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="fas fa-cog me-1"></i> Aksi
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="schedule-action-{{ $item->code }}">
+                                            <li>
+                                                <a href="{{ route($prefix.'master.jadkul-absen-view', $item->code) }}" class="dropdown-item text-info">
+                                                    <i class="fa-solid fa-user-check"></i> Lihat Absensi
+                                                </a>
+                                            </li>
+                                            @if ($canManageJadwal)
+                                                <li>
+                                                    <button type="button" class="dropdown-item text-primary" data-bs-toggle="modal"
+                                                        data-bs-target="#updateJadkul{{ $item->code }}">
+                                                        <i class="fas fa-edit"></i> Edit Jadwal
+                                                    </button>
+                                                </li>
+                                                <li><hr class="dropdown-divider my-1"></li>
+                                                <li>
+                                                    <form id="delete-form-{{ $item->code }}"
+                                                        action="{{ route($prefix.'master.jadkul-destroy', $item->code) }}" method="POST">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="button" class="dropdown-item text-danger"
+                                                            data-url="{{ route($prefix.'master.jadkul-destroy', $item->code) }}"
+                                                            data-name="{{ $item->matkul->name ?? 'jadwal ini' }}"
+                                                            onclick="deleteData('{{ $item->code }}')">
+                                                            <i class="fas fa-trash"></i> Hapus Jadwal
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                            @endif
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="6" class="text-center text-muted py-4">Belum ada jadwal pada periode ini.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 

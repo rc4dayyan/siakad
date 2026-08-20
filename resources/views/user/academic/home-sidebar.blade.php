@@ -27,7 +27,7 @@
                 <span>Mahasiswa</span>
             </a>
         </li>
-        <li class="sidebar-item has-sub {{ Route::is($prefix.'master.kurikulum-*', $prefix.'master.kelas-*', $prefix.'master.matkul-*', $prefix.'master.jadkul-*') ? 'active' : '' }}">
+        <li class="sidebar-item has-sub {{ Route::is($prefix.'master.kurikulum-*', $prefix.'master.kelas-*', $prefix.'master.matkul-*', $prefix.'master.jadkul-*', $prefix.'krs-list.*') ? 'active' : '' }}">
             <a href="#" class='sidebar-link'>
                 <i class="fa-solid fa-school"></i>
                 <span>Perkuliahan</span>
@@ -44,6 +44,9 @@
                 </li>
                 <li class="submenu-item {{ Route::is($prefix.'master.jadkul-*') ? 'active' : '' }}">
                     <a href="{{ route($prefix.'master.jadkul-index') }}" class="submenu-link">Jadwal Kuliah</a>
+                </li>
+                <li class="submenu-item {{ Route::is($prefix.'krs-list.*') ? 'active' : '' }}">
+                    <a href="{{ route($prefix.'krs-list.index') }}" class="submenu-link">List KRS</a>
                 </li>
             </ul>
         </li>

@@ -579,6 +579,93 @@ class KrsWorkflowTest extends TestCase
         app(AttendanceEligibilityService::class)->eligibleKrsItem($meeting, $outsider);
     }
 
+    public function test_krs_list_filters_rows_and_exports_reference_template_columns(): void
+    {
+        $data = $this->academicData();
+        $data['master']->update(['code' => 'PAI101']);
+        $offering = PenawaranMataKuliah::create([
+            ...$this->offeringAttributes($data),
+            'code' => 'PAI101-1A',
+        ]);
+        $service = app(KrsService::class);
+        $krs = $service->add($service->forRegistration($data['registration']), $offering);
+        $service->submit($krs);
+        $service->decide($krs->fresh(), $data['advisor'], Krs::STATUS_APPROVED, null);
+        NilaiMahasiswa::create([
+            'mahasiswa_id' => $data['student']->id,
+            'taka_id' => $data['periodId'],
+            'mata_kuliah_id' => null,
+            'penawaran_mata_kuliah_id' => $offering->id,
+            'kelas_id' => $data['classId'],
+            'dosen_id' => $data['advisor']->id,
+            'nilai' => 'A',
+        ]);
+        $administrator = $this->webAdministrator('KRSLISTADMIN');
+        $this->actingAs($administrator);
+        session([AcademicPeriodContext::SESSION_KEY => $data['periodId']]);
+
+        $request = Request::create('/web-admin/academic/krs-list', 'GET', [
+            'q' => '26001',
+            'status' => Krs::STATUS_APPROVED,
+            'nilai' => 'A',
+        ]);
+        $request->setUserResolver(fn () => $administrator);
+        $view = app(\App\Http\Controllers\Admin\KrsListController::class)
+            ->index($request, app(AcademicPeriodContext::class));
+
+        $this->assertSame(1, $view->getData()['items']->total());
+        $this->assertSame('26001', $view->getData()['items']->first()->nim);
+        $this->assertSame('A', $view->getData()['items']->first()->nilai_huruf);
+
+        $export = app(\App\Http\Controllers\Admin\KrsListController::class)
+            ->export($request, app(AcademicPeriodContext::class));
+        ob_start();
+        $export->sendContent();
+        $content = ob_get_clean();
+        $path = tempnam(sys_get_temp_dir(), 'krs-list-').'.xlsx';
+        file_put_contents($path, $content);
+
+        try {
+            $rows = (new FastExcel)->import($path);
+        } finally {
+            @unlink($path);
+        }
+
+        $this->assertCount(1, $rows);
+        $this->assertSame([
+            'NIM', 'Nama', 'Semester', 'Kode Mata Kuliah', 'Nama Mata Kuliah', 'Nama Kelas',
+            'Kode Prodi', 'Nama Prodi', 'Nilai Huruf', 'Nilai Indeks', 'Nilai Angka',
+        ], array_keys($rows->first()));
+        $this->assertSame('4.00', $rows->first()['Nilai Indeks']);
+    }
+
+    public function test_non_academic_staff_cannot_access_krs_list_controller(): void
+    {
+        $data = $this->academicData();
+        $staff = User::create([
+            'type' => 4,
+            'code' => 'DEPARTMENTADMIN',
+            'name' => 'Departement Admin',
+            'user' => 'departmentadmin',
+            'phone' => '081234567890',
+            'email' => 'departmentadmin@example.test',
+            'password' => 'secret',
+            'status' => 1,
+        ]);
+        $this->actingAs($staff);
+        session([AcademicPeriodContext::SESSION_KEY => $data['periodId']]);
+        $request = Request::create('/admin/krs-list');
+        $request->setUserResolver(fn () => $staff);
+
+        try {
+            app(\App\Http\Controllers\Admin\KrsListController::class)
+                ->index($request, app(AcademicPeriodContext::class));
+            $this->fail('Staf non-akademik seharusnya tidak dapat membuka List KRS.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+    }
+
     private function academicData(): array
     {
         $advisor = $this->lecturer('1001', 'Dosen Wali');

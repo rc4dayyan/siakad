@@ -108,10 +108,10 @@ Halaman untuk mengedit data pengguna {{ $student->mhs_name }}
                                     <small class="text-danger">{{ $message }}</small>
                                     @enderror
                                 </div>
-                                <div class="form-group col-lg-6 col-12">
+                                <!-- <div class="form-group col-lg-6 col-12">
                                     <label for="class_id">Kelas</label>
                                     <select name="class_id" id="class_id" class="form-select">
-                                        <option value="" selected>Pilih Jenis Kelamin</option>
+                                        <option value="" selected>Pilih Kelas</option>
                                         @foreach ($kelas as $item)
                                         <option value="{{ $item->id }}" {{ $item->id === $student->class_id ? 'selected' : ''}}>{{ $item->name }}</option>
                                         @endforeach
@@ -119,7 +119,7 @@ Halaman untuk mengedit data pengguna {{ $student->mhs_name }}
                                     @error('class_id')
                                     <small class="text-danger">{{ $message }}</small>
                                     @enderror
-                                </div>
+                                </div> -->
                                 <div class="form-group col-lg-6 col-12">
                                     <label for="mhs_gend">Jenis Kelamin</label>
                                     <select name="mhs_gend" id="mhs_gend" class="form-select">
