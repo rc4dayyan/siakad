@@ -24,7 +24,9 @@
             @include('user.support.home-sidebar')
             {{-- END -- MENU KHUSUS UNTUK DEPARTEMENT OFFICER --}}
         @endif
-        @include('user.sidebar-index')
+        @if (! in_array((int) Auth::user()->raw_type, [1, 3], true))
+            @include('user.sidebar-index')
+        @endif
     @endguest
 
     <!-- Menu untuk mahasiswa -->

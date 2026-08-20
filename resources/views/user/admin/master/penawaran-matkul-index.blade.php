@@ -4,6 +4,19 @@
 @section('submenu', 'Penawaran Periode')
 @section('urlmenu', '#')
 @section('subdesc', 'Kelola mata kuliah yang ditawarkan pada periode terpilih')
+@section('custom-css')
+    <style>
+        .offering-filter { padding: 20px; border: 1px solid #e1e8e6; border-radius: 14px; background: linear-gradient(145deg, #f8fbfa, #fff); }
+        .offering-filter__icon { display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; border-radius: 11px; color: #117a65; background: #e7f4f0; font-size: 17px; }
+        .offering-filter .form-label { margin-bottom: 6px; color: #526670; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+        .offering-filter .form-control, .offering-filter .form-select { min-height: 42px; border-color: #dce5e2; border-radius: 9px; }
+        .offering-filter .input-group-text { border-color: #dce5e2; border-radius: 9px 0 0 9px; color: #6b7d88; background: #fff; }
+        .offering-filter__actions { display: flex; align-items: end; gap: 8px; }
+        .offering-filter__actions .btn { min-height: 42px; border-radius: 9px; }
+        .offering-result { color: #6b7d88; font-size: 12px; }
+        @media (max-width: 767.98px) { .offering-filter__actions { align-items: stretch; flex-direction: column; } }
+    </style>
+@endsection
 @section('content')
     <div class="mb-3"><a class="btn btn-outline-primary" href="{{ route($prefix.'period-opening.index') }}">Dashboard Pembukaan Periode</a></div>
 <section class="section">
@@ -50,8 +63,21 @@
         </form>
     </div></div></div>
     @endif
-    <div class="card"><div class="card-header d-flex justify-content-between align-items-center"><h5 class="card-title">Daftar Penawaran — {{ $period?->name ?? 'Belum ada periode' }}</h5><div class="d-flex gap-2">@if($period)<a class="btn btn-outline-success" href="{{ route($prefix.'master.penawaran-export', array_filter($filters)) }}"><i class="fa-solid fa-file-export me-1"></i> Export</a>@endif @if($canManage)<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importOfferingModal"><i class="fa-solid fa-file-import me-1"></i> Import</button><button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createOfferingModal"><i class="fas fa-plus me-1"></i> Tambah Penawaran</button>@endif</div></div><div class="card-body table-responsive">
-        <form method="GET" class="row g-2 mb-3"><div class="col-md-4"><select name="pstudi_id" class="form-select"><option value="">Semua program studi</option>@foreach($programs as $item)<option value="{{ $item->id }}" @selected(($filters['pstudi_id'] ?? null) == $item->id)>{{ $item->name }}</option>@endforeach</select></div><div class="col-md-4"><select name="kuri_id" class="form-select"><option value="">Semua kurikulum</option>@foreach($curricula as $item)<option value="{{ $item->id }}" @selected(($filters['kuri_id'] ?? null) == $item->id)>{{ $item->name }}</option>@endforeach</select></div><div class="col-md-2"><button class="btn btn-outline-primary">Filter</button></div></form>
+    @php $activeFilterCount = collect($filters)->filter(fn ($value) => $value !== null && $value !== '')->count(); @endphp
+    <div class="card"><div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-3"><div><h5 class="card-title mb-1">Daftar Penawaran — {{ $period?->name ?? 'Belum ada periode' }}</h5><span class="offering-result">Menampilkan {{ number_format($offerings->count()) }} penawaran mata kuliah</span></div><div class="d-flex flex-wrap gap-2">@if($period)<a class="btn btn-outline-success" href="{{ route($prefix.'master.penawaran-export', array_filter($filters)) }}"><i class="fa-solid fa-file-export me-1"></i> Export Hasil</a>@endif @if($canManage)<button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#importOfferingModal"><i class="fa-solid fa-file-import me-1"></i> Import</button><button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createOfferingModal"><i class="fas fa-plus me-1"></i> Tambah Penawaran</button>@endif</div></div><div class="card-body">
+        <div class="offering-filter mb-4">
+            <div class="d-flex align-items-center gap-3 mb-3"><span class="offering-filter__icon"><i class="fas fa-filter"></i></span><div><h6 class="mb-1">Filter Penawaran</h6><small class="text-muted">Temukan penawaran berdasarkan informasi akademik yang dibutuhkan.</small></div>@if($activeFilterCount)<span class="badge bg-primary ms-auto">{{ $activeFilterCount }} filter aktif</span>@endif</div>
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-xl-4 col-lg-6"><label for="offering-search" class="form-label">Cari penawaran</label><div class="input-group"><span class="input-group-text"><i class="fas fa-search"></i></span><input type="search" name="q" id="offering-search" class="form-control" value="{{ $filters['q'] }}" placeholder="Kode atau nama mata kuliah"></div></div>
+                <div class="col-xl-2 col-lg-3 col-md-6"><label for="offering-program" class="form-label">Program studi</label><select name="pstudi_id" id="offering-program" class="form-select"><option value="">Semua program</option>@foreach($programs as $item)<option value="{{ $item->id }}" @selected($filters['pstudi_id'] == $item->id)>{{ $item->name }}</option>@endforeach</select></div>
+                <div class="col-xl-2 col-lg-3 col-md-6"><label for="offering-curriculum" class="form-label">Kurikulum</label><select name="kuri_id" id="offering-curriculum" class="form-select"><option value="">Semua kurikulum</option>@foreach($curricula as $item)<option value="{{ $item->id }}" @selected($filters['kuri_id'] == $item->id)>{{ $item->name }}</option>@endforeach</select></div>
+                <div class="col-xl-2 col-lg-3 col-md-6"><label for="offering-class" class="form-label">Kelas</label><select name="kelas_id" id="offering-class" class="form-select"><option value="">Semua kelas</option>@foreach($classes as $item)<option value="{{ $item->id }}" @selected($filters['kelas_id'] == $item->id)>{{ $item->name }}</option>@endforeach</select></div>
+                <div class="col-xl-2 col-lg-3 col-md-6"><label for="offering-semester" class="form-label">Semester</label><select name="semester" id="offering-semester" class="form-select"><option value="">Semua semester</option>@for($semester = 1; $semester <= 14; $semester++)<option value="{{ $semester }}" @selected($filters['semester'] === $semester)>Semester {{ $semester }}</option>@endfor</select></div>
+                <div class="col-xl-4 col-lg-6"><label for="offering-lecturer" class="form-label">Dosen utama</label><select name="dosen_id" id="offering-lecturer" class="form-select"><option value="">Semua dosen utama</option>@foreach($lecturers as $item)<option value="{{ $item->id }}" @selected($filters['dosen_id'] == $item->id)>{{ $item->dsn_name }}</option>@endforeach</select></div>
+                <div class="col-xl-4 col-lg-6 offering-filter__actions"><button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-filter me-1"></i> Terapkan Filter</button><a href="{{ route($prefix.'master.penawaran-index') }}" class="btn btn-outline-secondary"><i class="fas fa-rotate-left me-1"></i> Reset</a></div>
+            </form>
+        </div>
+        <div class="table-responsive">
         <table class="table table-striped">
             <thead><tr><th>Kode</th><th>Mata Kuliah</th><th>Kelas</th><th>Dosen</th><th>SKS</th><th>Kapasitas</th><th class="text-center">Aksi</th></tr></thead>
             <tbody>
@@ -107,7 +133,7 @@
                     <tr><td colspan="7" class="text-center text-muted">Belum ada penawaran.</td></tr>
                 @endforelse
             </tbody>
-        </table>
+        </table></div>
         @if($canManage) @foreach($offerings as $item)
         <div class="modal fade" id="editOffering{{ $item->id }}" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><form method="POST" action="{{ route($prefix.'master.penawaran-update', $item) }}">@csrf @method('PATCH')
             <div class="modal-header"><h5 class="modal-title">Edit {{ $item->masterMataKuliah->name }} — {{ $item->kelas->name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body row g-3">

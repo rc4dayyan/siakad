@@ -90,6 +90,68 @@ class KrsWorkflowTest extends TestCase
         PenawaranMataKuliah::create([...$attributes, 'code' => 'OF-DUPLICATE']);
     }
 
+    public function test_staff_receives_validation_error_when_creating_duplicate_course_offering(): void
+    {
+        $data = $this->academicData();
+        PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $administrator = $this->webAdministrator('OFFERINGADMIN');
+
+        $response = $this->withSession([AcademicPeriodContext::SESSION_KEY => $data['periodId']])
+            ->actingAs($administrator)
+            ->from(route('web-admin.master.penawaran-index'))
+            ->post(route('web-admin.master.penawaran-store'), [
+                '_form' => 'create-offering',
+                'master_mata_kuliah_id' => $data['master']->id,
+                'pstudi_id' => $data['programId'],
+                'kuri_id' => $data['curriculumId'],
+                'kelas_ids' => [$data['classId']],
+                'dosen_utama_id' => $data['advisor']->id,
+                'kapasitas' => 40,
+            ]);
+
+        $response
+            ->assertRedirect(route('web-admin.master.penawaran-index'))
+            ->assertSessionHasErrors([
+                'kelas_ids' => 'Penawaran mata kuliah tersebut sudah tersedia untuk kelas: PAI 1A.',
+            ]);
+        $this->assertSame(1, PenawaranMataKuliah::count());
+    }
+
+    public function test_course_offering_list_filters_by_search_class_lecturer_and_semester(): void
+    {
+        $data = $this->academicData();
+        PenawaranMataKuliah::create([...$this->offeringAttributes($data), 'code' => 'OF-INTRO']);
+        $advancedMaster = MasterMataKuliah::create([
+            'program_studi' => 'PAI',
+            'code' => 'PAI202',
+            'semester' => 2,
+            'name' => 'Fikih Lanjutan',
+            'sks' => 3,
+        ]);
+        $advancedOffering = PenawaranMataKuliah::create([
+            ...$this->offeringAttributes($data),
+            'master_mata_kuliah_id' => $advancedMaster->id,
+            'code' => 'OF-ADVANCED',
+        ]);
+        $administrator = $this->webAdministrator('OFFERINGFILTER');
+        $this->actingAs($administrator);
+        session([AcademicPeriodContext::SESSION_KEY => $data['periodId']]);
+        $request = Request::create('/web-admin/master/penawaran-matkul', 'GET', [
+            'q' => 'Fikih',
+            'kelas_id' => $data['classId'],
+            'dosen_id' => $data['advisor']->id,
+            'semester' => 2,
+        ]);
+        $request->setUserResolver(fn () => $administrator);
+
+        $view = app(\App\Http\Controllers\Admin\PenawaranMataKuliahController::class)
+            ->index($request, app(AcademicPeriodContext::class));
+
+        $this->assertSame([$advancedOffering->id], $view->getData()['offerings']->pluck('id')->all());
+        $this->assertSame('Fikih', $view->getData()['filters']['q']);
+        $this->assertSame(2, $view->getData()['filters']['semester']);
+    }
+
     public function test_participants_view_receives_web_admin_route_prefix(): void
     {
         $data = $this->academicData();
@@ -664,6 +726,124 @@ class KrsWorkflowTest extends TestCase
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
             $this->assertSame(403, $exception->getStatusCode());
         }
+    }
+
+    public function test_teaching_lecturer_list_includes_assistants_and_exports_reference_columns(): void
+    {
+        $data = $this->academicData();
+        $data['master']->update(['code' => 'PAI102']);
+        $assistant = $this->lecturer('1002', 'Dosen Pendamping');
+        PenawaranMataKuliah::create([
+            ...$this->offeringAttributes($data),
+            'code' => 'PAI102-1A',
+            'dosen_pendamping_1_id' => $assistant->id,
+        ]);
+        $administrator = $this->webAdministrator('LECTURERLISTADMIN');
+        $this->actingAs($administrator);
+        session([AcademicPeriodContext::SESSION_KEY => $data['periodId']]);
+
+        $allRequest = Request::create('/web-admin/academic/dosen-pengajar-list');
+        $allRequest->setUserResolver(fn () => $administrator);
+        $controller = app(\App\Http\Controllers\Admin\DosenPengajarListController::class);
+        $view = $controller->index($allRequest, app(AcademicPeriodContext::class));
+
+        $this->assertSame(2, $view->getData()['items']->total());
+        $this->assertSame(['pendamping_1', 'utama'], $view->getData()['items']->pluck('peran')->sort()->values()->all());
+
+        $request = Request::create('/web-admin/academic/dosen-pengajar-list', 'GET', [
+            'dosen_id' => $assistant->id,
+            'peran' => 'pendamping_1',
+        ]);
+        $request->setUserResolver(fn () => $administrator);
+        $export = $controller->export($request, app(AcademicPeriodContext::class));
+        ob_start();
+        $export->sendContent();
+        $content = ob_get_clean();
+        $path = tempnam(sys_get_temp_dir(), 'dosen-pengajar-list-').'.xlsx';
+        file_put_contents($path, $content);
+
+        try {
+            $rows = (new FastExcel)->import($path);
+        } finally {
+            @unlink($path);
+        }
+
+        $this->assertCount(1, $rows);
+        $this->assertSame([
+            'Semester', 'NIDN', 'NUPTK', 'Nama Dosen', 'Kode Matakuliah', 'Nama Matakuliah',
+            'Nama Kelas', 'Tatap Muka', 'Tatap Muka Realisasi', 'Kode Prodi', 'Nama Prodi',
+            'Sks Ajar', 'Jenis Evaluasi',
+        ], array_keys($rows->first()));
+        $this->assertSame('Dosen Pendamping', $rows->first()['Nama Dosen']);
+        $this->assertSame(1, $rows->first()['Jenis Evaluasi']);
+    }
+
+    public function test_academic_dashboard_metrics_follow_selected_period(): void
+    {
+        $data = $this->academicData();
+        $offering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        app(KrsService::class)->add(
+            app(KrsService::class)->forRegistration($data['registration']),
+            $offering
+        );
+        $roomId = $this->room(40, 'DASHBOARD');
+        $scheduleAttributes = [
+            'penawaran_mata_kuliah_id' => $offering->id,
+            'kelas_id' => $data['classId'],
+            'dosen_id' => $data['advisor']->id,
+            'ruang_id' => $roomId,
+            'hari' => 1,
+            'mulai' => '08:00',
+            'selesai' => '09:40',
+        ];
+        $schedule = JadwalMingguan::create([
+            ...$scheduleAttributes,
+            'code' => 'DASHBOARD-SCHEDULE',
+            'fingerprint' => JadwalMingguan::fingerprint($scheduleAttributes),
+        ]);
+        PertemuanKuliah::create([
+            'jadwal_mingguan_id' => $schedule->id,
+            'dosen_id' => $data['advisor']->id,
+            'ruang_id' => $roomId,
+            'pertemuan_ke' => 1,
+            'tanggal' => '2026-08-03',
+            'mulai' => '08:00',
+            'selesai' => '09:40',
+            'metode' => 'tatap_muka',
+            'status' => PertemuanKuliah::STATUS_SCHEDULED,
+            'code' => 'DASHBOARD-MEETING',
+        ]);
+        $academicStaff = User::create([
+            'type' => 3,
+            'code' => 'ACADEMICDASHBOARD',
+            'name' => 'Staf Akademik',
+            'user' => 'academicdashboard',
+            'phone' => '081234567891',
+            'email' => 'academicdashboard@example.test',
+            'password' => 'secret',
+            'status' => 1,
+        ]);
+        $this->actingAs($academicStaff);
+        session([AcademicPeriodContext::SESSION_KEY => $data['periodId']]);
+
+        $dashboard = app(\App\Services\Academic\AcademicDashboardService::class)
+            ->forUser($academicStaff);
+
+        $this->assertSame(1, $dashboard['registrations']);
+        $this->assertSame(1, $dashboard['activeStudents']);
+        $this->assertSame(1, $dashboard['offerings']);
+        $this->assertSame(1, $dashboard['weeklySchedules']);
+        $this->assertSame(1, $dashboard['meetings']);
+        $this->assertSame(1, $dashboard['krsStatuses'][Krs::STATUS_DRAFT]);
+        $this->assertSame(0, $dashboard['withoutKrs']);
+        $this->assertSame(0, $dashboard['offeringsWithoutSchedule']);
+
+        $html = view('user.academic.home-dashboard', [
+            'academicDashboard' => $dashboard,
+            'prefix' => 'academic.',
+        ])->render();
+        $this->assertStringContainsString('Ruang Kerja Akademik', $html);
+        $this->assertStringContainsString('1 jadwal mingguan', $html);
     }
 
     private function academicData(): array

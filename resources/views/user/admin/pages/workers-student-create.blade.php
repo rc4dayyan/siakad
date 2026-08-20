@@ -82,13 +82,18 @@
                                     @enderror
                                 </div>
                                 <div class="form-group col-lg-6 col-12">
-                                    <label for="class_id">Kelas</label>
-                                    <select name="class_id" id="class_id" class="form-select" >
-                                        <option value="" selected>Pilih Kelas</option>
+                                    <label for="class_id">Kelas <span class="text-danger">*</span></label>
+                                    <select name="class_id" id="class_id" class="form-select @error('class_id') is-invalid @enderror" required>
+                                        <option value="" @selected(old('class_id') === null || old('class_id') === '')>
+                                            {{ $academicPeriod ? 'Pilih Kelas - '.$academicPeriod->name : 'Belum ada periode akademik terpilih' }}
+                                        </option>
                                         @foreach ($kelas as $item)
-                                        <option value="{{ $item->id }}" >{{ $item->name }}</option>
+                                        <option value="{{ $item->id }}" @selected((string) old('class_id') === (string) $item->id)>{{ $item->name }}</option>
                                         @endforeach
                                     </select>
+                                    @if ($academicPeriod)
+                                        <small class="text-muted">Menampilkan kelas periode {{ $academicPeriod->name }}.</small>
+                                    @endif
                                     @error('class_id')
                                         <small class="text-danger">{{ $message }}</small>
                                     @enderror

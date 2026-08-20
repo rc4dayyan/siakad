@@ -15,6 +15,8 @@ use App\Models\PenawaranMataKuliah;
 use App\Models\ProgramStudi;
 use App\Models\TahunAkademik;
 use App\Services\Academic\AcademicPeriodContext;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,7 +34,8 @@ class PenawaranMataKuliahController extends Controller
     public function index(Request $request, AcademicPeriodContext $context): View
     {
         $period = $context->current(auth()->user());
-        $selectedProgramId = $request->integer('pstudi_id') ?: null;
+        $filters = $this->offeringFilters($request);
+        $selectedProgramId = $filters['pstudi_id'];
         $programs = ProgramStudi::query()->orderBy('name')->get();
         $selectedProgram = $programs->firstWhere('id', $selectedProgramId);
         $masterProgramNames = [];
@@ -47,9 +50,10 @@ class PenawaranMataKuliahController extends Controller
             'prefix' => $this->setPrefix(),
             'period' => $period,
             'periods' => TahunAkademik::query()->latest('year_start')->get(),
-            'offerings' => PenawaranMataKuliah::query()->forAcademicPeriod($period)
-                ->when($request->integer('pstudi_id'), fn ($query, $programId) => $query->where('pstudi_id', $programId))
-                ->when($request->integer('kuri_id'), fn ($query, $curriculumId) => $query->where('kuri_id', $curriculumId))
+            'offerings' => $this->applyOfferingFilters(
+                PenawaranMataKuliah::query()->forAcademicPeriod($period),
+                $filters
+            )
                 ->with(['masterMataKuliah', 'kelas', 'pstudi', 'kurikulum', 'dosenUtama'])
                 ->withCount('krsItems')
                 ->orderBy('code')
@@ -72,7 +76,7 @@ class PenawaranMataKuliahController extends Controller
                 ->get(),
             'lecturers' => Dosen::query()->orderBy('dsn_name')->get(),
             'canManage' => $period?->isWritable() ?? false,
-            'filters' => $request->only(['pstudi_id', 'kuri_id']),
+            'filters' => $filters,
             'krsWindow' => $period ? KalenderAkademik::query()->where('taka_id', $period->id)
                 ->where('kategori', KalenderAkademik::KATEGORI_KRS)->first() : null,
         ]);
@@ -101,17 +105,23 @@ class PenawaranMataKuliahController extends Controller
         $data = $this->validateOffering($request, $period->id, multipleClasses: true);
         $master = MasterMataKuliah::findOrFail($data['master_mata_kuliah_id']);
 
-        DB::transaction(function () use ($data, $master, $period): void {
-            foreach ($data['kelas_ids'] as $classId) {
-                PenawaranMataKuliah::create([
-                    ...collect($data)->except('kelas_ids')->all(),
-                    'taka_id' => $period->id,
-                    'kelas_id' => $classId,
-                    'sks' => $master->sks,
-                    'code' => $this->newCode($period->id, $master->id, $classId),
-                ]);
-            }
-        });
+        try {
+            DB::transaction(function () use ($data, $master, $period): void {
+                foreach ($data['kelas_ids'] as $classId) {
+                    PenawaranMataKuliah::create([
+                        ...collect($data)->except('kelas_ids')->all(),
+                        'taka_id' => $period->id,
+                        'kelas_id' => $classId,
+                        'sks' => $master->sks,
+                        'code' => $this->newCode($period->id, $master->id, $classId),
+                    ]);
+                }
+            });
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages([
+                'kelas_ids' => 'Penawaran mata kuliah tersebut sudah tersedia pada salah satu kelas yang dipilih.',
+            ]);
+        }
 
         return back()->with('success', 'Penawaran berhasil dibuat untuk '.count($data['kelas_ids']).' kelas.');
     }
@@ -134,7 +144,13 @@ class PenawaranMataKuliahController extends Controller
             $data['sks'] = MasterMataKuliah::findOrFail($data['master_mata_kuliah_id'])->sks;
         }
 
-        $penawaran->update($data);
+        try {
+            $penawaran->update($data);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages([
+                'kelas_id' => 'Penawaran mata kuliah tersebut sudah tersedia pada kelas yang dipilih.',
+            ]);
+        }
 
         return back()->with('success', 'Penawaran mata kuliah berhasil diperbarui.');
     }
@@ -154,10 +170,10 @@ class PenawaranMataKuliahController extends Controller
     public function export(Request $request, AcademicPeriodContext $context)
     {
         $period = $context->requireCurrent($request->user());
-        $offerings = PenawaranMataKuliah::query()
-            ->forAcademicPeriod($period)
-            ->when($request->integer('pstudi_id'), fn ($query, $programId) => $query->where('pstudi_id', $programId))
-            ->when($request->integer('kuri_id'), fn ($query, $curriculumId) => $query->where('kuri_id', $curriculumId))
+        $offerings = $this->applyOfferingFilters(
+            PenawaranMataKuliah::query()->forAcademicPeriod($period),
+            $this->offeringFilters($request)
+        )
             ->with([
                 'masterMataKuliah',
                 'pstudi',
@@ -800,6 +816,39 @@ class PenawaranMataKuliahController extends Controller
         ]);
     }
 
+    private function offeringFilters(Request $request): array
+    {
+        $semester = $request->integer('semester');
+
+        return [
+            'q' => trim((string) $request->query('q', '')),
+            'pstudi_id' => $request->integer('pstudi_id') ?: null,
+            'kuri_id' => $request->integer('kuri_id') ?: null,
+            'kelas_id' => $request->integer('kelas_id') ?: null,
+            'dosen_id' => $request->integer('dosen_id') ?: null,
+            'semester' => $semester >= 1 && $semester <= 14 ? $semester : null,
+        ];
+    }
+
+    private function applyOfferingFilters(Builder $query, array $filters): Builder
+    {
+        return $query
+            ->when($filters['q'], fn (Builder $query, string $search) => $query->where(function (Builder $query) use ($search): void {
+                $query->where('code', 'like', '%'.$search.'%')
+                    ->orWhereHas('masterMataKuliah', fn (Builder $masterQuery) => $masterQuery
+                        ->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('code', 'like', '%'.$search.'%'));
+            }))
+            ->when($filters['pstudi_id'], fn (Builder $query, int $programId) => $query->where('pstudi_id', $programId))
+            ->when($filters['kuri_id'], fn (Builder $query, int $curriculumId) => $query->where('kuri_id', $curriculumId))
+            ->when($filters['kelas_id'], fn (Builder $query, int $classId) => $query->where('kelas_id', $classId))
+            ->when($filters['dosen_id'], fn (Builder $query, int $lecturerId) => $query->where('dosen_utama_id', $lecturerId))
+            ->when($filters['semester'], fn (Builder $query, int $semester) => $query->whereHas(
+                'masterMataKuliah',
+                fn (Builder $masterQuery) => $masterQuery->where('semester', $semester)
+            ));
+    }
+
     private function validateOffering(Request $request, int $periodId, PenawaranMataKuliah|bool|null $offering = null, bool $multipleClasses = false): array
     {
         if (is_bool($offering)) {
@@ -835,10 +884,32 @@ class PenawaranMataKuliahController extends Controller
             $rules['kelas_ids.*'] = ['required', 'distinct', $classRule];
         }
 
-        return $request->validate($rules, [
+        $data = $request->validate($rules, [
             'master_mata_kuliah_id.exists' => 'Master mata kuliah tidak sesuai dengan program studi yang dipilih.',
             'kelas_ids.*.exists' => 'Kelas tidak sesuai dengan periode atau program studi yang dipilih.',
         ]);
+
+        $classIds = $multipleClasses ? $data['kelas_ids'] : [$data['kelas_id']];
+        $duplicateClasses = PenawaranMataKuliah::query()
+            ->where('master_mata_kuliah_id', $data['master_mata_kuliah_id'])
+            ->where('taka_id', $periodId)
+            ->where('pstudi_id', $data['pstudi_id'])
+            ->where('kuri_id', $data['kuri_id'])
+            ->whereIn('kelas_id', $classIds)
+            ->when($offering, fn ($query, PenawaranMataKuliah $currentOffering) => $query->whereKeyNot($currentOffering->getKey()))
+            ->with('kelas:id,name')
+            ->get()
+            ->map(fn (PenawaranMataKuliah $duplicate) => $duplicate->kelas?->name ?? 'kelas #'.$duplicate->kelas_id)
+            ->unique()
+            ->values();
+
+        if ($duplicateClasses->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                $multipleClasses ? 'kelas_ids' : 'kelas_id' => 'Penawaran mata kuliah tersebut sudah tersedia untuk kelas: '.$duplicateClasses->implode(', ').'.',
+            ]);
+        }
+
+        return $data;
     }
 
     private function newCode(int $periodId, int $masterId, int $classId): string

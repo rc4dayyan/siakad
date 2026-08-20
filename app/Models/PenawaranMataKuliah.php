@@ -78,6 +78,11 @@ class PenawaranMataKuliah extends Model
         return $this->hasMany(KrsItem::class);
     }
 
+    public function jadwalMingguans()
+    {
+        return $this->hasMany(JadwalMingguan::class);
+    }
+
     public function nilais()
     {
         return $this->hasMany(NilaiMahasiswa::class);

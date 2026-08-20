@@ -2,19 +2,17 @@
 
 namespace App\Http\Controllers\Core;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-// SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
-use Auth;
-use Str;
-// SECTION ADDONS EXTERNAL
 use Alert;
 use App\Helper\roleTrait;
-// SECTION AUTH
+// SECTION ADDONS SYSTEM
+use App\Http\Controllers\Controller;
 use App\Models\Notification;
+// SECTION ADDONS EXTERNAL
 use App\Models\Settings\webSettings;
+use Auth;
+// SECTION AUTH
+use Illuminate\Http\Request;
+use Str;
 
 class NotifyController extends Controller
 {
@@ -24,7 +22,7 @@ class NotifyController extends Controller
     {
         $data['prefix'] = $this->setPrefix();
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['notify'] = Notification::all();
+        $data['notify'] = Notification::query()->with('author')->latest()->get();
 
         return view('user.admin.system.notify-index', $data);
     }
@@ -66,13 +64,14 @@ class NotifyController extends Controller
         $notify->save();
 
         Alert::success('Succcess', 'Data berhasil ditambahkan!');
+
         return back();
 
     }
 
     public function update(Request $request, $code)
     {
-        $notify = Notification::where('code', $code)->first();
+        $notify = Notification::where('code', $code)->firstOrFail();
 
         $request->validate([
             'name' => 'required|string',
@@ -88,17 +87,18 @@ class NotifyController extends Controller
         $notify->save();
 
         Alert::success('Succcess', 'Data berhasil diupdate!');
+
         return back();
 
     }
 
     public function destroy($code)
     {
-        $notify = Notification::where('code', $code)->first();
+        $notify = Notification::where('code', $code)->firstOrFail();
         $notify->delete();
 
         Alert::success('Succcess', 'Data berhasil dihapus!');
+
         return back();
     }
-
 }

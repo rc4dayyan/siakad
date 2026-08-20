@@ -20,7 +20,10 @@ class KrsController extends Controller
         $student = Auth::guard('mahasiswa')->user();
         $period = app(AcademicPeriodContext::class)->published();
         $registration = $context->registrationFor($student, $period);
-        $krs = $registration ? $service->forRegistration($registration)->load('items.penawaranMataKuliah.masterMataKuliah') : null;
+        $krs = $registration ? $service->forRegistration($registration)->load([
+            'items.penawaranMataKuliah.masterMataKuliah',
+            'items.penawaranMataKuliah.kelas',
+        ]) : null;
 
         return view('mahasiswa.pages.krs-index', [
             'period' => $period,
@@ -31,6 +34,7 @@ class KrsController extends Controller
                 ->where('pstudi_id', $registration->kelas?->pstudi_id)
                 ->where('kelas_id', $registration->kelas_id)
                 ->with(['masterMataKuliah', 'kelas', 'dosenUtama', 'prasyaratMaster'])
+                ->withCount('krsItems')
                 ->orderBy('code')->get() : collect(),
         ]);
     }

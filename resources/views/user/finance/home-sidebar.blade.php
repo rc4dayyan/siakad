@@ -27,10 +27,3 @@
         </li>
     </ul>
 </li>
-<li class="sidebar-title">Administrasi</li>
-<li class="sidebar-item {{ Route::is($prefix.'approval.absen-*') ? 'active' : '' }}">
-    <a href="{{ route($prefix.'approval.absen-index') }}" class="sidebar-link">
-        <i class="fa-solid fa-file-signature"></i>
-        <span>Persetujuan Absensi</span>
-    </a>
-</li>

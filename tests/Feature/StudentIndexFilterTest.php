@@ -236,6 +236,56 @@ class StudentIndexFilterTest extends TestCase
         $response->assertSessionHasErrors('prodi_id');
     }
 
+    public function test_creating_student_without_class_returns_validation_error(): void
+    {
+        $period = $this->period();
+
+        $response = $this
+            ->actingAs($this->webAdmin())
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $period->id])
+            ->from(route('web-admin.workers.student-create'))
+            ->post(route('web-admin.workers.student-store'), [
+                'mhs_name' => 'Mahasiswa Tanpa Kelas',
+                'mhs_user' => 'mahasiswa.tanpa.kelas',
+                'mhs_phone' => '081234567890',
+                'mhs_mail' => 'tanpa.kelas@example.test',
+            ]);
+
+        $response->assertRedirect(route('web-admin.workers.student-create'));
+        $response->assertSessionHasErrors([
+            'class_id' => 'Kelas mahasiswa wajib dipilih.',
+        ]);
+        $this->assertDatabaseMissing('mahasiswas', [
+            'mhs_user' => 'mahasiswa.tanpa.kelas',
+        ]);
+    }
+
+    public function test_create_student_only_shows_classes_from_selected_academic_period(): void
+    {
+        $previousPeriod = $this->period(
+            '2025-GANJIL',
+            TahunAkademik::STATUS_CLOSED,
+            false,
+            2025,
+            '2025-08-01'
+        );
+        $selectedPeriod = $this->period();
+        $selectedClass = $this->kelas($selectedPeriod, 'Kelas Periode Terpilih');
+        $previousClass = $this->kelas($previousPeriod, 'Kelas Periode Lama');
+
+        $response = $this
+            ->actingAs($this->webAdmin())
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $selectedPeriod->id])
+            ->get(route('web-admin.workers.student-create'));
+
+        $response->assertOk();
+        $response->assertViewHas('academicPeriod', fn ($period): bool => $period->is($selectedPeriod));
+        $response->assertViewHas('kelas', fn ($classes): bool => $classes->modelKeys() === [$selectedClass->id]);
+        $response->assertSee('Kelas Periode Terpilih');
+        $response->assertDontSee('Kelas Periode Lama');
+        $this->assertNotSame($selectedClass->id, $previousClass->id);
+    }
+
     private function period(
         string $code = '2026-GANJIL',
         string $status = TahunAkademik::STATUS_ACTIVE,

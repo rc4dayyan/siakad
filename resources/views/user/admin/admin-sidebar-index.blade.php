@@ -29,7 +29,7 @@
         <span>Mahasiswa</span>
     </a>
 </li>
-<li class="sidebar-item has-sub {{ Route::is('web-admin.master.tahun-akademik-*', 'web-admin.master.proku-*', 'web-admin.master.taka-*', 'web-admin.master.kelas-*', 'web-admin.master.kurikulum-*', 'web-admin.master.master-matkul-*', 'web-admin.master.matkul-*', 'web-admin.master.jadkul-*', 'web-admin.krs-list.*') ? 'active' : '' }}">
+<li class="sidebar-item has-sub {{ Route::is('web-admin.master.tahun-akademik-*', 'web-admin.master.proku-*', 'web-admin.master.taka-*', 'web-admin.master.kelas-*', 'web-admin.master.kurikulum-*', 'web-admin.master.master-matkul-*', 'web-admin.master.matkul-*', 'web-admin.master.jadkul-*', 'web-admin.krs-list.*', 'web-admin.dosen-pengajar-list.*') ? 'active' : '' }}">
     <a href="#" class="sidebar-link">
         <i class="fa-solid fa-book-open"></i>
         <span>Perkuliahan</span>
@@ -55,6 +55,9 @@
         </li>
         <li class="submenu-item {{ Route::is('web-admin.krs-list.*') ? 'active' : '' }}">
             <a href="{{ route('web-admin.krs-list.index') }}" class="submenu-link">List KRS</a>
+        </li>
+        <li class="submenu-item {{ Route::is('web-admin.dosen-pengajar-list.*') ? 'active' : '' }}">
+            <a href="{{ route('web-admin.dosen-pengajar-list.index') }}" class="submenu-link">List Dosen Pengajar</a>
         </li>
     </ul>
 </li>

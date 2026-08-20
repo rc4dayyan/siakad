@@ -34,7 +34,7 @@
                                     <td data-label="Number">{{ ++$key }}</td>
                                     <td data-label="Judul Notifikasi">{{ $item->name }}</td>
                                     <td data-label="Kategori">{{ $item->type }}</td>
-                                    <td data-label="Author">{{ $item->author->name }}</td>
+                                    <td data-label="Author">{{ $item->author?->name ?? 'Pengguna tidak tersedia' }}</td>
                                     <td class="d-flex justify-content-center align-items-center">
                                         <a href="#" style="margin-right: 10px" data-bs-toggle="modal" data-bs-target="#updateNotify{{ $item->code }}" class="btn btn-outline-primary"><i class="fas fa-edit"></i></a>
                                         <form id="delete-form-{{ $item->code }}"

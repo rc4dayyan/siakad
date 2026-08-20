@@ -25,6 +25,8 @@ Route::group(['prefix' => 'academic', 'middleware' => ['user-access:Departement 
         Route::delete('/data-mahasiswa/{code}/destroy',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'destroyStudent'])->name('workers.student-destroy');
         Route::get('/krs-list', [App\Http\Controllers\Admin\KrsListController::class, 'index'])->name('krs-list.index');
         Route::get('/krs-list/export', [App\Http\Controllers\Admin\KrsListController::class, 'export'])->name('krs-list.export');
+        Route::get('/dosen-pengajar-list', [App\Http\Controllers\Admin\DosenPengajarListController::class, 'index'])->name('dosen-pengajar-list.index');
+        Route::get('/dosen-pengajar-list/export', [App\Http\Controllers\Admin\DosenPengajarListController::class, 'export'])->name('dosen-pengajar-list.export');
         Route::get('/krs-management', [App\Http\Controllers\Admin\KrsManagementController::class, 'index'])->name('krs-management.index');
         Route::get('/krs-management/import/template', [App\Http\Controllers\Admin\KrsManagementController::class, 'importTemplate'])->name('krs-management.import-template');
         Route::post('/krs-management/import/preview', [App\Http\Controllers\Admin\KrsManagementController::class, 'importPreview'])->name('krs-management.import-preview');

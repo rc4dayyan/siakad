@@ -43,8 +43,13 @@ class HomeController extends Controller
     {
         $user = Auth::guard('mahasiswa')->user();
         $period = $context->published();
+        $academicRegistration = $studentContext->registrationFor($user, $period);
+        $academicRegistration?->load('krs');
         $academicClass = $studentContext->classFor($user, $period);
         $data['web'] = webSettings::where('id', 1)->first();
+        $data['academicPeriod'] = $period;
+        $data['academicRegistration'] = $academicRegistration;
+        $data['academicClass'] = $academicClass;
         $data['tagihan'] = TagihanKuliah::query()
             ->where(function ($query) use ($user, $academicClass): void {
                 $query->where('users_id', $user->id);
