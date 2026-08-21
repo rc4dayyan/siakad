@@ -11,6 +11,15 @@ class TemplateTagihan extends Model
 {
     use Concerns\HasPeriodeAkademik;
 
+    public const JENIS_LABELS = [
+        'ukt' => 'UKT',
+        'registrasi' => 'Registrasi / Daftar Ulang',
+        'praktikum' => 'Praktikum',
+        'ujian' => 'Ujian',
+        'wisuda' => 'Wisuda',
+        'lainnya' => 'Lainnya',
+    ];
+
     protected $guarded = [];
 
     protected function casts(): array
@@ -53,5 +62,10 @@ class TemplateTagihan extends Model
     public function tagihans(): HasMany
     {
         return $this->hasMany(TagihanKuliah::class);
+    }
+
+    public function penerbitanBatches(): HasMany
+    {
+        return $this->hasMany(PenerbitanTagihanBatch::class, 'template_tagihan_id');
     }
 }

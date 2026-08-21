@@ -20,12 +20,28 @@ class BulkBillingService
 
     public function preview(TemplateTagihan $template): array
     {
-        $candidates = $this->targets->candidates($template);
+        $candidateIds = $this->targets->candidateQuery($template)
+            ->pluck('mahasiswa_id')
+            ->filter()
+            ->unique()
+            ->values();
+        $existingStudentIds = $candidateIds->isEmpty()
+            ? collect()
+            : TagihanKuliah::forAcademicPeriod($template->taka_id)
+                ->where('target_type', 'mahasiswa')
+                ->where('jenis', $template->jenis)
+                ->whereIn('target_mahasiswa_id', $candidateIds)
+                ->pluck('target_mahasiswa_id')
+                ->unique()
+                ->values();
+        $readyCount = $candidateIds->diff($existingStudentIds)->count();
 
         return [
-            'calon' => $candidates->count(),
-            'total_nominal' => $candidates->count() * $template->nominal,
-            'mahasiswa' => $candidates,
+            'calon' => $candidateIds->count(),
+            'siap' => $readyCount,
+            'dilewati' => $existingStudentIds->count(),
+            'total_nominal' => $readyCount * $template->nominal,
+            'mahasiswa_ids_tertagih' => $existingStudentIds->all(),
         ];
     }
 

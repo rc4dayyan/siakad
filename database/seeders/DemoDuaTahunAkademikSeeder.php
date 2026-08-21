@@ -385,8 +385,8 @@ class DemoDuaTahunAkademikSeeder extends Seeder
             fn (array $row): ?Dosen => $lecturersByNidn->get($row['dsn_nidn']),
             DosenSeeder::rows(),
         )));
-        $requiredClasses = count($studyPrograms) * count($this->entryYears($periods)) * 2;
-        $requiredLecturers = ($requiredClasses * 2) - 1;
+        $parallelGroups = count($studyPrograms) * count($this->entryYears($periods));
+        $requiredLecturers = ($parallelGroups * 2) + 15;
 
         if (count($availableLecturers) < $requiredLecturers) {
             throw new RuntimeException(sprintf(
@@ -397,14 +397,13 @@ class DemoDuaTahunAkademikSeeder extends Seeder
         }
 
         $this->availableLecturers = $availableLecturers;
-        $serial = 0;
+        $groupIndex = 0;
 
         foreach ($studyPrograms as $studyProgram) {
             foreach ($this->entryYears($periods) as $entryYear) {
-                foreach ([0, 1] as $classIndex) {
-                    $lecturers[$studyProgram->id][$entryYear][$classIndex] = $availableLecturers[$serial * 2];
-                    $serial++;
-                }
+                $lecturers[$studyProgram->id][$entryYear][0] = $availableLecturers[$groupIndex];
+                $lecturers[$studyProgram->id][$entryYear][1] = $availableLecturers[$parallelGroups + 1 + $groupIndex];
+                $groupIndex++;
             }
         }
 

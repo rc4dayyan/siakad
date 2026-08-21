@@ -358,7 +358,7 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
         $this->assertSame(144, DB::table('tagihan_kuliahs')->count());
     }
 
-    public function test_dosen_seeder_uses_source_identity_without_replacing_existing_password(): void
+    public function test_dosen_seeder_uses_source_identity_and_nidn_as_password(): void
     {
         $existingPassword = Hash::make('KataSandiTetap!');
         DB::table('dosens')->insert([
@@ -381,8 +381,10 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
         $this->assertSame(39, DB::table('dosens')->count());
         $this->assertSame('NIDA NURJUNAEDAH', $lecturer->dsn_name);
         $this->assertSame('zlKgc9W30aYt', $lecturer->dsn_code);
+        $this->assertSame('2008017601', $lecturer->dsn_user);
         $this->assertSame('dosen/foto-tetap.jpg', $lecturer->dsn_image);
-        $this->assertTrue(Hash::check('KataSandiTetap!', $lecturer->password));
+        $this->assertFalse(Hash::check('KataSandiTetap!', $lecturer->password));
+        $this->assertTrue(Hash::check('2008017601', $lecturer->password));
     }
 
     public function test_seeder_creates_twelve_students_and_two_parallel_classes_for_each_study_program(): void

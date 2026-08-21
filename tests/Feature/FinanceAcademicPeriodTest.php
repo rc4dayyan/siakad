@@ -8,6 +8,7 @@ use App\Models\RegistrasiMahasiswa;
 use App\Models\TagihanKuliah;
 use App\Models\TemplateTagihan;
 use App\Models\User;
+use App\Services\Academic\AcademicPeriodContext;
 use App\Services\Academic\KrsEligibilityService;
 use App\Services\Finance\BillingTargetService;
 use App\Services\Finance\BulkBillingService;
@@ -43,6 +44,7 @@ class FinanceAcademicPeriodTest extends TestCase
             '2026_07_17_000003_extend_tahun_akademiks_for_period_lifecycle.php',
             '2026_07_17_000005_create_registrasi_mahasiswas_table.php',
             '2026_07_17_000010_normalize_period_billing_and_financial_krs_policy.php',
+            '2026_07_17_000011_create_period_opening_workflow_and_audit.php',
             '2026_07_18_000001_add_manual_verification_to_history_tagihans.php',
         ] as $migration) {
             (require database_path('migrations/'.$migration))->up();
@@ -68,12 +70,20 @@ class FinanceAcademicPeriodTest extends TestCase
         $template = $this->template($data, ['target_type' => 'kelompok', 'kelompok_target' => 'aktif']);
         $service = app(BulkBillingService::class);
 
-        $this->assertSame(1, $service->preview($template)['calon']);
+        $preview = $service->preview($template);
+        $this->assertSame(1, $preview['calon']);
+        $this->assertSame(1, $preview['siap']);
+        $this->assertSame(0, $preview['dilewati']);
+        $this->assertSame(500000, $preview['total_nominal']);
         $first = $service->issue($template, $data['actor']);
+        $repeatedPreview = $service->preview($template);
         $second = $service->issue($template, $data['actor']);
 
         $this->assertSame(1, $first->berhasil);
         $this->assertSame(0, $first->gagal);
+        $this->assertSame(0, $repeatedPreview['siap']);
+        $this->assertSame(1, $repeatedPreview['dilewati']);
+        $this->assertSame(0, $repeatedPreview['total_nominal']);
         $this->assertSame(0, $second->berhasil);
         $this->assertSame(1, $second->dilewati);
         $this->assertDatabaseCount('tagihan_kuliahs', 1);
@@ -233,6 +243,245 @@ class FinanceAcademicPeriodTest extends TestCase
         $this->assertSame($before, $reports->forPeriod($old['periodId'])['ringkasan']);
         $this->assertSame(500000, $before['total_tagihan']);
         $this->assertSame(750000, $reports->forPeriod($new['periodId'])['ringkasan']['total_tagihan']);
+    }
+
+    public function test_finance_can_prepare_a_legacy_draft_for_preview_safely(): void
+    {
+        $data = $this->academicData();
+        $draft = TagihanKuliah::create([
+            'author_id' => (string) $data['actor']->id,
+            'proku_id' => '0',
+            'prodi_id' => '0',
+            'users_id' => (string) $data['student']->id,
+            'name' => 'UKT Draft',
+            'code' => 'UKT-DRAFT-ONE',
+            'price' => '650000',
+            'status' => TagihanKuliah::STATUS_DRAFT,
+        ]);
+
+        $response = $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['periodId']])
+            ->post(route('finance.finance.tagihan-prepare', $draft->code), [
+                '_form' => 'prepare-billing-'.$draft->id,
+                'jenis' => 'ukt',
+                'nominal' => 650000,
+                'tanggal_terbit' => '2026-07-01',
+                'jatuh_tempo' => '2026-08-01',
+                'wajib_lunas_krs' => '1',
+            ]);
+
+        $template = TemplateTagihan::where('name', 'UKT Draft')->firstOrFail();
+
+        $response->assertRedirect(route('finance.billing-period.preview', $template));
+        $this->assertSame(TagihanKuliah::STATUS_DIBATALKAN, $draft->fresh()->status);
+        $this->assertSame($data['periodId'], $template->taka_id);
+        $this->assertSame($data['student']->id, $template->target_mahasiswa_id);
+        $this->assertSame(650000, $template->nominal);
+        $this->assertTrue($template->wajib_lunas_krs);
+        $this->assertDatabaseHas('academic_workflow_audits', [
+            'event' => 'billing.draft_prepared',
+            'subject_id' => $draft->id,
+            'actor_id' => $data['actor']->id,
+        ]);
+    }
+
+    public function test_prepared_draft_cannot_be_processed_twice(): void
+    {
+        $data = $this->academicData();
+        $draft = TagihanKuliah::create([
+            'author_id' => (string) $data['actor']->id,
+            'proku_id' => '0',
+            'prodi_id' => '0',
+            'users_id' => (string) $data['student']->id,
+            'name' => 'Draft Sudah Diproses',
+            'code' => 'UKT-DRAFT-TWO',
+            'price' => '500000',
+            'status' => TagihanKuliah::STATUS_DIBATALKAN,
+        ]);
+
+        $response = $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['periodId']])
+            ->from(route('finance.finance.tagihan-index'))
+            ->post(route('finance.finance.tagihan-prepare', $draft->code), [
+                '_form' => 'prepare-billing-'.$draft->id,
+                'jenis' => 'ukt',
+                'nominal' => 500000,
+                'tanggal_terbit' => '2026-07-01',
+                'jatuh_tempo' => '2026-08-01',
+                'wajib_lunas_krs' => '0',
+            ]);
+
+        $response->assertRedirect(route('finance.finance.tagihan-index'));
+        $response->assertSessionHasErrors('status');
+        $this->assertDatabaseCount('template_tagihans', 0);
+    }
+
+    public function test_prepare_rejects_a_non_standard_billing_type_without_changing_the_draft(): void
+    {
+        $data = $this->academicData();
+        $draft = TagihanKuliah::create([
+            'author_id' => (string) $data['actor']->id,
+            'proku_id' => '0',
+            'prodi_id' => '0',
+            'users_id' => (string) $data['student']->id,
+            'name' => 'Draft Jenis Tidak Valid',
+            'code' => 'UKT-DRAFT-INVALID-TYPE',
+            'price' => '500000',
+            'status' => TagihanKuliah::STATUS_DRAFT,
+        ]);
+
+        $response = $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['periodId']])
+            ->from(route('finance.finance.tagihan-index'))
+            ->post(route('finance.finance.tagihan-prepare', $draft->code), [
+                '_form' => 'prepare-billing-'.$draft->id,
+                'jenis' => 'jenis-bebas',
+                'nominal' => 500000,
+                'tanggal_terbit' => '2026-07-01',
+                'jatuh_tempo' => '2026-08-01',
+                'wajib_lunas_krs' => '0',
+            ]);
+
+        $response->assertRedirect(route('finance.finance.tagihan-index'));
+        $response->assertSessionHasErrors('jenis');
+        $this->assertSame(TagihanKuliah::STATUS_DRAFT, $draft->fresh()->status);
+        $this->assertDatabaseCount('template_tagihans', 0);
+    }
+
+    public function test_unused_prepared_template_can_be_deleted_and_restores_its_source_draft(): void
+    {
+        $data = $this->academicData();
+        $draft = TagihanKuliah::create([
+            'author_id' => (string) $data['actor']->id,
+            'proku_id' => '0',
+            'prodi_id' => '0',
+            'users_id' => (string) $data['student']->id,
+            'name' => 'Draft Dapat Dipulihkan',
+            'code' => 'UKT-DRAFT-RESTORE',
+            'price' => '500000',
+            'status' => TagihanKuliah::STATUS_DRAFT,
+        ]);
+        $session = [AcademicPeriodContext::SESSION_KEY => $data['periodId']];
+
+        $this->actingAs($data['actor'])->withSession($session)
+            ->post(route('finance.finance.tagihan-prepare', $draft->code), [
+                '_form' => 'prepare-billing-'.$draft->id,
+                'jenis' => 'ukt',
+                'nominal' => 500000,
+                'tanggal_terbit' => '2026-07-01',
+                'jatuh_tempo' => '2026-08-01',
+                'wajib_lunas_krs' => '0',
+            ]);
+        $template = TemplateTagihan::where('name', 'Draft Dapat Dipulihkan')->firstOrFail();
+
+        $response = $this->actingAs($data['actor'])->withSession($session)
+            ->delete(route('finance.billing-period.destroy', $template));
+
+        $response->assertRedirect(route('finance.billing-period.index'));
+        $this->assertDatabaseMissing('template_tagihans', ['id' => $template->id]);
+        $this->assertSame(TagihanKuliah::STATUS_DRAFT, $draft->fresh()->status);
+        $this->assertDatabaseHas('academic_workflow_audits', [
+            'event' => 'billing.template_deleted',
+            'subject_id' => $template->id,
+        ]);
+    }
+
+    public function test_issued_template_cannot_be_deleted(): void
+    {
+        $data = $this->academicData();
+        $template = $this->template($data, [
+            'target_type' => 'mahasiswa',
+            'target_mahasiswa_id' => $data['student']->id,
+        ]);
+        app(BulkBillingService::class)->issue($template, $data['actor']);
+
+        $response = $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['periodId']])
+            ->from(route('finance.billing-period.index'))
+            ->delete(route('finance.billing-period.destroy', $template));
+
+        $response->assertRedirect(route('finance.billing-period.index'));
+        $response->assertSessionHasErrors('template');
+        $this->assertDatabaseHas('template_tagihans', ['id' => $template->id]);
+        $this->assertDatabaseCount('tagihan_kuliahs', 1);
+    }
+
+    public function test_unused_template_can_be_updated(): void
+    {
+        $data = $this->academicData();
+        $template = $this->template($data, [
+            'target_type' => 'mahasiswa',
+            'target_mahasiswa_id' => $data['student']->id,
+        ]);
+
+        $response = $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['periodId']])
+            ->patch(route('finance.billing-period.update', $template), [
+                '_form' => 'edit-billing-template-'.$template->id,
+                'name' => 'Registrasi Semester Ganjil',
+                'jenis' => 'registrasi',
+                'nominal' => 725000,
+                'tanggal_terbit' => '2026-07-05',
+                'jatuh_tempo' => '2026-08-05',
+                'wajib_lunas_krs' => '1',
+                'target_type' => 'kelompok',
+                'target_mahasiswa_id' => $data['student']->id,
+                'target_prodi_id' => null,
+                'target_proku_id' => null,
+                'kelompok_target' => 'aktif',
+            ]);
+
+        $response->assertRedirect(route('finance.billing-period.index'));
+        $template->refresh();
+        $this->assertSame('Registrasi Semester Ganjil', $template->name);
+        $this->assertSame('registrasi', $template->jenis);
+        $this->assertSame(725000, $template->nominal);
+        $this->assertTrue($template->wajib_lunas_krs);
+        $this->assertSame('kelompok', $template->target_type);
+        $this->assertSame('aktif', $template->kelompok_target);
+        $this->assertNull($template->target_mahasiswa_id);
+        $this->assertDatabaseHas('academic_workflow_audits', [
+            'event' => 'billing.template_updated',
+            'subject_id' => $template->id,
+            'actor_id' => $data['actor']->id,
+        ]);
+    }
+
+    public function test_issued_template_cannot_be_updated(): void
+    {
+        $data = $this->academicData();
+        $template = $this->template($data, [
+            'target_type' => 'mahasiswa',
+            'target_mahasiswa_id' => $data['student']->id,
+        ]);
+        app(BulkBillingService::class)->issue($template, $data['actor']);
+
+        $response = $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['periodId']])
+            ->from(route('finance.billing-period.index'))
+            ->patch(route('finance.billing-period.update', $template), [
+                '_form' => 'edit-billing-template-'.$template->id,
+                'name' => 'Nama Tidak Boleh Berubah',
+                'jenis' => 'ukt',
+                'nominal' => 900000,
+                'tanggal_terbit' => '2026-07-01',
+                'jatuh_tempo' => '2026-08-01',
+                'wajib_lunas_krs' => '0',
+                'target_type' => 'mahasiswa',
+                'target_mahasiswa_id' => $data['student']->id,
+                'target_prodi_id' => null,
+                'target_proku_id' => null,
+                'kelompok_target' => null,
+            ]);
+
+        $response->assertRedirect(route('finance.billing-period.index'));
+        $response->assertSessionHasErrors('template');
+        $this->assertSame('UKT Semester', $template->fresh()->name);
+        $this->assertSame(500000, $template->fresh()->nominal);
+        $this->assertDatabaseMissing('academic_workflow_audits', [
+            'event' => 'billing.template_updated',
+            'subject_id' => $template->id,
+        ]);
     }
 
     private function academicData(string $name = '2026/2027', string $code = '20261'): array

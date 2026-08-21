@@ -9,8 +9,6 @@ use RuntimeException;
 
 class DosenSeeder extends Seeder
 {
-    private const DEFAULT_PASSWORD = 'Demo123!';
-
     /**
      * Data identitas berasal dari dosens.sql yang diberikan untuk data demo.
      * Hash kata sandi dan ID numerik dari dump sengaja tidak disalin.
@@ -24,10 +22,10 @@ class DosenSeeder extends Seeder
             $isNew = ! $lecturer->exists;
 
             $lecturer->fill($attributes);
+            $lecturer->password = Hash::make($attributes['dsn_nidn']);
 
             if ($isNew) {
                 $lecturer->dsn_image = 'default/default-profile.jpg';
-                $lecturer->password = Hash::make(self::DEFAULT_PASSWORD);
             }
 
             $lecturer->save();
