@@ -36,13 +36,18 @@
 
 @section('content')
     <section class="section">
+        @php $activePrintFilters = collect($filters)->reject(fn ($value) => $value === null || $value === ''); @endphp
         <div class="card student-schedule-card">
             <div class="card-header student-schedule-header d-flex justify-content-between align-items-center gap-3">
                 <div>
                     <h5 class="mb-1">Jadwal Kuliah Saya</h5>
                     <small class="text-muted">Periode {{ $selectedPeriod?->name ?? 'belum tersedia' }}</small>
                 </div>
-                <span class="badge bg-primary rounded-pill px-3 py-2">{{ $jadkul->count() }} jadwal</span>
+                <div class="d-flex flex-wrap justify-content-end align-items-center gap-2">
+                    <a href="{{ route('mahasiswa.home-jadkul-print', $activePrintFilters->all()) }}" target="_blank" class="btn btn-outline-primary"><i class="fas fa-calendar-days me-1"></i> Cetak Pertemuan</a>
+                    <a href="{{ route('mahasiswa.home-jadkul-weekly-print', isset($filters['days_id']) ? ['hari' => $filters['days_id']] : []) }}" target="_blank" class="btn btn-outline-success"><i class="fas fa-print me-1"></i> Cetak Mingguan</a>
+                    <span class="badge bg-primary rounded-pill px-3 py-2">{{ $jadkul->count() }} jadwal</span>
+                </div>
             </div>
             <div class="card-body">
                 <form method="GET" action="{{ route('mahasiswa.home-jadkul-index') }}" class="student-schedule-filter row g-2 align-items-center mb-3">

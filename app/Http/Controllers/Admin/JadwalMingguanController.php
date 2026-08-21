@@ -16,6 +16,7 @@ use App\Services\Academic\AcademicPeriodContext;
 use App\Services\Academic\MeetingGeneratorService;
 use App\Services\Academic\ScheduleConflictService;
 use App\Services\Academic\ScheduleNotificationService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,9 +31,9 @@ class JadwalMingguanController extends Controller
 {
     use roleTrait;
 
-    public function index(AcademicPeriodContext $context): View
+    public function index(Request $request, AcademicPeriodContext $context): View
     {
-        return view('user.admin.master.jadwal-mingguan-index', $this->formData($context));
+        return view('user.admin.master.jadwal-mingguan-index', $this->formData($context, $request));
     }
 
     public function recap(AcademicPeriodContext $context): View
@@ -62,7 +63,7 @@ class JadwalMingguanController extends Controller
                 'penawaranMataKuliah',
                 fn ($offering) => $offering->where('pstudi_id', $program->id)
             ))
-            ->with(['penawaranMataKuliah.masterMataKuliah', 'kelas', 'dosen'])
+            ->with(['penawaranMataKuliah.masterMataKuliah', 'kelas', 'dosen', 'ruang.gedung'])
             ->orderBy('hari')
             ->orderBy('mulai')
             ->get();
@@ -118,6 +119,13 @@ class JadwalMingguanController extends Controller
             'semesters' => $semesters,
             'days' => $days,
             'web' => webSettings::query()->first(),
+            'summary' => [
+                'schedules' => $schedules->count(),
+                'classes' => $schedules->pluck('kelas_id')->filter()->unique()->count(),
+                'lecturers' => $schedules->pluck('dosen_id')->filter()->unique()->count(),
+                'rooms' => $schedules->pluck('ruang_id')->filter()->unique()->count(),
+            ],
+            'printedAt' => now(),
         ]);
     }
 
@@ -145,8 +153,10 @@ class JadwalMingguanController extends Controller
     public function export(Request $request, AcademicPeriodContext $context)
     {
         $period = $context->requireCurrent($request->user());
-        $schedules = JadwalMingguan::query()
-            ->forAcademicPeriod($period)
+        $schedules = $this->applyScheduleFilters(
+            JadwalMingguan::query()->forAcademicPeriod($period),
+            $this->scheduleFilters($request)
+        )
             ->with(['penawaranMataKuliah.masterMataKuliah', 'kelas', 'dosen', 'ruang'])
             ->orderBy('hari')
             ->orderBy('mulai')
@@ -356,7 +366,7 @@ class JadwalMingguanController extends Controller
             'jumlah_pertemuan' => 16,
         ]);
         $data = $this->validateGeneration($request, $period->id);
-        $viewData = $this->formData($context);
+        $viewData = $this->formData($context, $request);
         $viewData['preview'] = $generator->preview($jadwal, $data['mulai_tanggal'], $data['selesai_tanggal'], $data['jumlah_pertemuan']);
         $viewData['previewSchedule'] = $jadwal;
         $viewData['generationInput'] = $data;
@@ -374,19 +384,28 @@ class JadwalMingguanController extends Controller
         return back()->with('success', "Generator selesai: {$result['created']} pertemuan dibuat dan {$result['skipped']} duplikat dilewati.");
     }
 
-    private function formData(AcademicPeriodContext $context): array
+    private function formData(AcademicPeriodContext $context, Request $request): array
     {
         $period = $context->current(auth()->user());
+        $filters = $this->scheduleFilters($request);
+        $offerings = PenawaranMataKuliah::query()->forAcademicPeriod($period)
+            ->with(['masterMataKuliah', 'kelas', 'dosenUtama'])->orderBy('code')->get();
+        $preferredOffering = $offerings->firstWhere('id', $request->integer('penawaran_id'));
 
         return [
             'prefix' => $this->setPrefix(),
             'period' => $period,
             'canManage' => $period?->isWritable() ?? false,
-            'schedules' => JadwalMingguan::query()->forAcademicPeriod($period)
+            'schedules' => $this->applyScheduleFilters(
+                JadwalMingguan::query()->forAcademicPeriod($period),
+                $filters
+            )
                 ->with(['penawaranMataKuliah.masterMataKuliah', 'kelas', 'dosen', 'ruang', 'pertemuans'])
                 ->orderBy('hari')->orderBy('mulai')->get(),
-            'offerings' => PenawaranMataKuliah::query()->forAcademicPeriod($period)
-                ->with(['masterMataKuliah', 'kelas', 'dosenUtama'])->orderBy('code')->get(),
+            'offerings' => $offerings,
+            'preferredOffering' => $preferredOffering,
+            'openCreateModal' => $request->boolean('buat') && $preferredOffering && ($period?->isWritable() ?? false),
+            'filterClasses' => $offerings->pluck('kelas')->filter()->unique('id')->sortBy('name')->values(),
             'lecturers' => Dosen::query()->orderBy('dsn_name')->get(),
             'rooms' => Ruang::query()->orderBy('name')->get(),
             'studyPrograms' => ProgramStudi::query()->orderBy('name')->get(),
@@ -395,7 +414,46 @@ class JadwalMingguanController extends Controller
             'preview' => null,
             'previewSchedule' => null,
             'generationInput' => null,
+            'filters' => $filters,
         ];
+    }
+
+    private function scheduleFilters(Request $request): array
+    {
+        $day = $request->filled('hari') ? $request->integer('hari') : null;
+
+        return [
+            'q' => trim((string) $request->query('q', '')),
+            'pstudi_id' => $request->integer('pstudi_id') ?: null,
+            'kelas_id' => $request->integer('kelas_id') ?: null,
+            'dosen_id' => $request->integer('dosen_id') ?: null,
+            'ruang_id' => $request->integer('ruang_id') ?: null,
+            'hari' => $day !== null && $day >= 0 && $day <= 6 ? $day : null,
+        ];
+    }
+
+    private function applyScheduleFilters(Builder $query, array $filters): Builder
+    {
+        return $query
+            ->when($filters['q'], fn (Builder $query, string $search) => $query->where(function (Builder $query) use ($search): void {
+                $query->where('code', 'like', '%'.$search.'%')
+                    ->orWhereHas('penawaranMataKuliah', fn (Builder $offering) => $offering
+                        ->where('code', 'like', '%'.$search.'%')
+                        ->orWhereHas('masterMataKuliah', fn (Builder $master) => $master
+                            ->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('code', 'like', '%'.$search.'%')))
+                    ->orWhereHas('kelas', fn (Builder $class) => $class->where('name', 'like', '%'.$search.'%'))
+                    ->orWhereHas('dosen', fn (Builder $lecturer) => $lecturer->where('dsn_name', 'like', '%'.$search.'%'))
+                    ->orWhereHas('ruang', fn (Builder $room) => $room->where('name', 'like', '%'.$search.'%'));
+            }))
+            ->when($filters['pstudi_id'], fn (Builder $query, int $programId) => $query->whereHas(
+                'penawaranMataKuliah',
+                fn (Builder $offering) => $offering->where('pstudi_id', $programId)
+            ))
+            ->when($filters['kelas_id'], fn (Builder $query, int $classId) => $query->where('kelas_id', $classId))
+            ->when($filters['dosen_id'], fn (Builder $query, int $lecturerId) => $query->where('dosen_id', $lecturerId))
+            ->when($filters['ruang_id'], fn (Builder $query, int $roomId) => $query->where('ruang_id', $roomId))
+            ->when($filters['hari'] !== null, fn (Builder $query) => $query->where('hari', $filters['hari']));
     }
 
     private function validatedSchedule(Request $request, int $periodId): array

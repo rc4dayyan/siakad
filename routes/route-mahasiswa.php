@@ -13,6 +13,8 @@ Route::group(['prefix' => 'mahasiswa', 'middleware' => ['mhs-access:Mahasiswa Ak
     Route::get('/tagihan', [App\Http\Controllers\Mahasiswa\HomeController::class, 'tagihanIndex'])->name('home-tagihan-index');
     Route::get('/tagihan/{code}/invoice', [App\Http\Controllers\Mahasiswa\HomeController::class, 'tagihanInvoice'])->name('home-tagihan-invoice');
     Route::get('/jadwal-kuliah', [App\Http\Controllers\Mahasiswa\HomeController::class, 'jadkulIndex'])->name('home-jadkul-index');
+    Route::get('/jadwal-kuliah/cetak', [App\Http\Controllers\Mahasiswa\HomeController::class, 'jadkulPrint'])->name('home-jadkul-print');
+    Route::get('/jadwal-kuliah/cetak-mingguan', [App\Http\Controllers\Mahasiswa\HomeController::class, 'jadkulWeeklyPrint'])->name('home-jadkul-weekly-print');
     Route::get('/tagihan/view/{code}', [App\Http\Controllers\Mahasiswa\HomeController::class, 'tagihanView'])->name('home-tagihan-view');
     Route::post('/tagihan/view/{code}/payment', [App\Http\Controllers\Mahasiswa\HomeController::class, 'tagihanPayment'])->name('home-tagihan-payment');
     Route::get('/tagihan/pembayaran/{payment}/bukti', [App\Http\Controllers\Mahasiswa\HomeController::class, 'paymentProof'])->name('home-tagihan-payment-proof');

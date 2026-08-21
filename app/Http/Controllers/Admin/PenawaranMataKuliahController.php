@@ -55,7 +55,7 @@ class PenawaranMataKuliahController extends Controller
                 $filters
             )
                 ->with(['masterMataKuliah', 'kelas', 'pstudi', 'kurikulum', 'dosenUtama'])
-                ->withCount('krsItems')
+                ->withCount(['krsItems', 'jadwalMingguans'])
                 ->orderBy('code')
                 ->get(),
             'masters' => MasterMataKuliah::query()
@@ -79,6 +79,36 @@ class PenawaranMataKuliahController extends Controller
             'filters' => $filters,
             'krsWindow' => $period ? KalenderAkademik::query()->where('taka_id', $period->id)
                 ->where('kategori', KalenderAkademik::KATEGORI_KRS)->first() : null,
+        ]);
+    }
+
+    public function unscheduled(Request $request, AcademicPeriodContext $context): View
+    {
+        $period = $context->current($request->user());
+        $filters = $this->offeringFilters($request);
+        $filters['status_jadwal'] = null;
+
+        return view('user.admin.master.penawaran-belum-dijadwalkan-index', [
+            'prefix' => $this->setPrefix(),
+            'period' => $period,
+            'offerings' => $this->applyOfferingFilters(
+                PenawaranMataKuliah::query()
+                    ->forAcademicPeriod($period)
+                    ->whereDoesntHave('jadwalMingguans'),
+                $filters
+            )
+                ->with(['masterMataKuliah', 'kelas', 'pstudi', 'dosenUtama'])
+                ->withCount('krsItems')
+                ->orderBy('code')
+                ->get(),
+            'programs' => ProgramStudi::query()->orderBy('name')->get(),
+            'classes' => Kelas::query()
+                ->forAcademicPeriod($period)
+                ->orderBy('name')
+                ->get(),
+            'lecturers' => Dosen::query()->orderBy('dsn_name')->get(),
+            'canManage' => $period?->isWritable() ?? false,
+            'filters' => $filters,
         ]);
     }
 
@@ -819,6 +849,7 @@ class PenawaranMataKuliahController extends Controller
     private function offeringFilters(Request $request): array
     {
         $semester = $request->integer('semester');
+        $scheduleStatus = $request->query('status_jadwal');
 
         return [
             'q' => trim((string) $request->query('q', '')),
@@ -827,6 +858,7 @@ class PenawaranMataKuliahController extends Controller
             'kelas_id' => $request->integer('kelas_id') ?: null,
             'dosen_id' => $request->integer('dosen_id') ?: null,
             'semester' => $semester >= 1 && $semester <= 14 ? $semester : null,
+            'status_jadwal' => in_array($scheduleStatus, ['belum', 'sudah'], true) ? $scheduleStatus : null,
         ];
     }
 
@@ -843,6 +875,8 @@ class PenawaranMataKuliahController extends Controller
             ->when($filters['kuri_id'], fn (Builder $query, int $curriculumId) => $query->where('kuri_id', $curriculumId))
             ->when($filters['kelas_id'], fn (Builder $query, int $classId) => $query->where('kelas_id', $classId))
             ->when($filters['dosen_id'], fn (Builder $query, int $lecturerId) => $query->where('dosen_utama_id', $lecturerId))
+            ->when($filters['status_jadwal'] === 'belum', fn (Builder $query) => $query->whereDoesntHave('jadwalMingguans'))
+            ->when($filters['status_jadwal'] === 'sudah', fn (Builder $query) => $query->whereHas('jadwalMingguans'))
             ->when($filters['semester'], fn (Builder $query, int $semester) => $query->whereHas(
                 'masterMataKuliah',
                 fn (Builder $masterQuery) => $masterQuery->where('semester', $semester)

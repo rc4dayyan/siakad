@@ -1010,6 +1010,60 @@ class PeriodOpeningWorkflowTest extends TestCase
         $this->assertDatabaseCount('penawaran_mata_kuliahs', 1);
     }
 
+    public function test_unscheduled_offerings_page_only_lists_offerings_without_a_weekly_schedule(): void
+    {
+        $data = $this->readyPeriod();
+        $master = MasterMataKuliah::create([
+            'program_studi' => $data['offering']->masterMataKuliah->program_studi,
+            'semester' => 1,
+            'name' => 'Mata Kuliah Belum Dijadwalkan',
+            'sks' => 2,
+        ]);
+        $unscheduled = PenawaranMataKuliah::create([
+            ...$data['offering']->only(['taka_id', 'pstudi_id', 'kuri_id', 'kelas_id', 'dosen_utama_id', 'kapasitas']),
+            'master_mata_kuliah_id' => $master->id,
+            'code' => 'OFF-BELUM-JADWAL',
+            'sks' => 2,
+        ]);
+
+        $response = $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('web-admin.master.penawaran-unscheduled'));
+
+        $response->assertOk()
+            ->assertSee('Penawaran Belum Dijadwalkan')
+            ->assertSee($unscheduled->code)
+            ->assertDontSee($data['offering']->code)
+            ->assertSee('Jadwalkan');
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('web-admin.master.penawaran-index', ['status_jadwal' => 'belum']))
+            ->assertOk()
+            ->assertSee($unscheduled->code)
+            ->assertDontSee($data['offering']->code)
+            ->assertSee('Belum dijadwalkan')
+            ->assertSee('Jadwalkan');
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('web-admin.master.penawaran-index', ['status_jadwal' => 'sudah']))
+            ->assertOk()
+            ->assertSee($data['offering']->code)
+            ->assertDontSee($unscheduled->code)
+            ->assertSee('Sudah dijadwalkan');
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->get(route('web-admin.master.jadwal-mingguan-index', [
+                'penawaran_id' => $unscheduled->id,
+                'buat' => 1,
+            ]))
+            ->assertOk()
+            ->assertViewHas('preferredOffering', fn ($offering) => $offering?->is($unscheduled))
+            ->assertViewHas('openCreateModal', true);
+    }
+
     public function test_weekly_schedules_can_be_exported_and_imported_for_the_selected_period(): void
     {
         $data = $this->readyPeriod();

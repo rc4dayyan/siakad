@@ -368,6 +368,96 @@ class KrsWorkflowTest extends TestCase
 
         $this->assertSame([$matching->id], $studentView->getData()['jadkul']->modelKeys());
         $this->assertSame($data['advisor']->id, $studentView->getData()['filterLecturers']->sole()->id);
+
+        $printRequest = Request::create('/mahasiswa/jadwal-kuliah/cetak', 'GET', [
+            'q' => 'JAD-FILTER-A', 'ruang_id' => $firstRoom, 'date_to' => '2026-08-17',
+        ]);
+        $printView = app(\App\Http\Controllers\Mahasiswa\HomeController::class)->jadkulPrint(
+            $printRequest,
+            app(AcademicPeriodContext::class),
+            app(\App\Services\Academic\StudentAcademicContext::class)
+        );
+        $printHtml = $printView->render();
+
+        $this->assertSame([$matching->id], $printView->getData()['schedules']->modelKeys());
+        $this->assertStringContainsString('Jadwal Kuliah Mahasiswa', $printHtml);
+        $this->assertStringContainsString($data['student']->mhs_name, $printHtml);
+        $this->assertStringContainsString('Ruang FILTER-A', $printHtml);
+        $this->assertStringNotContainsString('Ruang FILTER-B', $printHtml);
+    }
+
+    public function test_student_can_print_only_approved_weekly_schedules_from_their_krs(): void
+    {
+        $data = $this->academicData();
+        DB::table('tahun_akademiks')->where('id', $data['periodId'])->update([
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+        $offering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $service = app(KrsService::class);
+        $krs = $service->add($service->forRegistration($data['registration']), $offering);
+        $service->submit($krs);
+        $service->decide($krs->fresh(), $data['advisor'], Krs::STATUS_APPROVED, null);
+
+        $roomId = $this->room(40, 'STUDENT-WEEKLY');
+        $scheduleAttributes = [
+            'penawaran_mata_kuliah_id' => $offering->id,
+            'kelas_id' => $data['classId'],
+            'dosen_id' => $data['advisor']->id,
+            'ruang_id' => $roomId,
+            'hari' => 1,
+            'mulai' => '08:00',
+            'selesai' => '09:40',
+        ];
+        $schedule = JadwalMingguan::create([
+            ...$scheduleAttributes,
+            'code' => 'JMG-STUDENT-WEEKLY',
+            'fingerprint' => JadwalMingguan::fingerprint($scheduleAttributes),
+        ]);
+
+        $otherMaster = MasterMataKuliah::create([
+            'program_studi' => 'PAI',
+            'code' => 'PAI999',
+            'semester' => 1,
+            'name' => 'Mata Kuliah Tidak Diambil',
+            'sks' => 2,
+        ]);
+        $otherOffering = PenawaranMataKuliah::create([
+            ...$this->offeringAttributes($data),
+            'master_mata_kuliah_id' => $otherMaster->id,
+            'code' => 'OF-NOT-TAKEN',
+            'sks' => 2,
+        ]);
+        $otherScheduleAttributes = [
+            'penawaran_mata_kuliah_id' => $otherOffering->id,
+            'kelas_id' => $data['classId'],
+            'dosen_id' => $data['advisor']->id,
+            'ruang_id' => $roomId,
+            'hari' => 1,
+            'mulai' => '10:00',
+            'selesai' => '11:40',
+        ];
+        JadwalMingguan::create([
+            ...$otherScheduleAttributes,
+            'code' => 'JMG-NOT-TAKEN',
+            'fingerprint' => JadwalMingguan::fingerprint($otherScheduleAttributes),
+        ]);
+
+        $this->actingAs($data['student'], 'mahasiswa');
+        $request = Request::create('/mahasiswa/jadwal-kuliah/cetak-mingguan', 'GET', ['hari' => 1]);
+        $view = app(\App\Http\Controllers\Mahasiswa\HomeController::class)->jadkulWeeklyPrint(
+            $request,
+            app(AcademicPeriodContext::class),
+            app(\App\Services\Academic\StudentAcademicContext::class)
+        );
+        $html = $view->render();
+
+        $this->assertSame([$schedule->id], $view->getData()['schedules']->modelKeys());
+        $this->assertStringContainsString('Jadwal Kuliah Mingguan', $html);
+        $this->assertStringContainsString('Pengantar Studi Islam', $html);
+        $this->assertStringContainsString('Dosen Wali', $html);
+        $this->assertStringContainsString('Ruang STUDENT-WEEKLY', $html);
+        $this->assertStringNotContainsString('Mata Kuliah Tidak Diambil', $html);
     }
 
     public function test_offering_grades_can_be_imported_exported_and_not_changed_after_period_closes(): void
@@ -582,6 +672,99 @@ class KrsWorkflowTest extends TestCase
         $smallRoom = $this->room(2, 'R002');
         $this->expectException(ValidationException::class);
         app(ScheduleConflictService::class)->validate($offering, [...$attributes, 'ruang_id' => $smallRoom, 'hari' => 2]);
+    }
+
+    public function test_printed_weekly_timetable_contains_professional_schedule_details(): void
+    {
+        $data = $this->academicData();
+        $offering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $roomId = $this->room(40, 'PRINT');
+        $attributes = [
+            'penawaran_mata_kuliah_id' => $offering->id,
+            'kelas_id' => $data['classId'],
+            'dosen_id' => $data['advisor']->id,
+            'ruang_id' => $roomId,
+            'hari' => 1,
+            'mulai' => '08:00',
+            'selesai' => '09:40',
+        ];
+        JadwalMingguan::create([
+            ...$attributes,
+            'code' => 'JMG-PRINT',
+            'fingerprint' => JadwalMingguan::fingerprint($attributes),
+        ]);
+        $administrator = $this->webAdministrator('TIMETABLEPRINT');
+        $this->actingAs($administrator);
+        session([AcademicPeriodContext::SESSION_KEY => $data['periodId']]);
+        $request = Request::create('/web-admin/master/jadwal-mingguan/cetak', 'GET', [
+            'pstudi_id' => $data['programId'],
+        ]);
+        $request->setUserResolver(fn () => $administrator);
+
+        $view = app(\App\Http\Controllers\Admin\JadwalMingguanController::class)
+            ->printTimetable($request, app(AcademicPeriodContext::class));
+        $html = $view->render();
+
+        $this->assertStringContainsString('Pengantar Studi Islam', $html);
+        $this->assertStringContainsString('PAI 1A', $html);
+        $this->assertStringContainsString('Ruang PRINT', $html);
+        $this->assertStringContainsString('3 SKS', $html);
+        $this->assertStringContainsString('Nama Dosen', $html);
+        $this->assertStringNotContainsString('Kode Dosen', $html);
+        $this->assertStringContainsString('Dosen Wali', $html);
+        $this->assertSame([
+            'schedules' => 1,
+            'classes' => 1,
+            'lecturers' => 1,
+            'rooms' => 1,
+        ], $view->getData()['summary']);
+    }
+
+    public function test_weekly_schedule_list_combines_academic_resource_and_day_filters(): void
+    {
+        $data = $this->academicData();
+        $offering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $roomId = $this->room(40, 'FILTER');
+        $attributes = [
+            'penawaran_mata_kuliah_id' => $offering->id,
+            'kelas_id' => $data['classId'],
+            'dosen_id' => $data['advisor']->id,
+            'ruang_id' => $roomId,
+            'hari' => 1,
+            'mulai' => '08:00',
+            'selesai' => '09:40',
+        ];
+        $schedule = JadwalMingguan::create([
+            ...$attributes,
+            'code' => 'JMG-FILTER',
+            'fingerprint' => JadwalMingguan::fingerprint($attributes),
+        ]);
+        $administrator = $this->webAdministrator('SCHEDULEFILTER');
+        $this->actingAs($administrator);
+        session([AcademicPeriodContext::SESSION_KEY => $data['periodId']]);
+        $request = Request::create('/web-admin/master/jadwal-mingguan', 'GET', [
+            'q' => 'Pengantar',
+            'pstudi_id' => $data['programId'],
+            'kelas_id' => $data['classId'],
+            'dosen_id' => $data['advisor']->id,
+            'ruang_id' => $roomId,
+            'hari' => 1,
+        ]);
+        $request->setUserResolver(fn () => $administrator);
+
+        $view = app(\App\Http\Controllers\Admin\JadwalMingguanController::class)
+            ->index($request, app(AcademicPeriodContext::class));
+
+        $this->assertSame([$schedule->id], $view->getData()['schedules']->pluck('id')->all());
+        $this->assertSame(1, $view->getData()['filters']['hari']);
+
+        $sundayRequest = Request::create('/web-admin/master/jadwal-mingguan', 'GET', ['hari' => 0]);
+        $sundayRequest->setUserResolver(fn () => $administrator);
+        $sundayView = app(\App\Http\Controllers\Admin\JadwalMingguanController::class)
+            ->index($sundayRequest, app(AcademicPeriodContext::class));
+
+        $this->assertSame(0, $sundayView->getData()['filters']['hari']);
+        $this->assertTrue($sundayView->getData()['schedules']->isEmpty());
     }
 
     public function test_meeting_generator_skips_holiday_and_is_idempotent(): void

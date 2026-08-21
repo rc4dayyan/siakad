@@ -11,7 +11,9 @@ use App\Models\Dosen;
 use App\Models\FeedBack\FBPerkuliahan;
 use App\Models\HistoryTagihan;
 use App\Models\JadwalKuliah;
+use App\Models\JadwalMingguan;
 use App\Models\Kelas;
+use App\Models\Krs;
 use App\Models\Kurikulum;
 // SECTION ADDONS EXTERNAL
 use App\Models\MataKuliah;
@@ -94,70 +96,67 @@ class HomeController extends Controller
 
     public function jadkulIndex(Request $request, AcademicPeriodContext $context, StudentAcademicContext $studentContext)
     {
-        $period = $context->published();
-        $student = Auth::guard('mahasiswa')->user();
-        $academicClass = $studentContext->classFor($student, $period);
-        $baseQuery = JadwalKuliah::query()
-            ->forAcademicPeriod($period)
-            ->when(
-                Schema::hasColumn('jadwal_kuliahs', 'penawaran_mata_kuliah_id'),
-                fn ($query) => $query->forApprovedStudent($student->id),
-                fn ($query) => $query->when($academicClass, fn ($query) => $query->forStudentClass($academicClass->id))
-            )
-            ->when(! $academicClass, fn ($query) => $query->whereRaw('1 = 0'));
-        $classIds = (clone $baseQuery)->distinct()->pluck('kelas_id');
-        $lecturerIds = (clone $baseQuery)->distinct()->pluck('dosen_id');
-        $roomIds = (clone $baseQuery)->distinct()->pluck('ruang_id');
-        $filters = $request->validate([
-            'q' => ['nullable', 'string', 'max:100'],
-            'kelas_id' => ['nullable', 'integer', Rule::in($classIds->all())],
-            'dosen_id' => ['nullable', 'integer', Rule::in($lecturerIds->all())],
-            'ruang_id' => ['nullable', 'integer', Rule::in($roomIds->all())],
-            'meth_id' => ['nullable', 'integer', 'in:0,1'],
-            'days_id' => ['nullable', 'integer', 'between:0,6'],
-            'date_from' => ['nullable', 'date'],
-            'date_to' => [
-                'nullable',
-                'date',
-                Rule::when($request->filled('date_from'), ['after_or_equal:date_from']),
-            ],
-        ]);
+        $listing = $this->studentScheduleListing($request, $context, $studentContext);
+        $period = $listing['period'];
         $data['kuri'] = Kurikulum::all();
         $data['taka'] = $period ? collect([$period]) : collect();
         $data['pstudi'] = ProgramStudi::all();
         $data['matkul'] = MataKuliah::query()->forAcademicPeriod($period)->get();
-        $data['jadkul'] = (clone $baseQuery)
-            ->with(['matkul', 'kelas', 'dosen', 'ruang.gedung'])
-            ->when($filters['q'] ?? null, function ($query, string $keyword) {
-                $query->where(function ($query) use ($keyword) {
-                    $query->where('code', 'like', "%{$keyword}%")
-                        ->orWhereHas('matkul', fn ($course) => $course
-                            ->where('name', 'like', "%{$keyword}%")
-                            ->orWhere('code', 'like', "%{$keyword}%"))
-                        ->orWhereHas('kelas', fn ($class) => $class
-                            ->where('name', 'like', "%{$keyword}%")
-                            ->orWhere('code', 'like', "%{$keyword}%"))
-                        ->orWhereHas('dosen', fn ($lecturer) => $lecturer->where('dsn_name', 'like', "%{$keyword}%"));
-                });
-            })
-            ->when($filters['kelas_id'] ?? null, fn ($query, $classId) => $query->where('kelas_id', $classId))
-            ->when($filters['dosen_id'] ?? null, fn ($query, $lecturerId) => $query->where('dosen_id', $lecturerId))
-            ->when($filters['ruang_id'] ?? null, fn ($query, $roomId) => $query->where('ruang_id', $roomId))
-            ->when(isset($filters['meth_id']) && $filters['meth_id'] !== null, fn ($query) => $query->where('meth_id', $filters['meth_id']))
-            ->when(isset($filters['days_id']) && $filters['days_id'] !== null, fn ($query) => $query->where('days_id', $filters['days_id']))
-            ->when($filters['date_from'] ?? null, fn ($query, $date) => $query->whereDate('date', '>=', $date))
-            ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->whereDate('date', '<=', $date))
-            ->orderBy('date')
-            ->orderBy('start')
-            ->get();
-        $data['filters'] = $filters;
-        $data['filterClasses'] = Kelas::query()->whereIn('id', $classIds)->orderBy('name')->get();
-        $data['filterLecturers'] = Dosen::query()->whereIn('id', $lecturerIds)->orderBy('dsn_name')->get();
-        $data['filterRooms'] = Ruang::query()->whereIn('id', $roomIds)->orderBy('name')->get();
+        $data['jadkul'] = $listing['schedules'];
+        $data['filters'] = $listing['filters'];
+        $data['filterClasses'] = Kelas::query()->whereIn('id', $listing['classIds'])->orderBy('name')->get();
+        $data['filterLecturers'] = Dosen::query()->whereIn('id', $listing['lecturerIds'])->orderBy('dsn_name')->get();
+        $data['filterRooms'] = Ruang::query()->whereIn('id', $listing['roomIds'])->orderBy('name')->get();
         $data['selectedPeriod'] = $period;
         $data['web'] = webSettings::where('id', 1)->first();
 
         return view('mahasiswa.pages.mhs-jadkul-index', $data);
+    }
+
+    public function jadkulPrint(Request $request, AcademicPeriodContext $context, StudentAcademicContext $studentContext)
+    {
+        $listing = $this->studentScheduleListing($request, $context, $studentContext);
+
+        return view('base.cetak.cetak-jadwal-mahasiswa', [
+            'student' => $listing['student'],
+            'academicClass' => $listing['academicClass'],
+            'period' => $listing['period'],
+            'schedules' => $listing['schedules'],
+            'filters' => $listing['filters'],
+            'web' => webSettings::query()->first(),
+            'printedAt' => now(),
+        ]);
+    }
+
+    public function jadkulWeeklyPrint(Request $request, AcademicPeriodContext $context, StudentAcademicContext $studentContext)
+    {
+        $filters = $request->validate([
+            'hari' => ['nullable', 'integer', 'between:0,6'],
+        ]);
+        $student = Auth::guard('mahasiswa')->user();
+        $period = $context->published();
+        $academicClass = $studentContext->classFor($student, $period);
+        $academicClass?->loadMissing('pstudi');
+        $schedules = JadwalMingguan::query()
+            ->forAcademicPeriod($period)
+            ->whereHas('penawaranMataKuliah.krsItems.krs', fn ($krs) => $krs
+                ->whereIn('status', [Krs::STATUS_APPROVED, Krs::STATUS_LOCKED])
+                ->whereHas('registrasiMahasiswa', fn ($registration) => $registration
+                    ->where('mahasiswa_id', $student->id)))
+            ->when(isset($filters['hari']), fn ($query) => $query->where('hari', $filters['hari']))
+            ->with(['penawaranMataKuliah.masterMataKuliah', 'kelas.pstudi', 'dosen', 'ruang.gedung'])
+            ->orderBy('hari')
+            ->orderBy('mulai')
+            ->get();
+
+        return view('base.cetak.cetak-jadwal-mingguan-mahasiswa', [
+            'student' => $student,
+            'academicClass' => $academicClass,
+            'period' => $period,
+            'schedules' => $schedules,
+            'web' => webSettings::query()->first(),
+            'printedAt' => now(),
+        ]);
     }
 
     public function jadkulAbsen(string $code, AcademicPeriodContext $context, StudentAcademicContext $studentContext)
@@ -577,6 +576,77 @@ class HomeController extends Controller
 
         }
 
+    }
+
+    private function studentScheduleListing(
+        Request $request,
+        AcademicPeriodContext $context,
+        StudentAcademicContext $studentContext
+    ): array {
+        $period = $context->published();
+        $student = Auth::guard('mahasiswa')->user();
+        $academicClass = $studentContext->classFor($student, $period);
+        $academicClass?->loadMissing('pstudi');
+        $baseQuery = JadwalKuliah::query()
+            ->forAcademicPeriod($period)
+            ->when(
+                Schema::hasColumn('jadwal_kuliahs', 'penawaran_mata_kuliah_id'),
+                fn ($query) => $query->forApprovedStudent($student->id),
+                fn ($query) => $query->when($academicClass, fn ($query) => $query->forStudentClass($academicClass->id))
+            )
+            ->when(! $academicClass, fn ($query) => $query->whereRaw('1 = 0'));
+        $classIds = (clone $baseQuery)->distinct()->pluck('kelas_id');
+        $lecturerIds = (clone $baseQuery)->distinct()->pluck('dosen_id');
+        $roomIds = (clone $baseQuery)->distinct()->pluck('ruang_id');
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'kelas_id' => ['nullable', 'integer', Rule::in($classIds->all())],
+            'dosen_id' => ['nullable', 'integer', Rule::in($lecturerIds->all())],
+            'ruang_id' => ['nullable', 'integer', Rule::in($roomIds->all())],
+            'meth_id' => ['nullable', 'integer', 'in:0,1'],
+            'days_id' => ['nullable', 'integer', 'between:0,6'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => [
+                'nullable',
+                'date',
+                Rule::when($request->filled('date_from'), ['after_or_equal:date_from']),
+            ],
+        ]);
+        $schedules = (clone $baseQuery)
+            ->with(['matkul', 'kelas.pstudi', 'dosen', 'ruang.gedung'])
+            ->when($filters['q'] ?? null, function ($query, string $keyword) {
+                $query->where(function ($query) use ($keyword) {
+                    $query->where('code', 'like', "%{$keyword}%")
+                        ->orWhereHas('matkul', fn ($course) => $course
+                            ->where('name', 'like', "%{$keyword}%")
+                            ->orWhere('code', 'like', "%{$keyword}%"))
+                        ->orWhereHas('kelas', fn ($class) => $class
+                            ->where('name', 'like', "%{$keyword}%")
+                            ->orWhere('code', 'like', "%{$keyword}%"))
+                        ->orWhereHas('dosen', fn ($lecturer) => $lecturer->where('dsn_name', 'like', "%{$keyword}%"));
+                });
+            })
+            ->when($filters['kelas_id'] ?? null, fn ($query, $classId) => $query->where('kelas_id', $classId))
+            ->when($filters['dosen_id'] ?? null, fn ($query, $lecturerId) => $query->where('dosen_id', $lecturerId))
+            ->when($filters['ruang_id'] ?? null, fn ($query, $roomId) => $query->where('ruang_id', $roomId))
+            ->when(isset($filters['meth_id']) && $filters['meth_id'] !== null, fn ($query) => $query->where('meth_id', $filters['meth_id']))
+            ->when(isset($filters['days_id']) && $filters['days_id'] !== null, fn ($query) => $query->where('days_id', $filters['days_id']))
+            ->when($filters['date_from'] ?? null, fn ($query, $date) => $query->whereDate('date', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->whereDate('date', '<=', $date))
+            ->orderBy('date')
+            ->orderBy('start')
+            ->get();
+
+        return compact(
+            'period',
+            'student',
+            'academicClass',
+            'classIds',
+            'lecturerIds',
+            'roomIds',
+            'filters',
+            'schedules'
+        );
     }
 
     private function studentActiveSchedule(string $code, ?int $classId, AcademicPeriodContext $context): JadwalKuliah

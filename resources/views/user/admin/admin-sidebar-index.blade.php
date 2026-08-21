@@ -9,8 +9,11 @@
         <li class="submenu-item {{ Route::is('web-admin.period-opening.*') ? 'active' : '' }}">
             <a href="{{ route('web-admin.period-opening.index') }}" class="submenu-link">Kesiapan Periode</a>
         </li>
-        <li class="submenu-item {{ Route::is('web-admin.master.penawaran-*') ? 'active' : '' }}">
+        <li class="submenu-item {{ Route::is('web-admin.master.penawaran-*') && ! Route::is('web-admin.master.penawaran-unscheduled') ? 'active' : '' }}">
             <a href="{{ route('web-admin.master.penawaran-index') }}" class="submenu-link">Penawaran Mata Kuliah</a>
+        </li>
+        <li class="submenu-item {{ Route::is('web-admin.master.penawaran-unscheduled') ? 'active' : '' }}">
+            <a href="{{ route('web-admin.master.penawaran-unscheduled') }}" class="submenu-link">Belum Dijadwalkan</a>
         </li>
         <li class="submenu-item {{ Route::is('web-admin.master.jadwal-mingguan-*') ? 'active' : '' }}">
             <a href="{{ route('web-admin.master.jadwal-mingguan-index') }}" class="submenu-link">Jadwal &amp; Pertemuan</a>

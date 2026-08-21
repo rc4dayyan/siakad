@@ -122,7 +122,7 @@
                         <span><strong>{{ number_format($dashboard['withoutKrs']) }} mahasiswa belum memiliki KRS</strong><small>Periksa registrasi dan kelayakan pengisian</small></span>
                         <i class="fas fa-chevron-right"></i>
                     </a>
-                    <a href="{{ route($prefix.'master.penawaran-index') }}" class="attention-item">
+                    <a href="{{ route($prefix.'master.penawaran-unscheduled') }}" class="attention-item">
                         <span class="attention-item__icon is-info"><i class="fas fa-calendar-xmark"></i></span>
                         <span><strong>{{ number_format($dashboard['offeringsWithoutSchedule']) }} penawaran belum dijadwalkan</strong><small>Lengkapi jadwal mingguan mata kuliah</small></span>
                         <i class="fas fa-chevron-right"></i>

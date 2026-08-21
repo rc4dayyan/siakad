@@ -74,22 +74,35 @@
                 <div class="col-xl-2 col-lg-3 col-md-6"><label for="offering-class" class="form-label">Kelas</label><select name="kelas_id" id="offering-class" class="form-select"><option value="">Semua kelas</option>@foreach($classes as $item)<option value="{{ $item->id }}" @selected($filters['kelas_id'] == $item->id)>{{ $item->name }}</option>@endforeach</select></div>
                 <div class="col-xl-2 col-lg-3 col-md-6"><label for="offering-semester" class="form-label">Semester</label><select name="semester" id="offering-semester" class="form-select"><option value="">Semua semester</option>@for($semester = 1; $semester <= 14; $semester++)<option value="{{ $semester }}" @selected($filters['semester'] === $semester)>Semester {{ $semester }}</option>@endfor</select></div>
                 <div class="col-xl-4 col-lg-6"><label for="offering-lecturer" class="form-label">Dosen utama</label><select name="dosen_id" id="offering-lecturer" class="form-select"><option value="">Semua dosen utama</option>@foreach($lecturers as $item)<option value="{{ $item->id }}" @selected($filters['dosen_id'] == $item->id)>{{ $item->dsn_name }}</option>@endforeach</select></div>
+                <div class="col-xl-3 col-lg-4 col-md-6"><label for="offering-schedule-status" class="form-label">Status jadwal</label><select name="status_jadwal" id="offering-schedule-status" class="form-select"><option value="">Semua status</option><option value="belum" @selected($filters['status_jadwal'] === 'belum')>Belum dijadwalkan</option><option value="sudah" @selected($filters['status_jadwal'] === 'sudah')>Sudah dijadwalkan</option></select></div>
                 <div class="col-xl-4 col-lg-6 offering-filter__actions"><button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-filter me-1"></i> Terapkan Filter</button><a href="{{ route($prefix.'master.penawaran-index') }}" class="btn btn-outline-secondary"><i class="fas fa-rotate-left me-1"></i> Reset</a></div>
             </form>
         </div>
         <div class="table-responsive">
         <table class="table table-striped">
-            <thead><tr><th>Kode</th><th>Mata Kuliah</th><th>Kelas</th><th>Dosen</th><th>SKS</th><th>Kapasitas</th><th class="text-center">Aksi</th></tr></thead>
+            <thead><tr><th>Kode</th><th>Mata Kuliah</th><th>Kelas</th><th>Dosen</th><th>SKS</th><th>Kapasitas</th><th>Status Jadwal</th><th class="text-center">Aksi</th></tr></thead>
             <tbody>
                 @forelse($offerings as $item)
-                    <tr>
+                    <tr @class(['table-warning' => $item->jadwal_mingguans_count === 0])>
                         <td>{{ $item->code }}</td>
                         <td>{{ $item->masterMataKuliah->name }}</td>
                         <td>{{ $item->kelas->name }}</td>
                         <td>{{ $item->dosenUtama->dsn_name }}</td>
                         <td>{{ $item->sks }}</td>
                         <td>{{ $item->krs_items_count }} / {{ $item->kapasitas }}</td>
+                        <td>
+                            @if($item->jadwal_mingguans_count === 0)
+                                <span class="badge bg-warning text-dark"><i class="fas fa-calendar-xmark me-1"></i>Belum dijadwalkan</span>
+                            @else
+                                <span class="badge bg-light-success text-success"><i class="fas fa-calendar-check me-1"></i>Sudah dijadwalkan</span>
+                            @endif
+                        </td>
                         <td class="text-center">
+                            @if($canManage && $item->jadwal_mingguans_count === 0)
+                                <a href="{{ route($prefix.'master.jadwal-mingguan-index', ['penawaran_id' => $item->id, 'buat' => 1]) }}" class="btn btn-sm btn-primary me-1">
+                                    <i class="fas fa-calendar-plus me-1"></i> Jadwalkan
+                                </a>
+                            @endif
                             <div class="dropdown d-inline-block">
                                 <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle"
                                     data-bs-toggle="dropdown" aria-expanded="false">
@@ -130,7 +143,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="text-center text-muted">Belum ada penawaran.</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted">Belum ada penawaran.</td></tr>
                 @endforelse
             </tbody>
         </table></div>
