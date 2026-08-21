@@ -47,6 +47,13 @@
             <div class="col-md-4"><label class="form-label">Prasyarat</label><select name="prasyarat_master_id" class="form-select"><option value="">Tanpa prasyarat</option>@foreach($masters as $item)<option value="{{ $item->id }}" @selected(old('prasyarat_master_id') == $item->id)>{{ $item->name }} — {{ $masterProgramNames[$item->program_studi] ?? $item->program_studi }} — Semester {{ $item->semester }} ({{ $item->sks }} SKS)</option>@endforeach</select></div>
             <div class="col-md-2"><label class="form-label">Kapasitas</label><input type="number" name="kapasitas" value="{{ old('kapasitas', 40) }}" min="1" class="form-control" required></div>
             <div class="col-12"><label class="form-label">Deskripsi</label><textarea name="deskripsi" class="form-control">{{ old('deskripsi') }}</textarea></div>
+            <div class="col-12"><hr><div class="form-check"><input class="form-check-input" type="checkbox" name="buat_jadwal" value="1" id="create-offering-with-schedule" @checked(old('buat_jadwal'))><label class="form-check-label fw-bold" for="create-offering-with-schedule">Sekaligus buat jadwal mingguan</label></div><small class="text-muted">Penjadwalan langsung hanya dapat digunakan jika memilih tepat satu kelas.</small></div>
+            <div class="col-12 {{ old('buat_jadwal') ? '' : 'd-none' }}" id="create-offering-schedule-fields"><div class="row g-3 rounded border bg-light p-2">
+                <div class="col-md-4"><label for="create-offering-room" class="form-label">Ruang</label><select name="jadwal_ruang_id" id="create-offering-room" class="form-select" required @disabled(!old('buat_jadwal'))><option value="">Pilih ruang</option>@foreach($rooms as $room)<option value="{{ $room->id }}" @selected(old('jadwal_ruang_id') == $room->id)>{{ $room->name }} ({{ $room->kapasitas }})</option>@endforeach</select></div>
+                <div class="col-md-3"><label for="create-offering-day" class="form-label">Hari</label><select name="jadwal_hari" id="create-offering-day" class="form-select" required @disabled(!old('buat_jadwal'))><option value="">Pilih hari</option>@foreach(['Minggu','Senin','Selasa','Rabu','Kamis',"Jum'at",'Sabtu'] as $day)<option value="{{ $loop->index }}" @selected(old('jadwal_hari') !== null && (int) old('jadwal_hari') === $loop->index)>{{ $day }}</option>@endforeach</select></div>
+                <div class="col-md-2"><label for="create-offering-start" class="form-label">Jam mulai</label><input type="time" name="jadwal_mulai" id="create-offering-start" value="{{ old('jadwal_mulai') }}" class="form-control" required @disabled(!old('buat_jadwal'))></div>
+                <div class="col-md-2"><label for="create-offering-end" class="form-label">Jam selesai</label><input type="time" name="jadwal_selesai" id="create-offering-end" value="{{ old('jadwal_selesai') }}" class="form-control" required @disabled(!old('buat_jadwal'))></div>
+            </div></div>
         </form></div>
         <div class="modal-footer"><button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" form="create-offering-form" class="btn btn-primary">Simpan Penawaran</button></div>
     </div></div></div>
@@ -55,7 +62,7 @@
             <div class="modal-header"><h5 class="modal-title" id="importOfferingModalLabel">Import Penawaran Mata Kuliah — {{ $period->name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
             <div class="modal-body">
                 @if($errors->any() && old('_form') === 'import-offerings')<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
-                <p class="text-muted">Gunakan hasil export sebagai template. Kode periode harus <strong>{{ $period->code }}</strong>. Semester Mata Kuliah dan Semester Prasyarat dapat ditulis dengan angka atau Romawi (contoh: 2 atau II). Penawaran dengan kombinasi mata kuliah, program studi, kurikulum, dan kelas yang sudah ada akan dilewati.</p>
+                <p class="text-muted">Gunakan hasil export sebagai template. Kode periode harus <strong>{{ $period->code }}</strong>. Semester dapat ditulis dengan angka atau Romawi. Kolom jadwal bersifat opsional; jika jadwal disertakan, Kode Ruang Jadwal, Hari Jadwal, Jam Mulai Jadwal, dan Jam Selesai Jadwal wajib diisi. Penawaran duplikat akan dilewati.</p>
                 <label for="import-offering-file" class="form-label">File XLSX atau CSV</label>
                 <input type="file" name="import" id="import-offering-file" class="form-control" accept=".xlsx,.csv" required>
             </div>
@@ -163,4 +170,17 @@
 </section>
 @if($errors->any() && old('_form') === 'create-offering')<script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('createOfferingModal')).show());</script>@endif
 @if($errors->any() && old('_form') === 'import-offerings')<script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('importOfferingModal')).show());</script>@endif
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const checkbox = document.getElementById('create-offering-with-schedule');
+    const fields = document.getElementById('create-offering-schedule-fields');
+    if (!checkbox || !fields) return;
+    const toggleScheduleFields = () => {
+        fields.classList.toggle('d-none', !checkbox.checked);
+        fields.querySelectorAll('input, select').forEach((field) => field.disabled = !checkbox.checked);
+    };
+    checkbox.addEventListener('change', toggleScheduleFields);
+    toggleScheduleFields();
+});
+</script>
 @endsection

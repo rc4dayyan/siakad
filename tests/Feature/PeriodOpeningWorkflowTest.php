@@ -980,6 +980,7 @@ class PeriodOpeningWorkflowTest extends TestCase
     public function test_offerings_can_be_exported_for_the_selected_period(): void
     {
         $data = $this->readyPeriod();
+        $originalSchedule = JadwalMingguan::query()->where('penawaran_mata_kuliah_id', $data['offering']->id)->firstOrFail();
 
         $response = $this->actingAs($data['actor'])
             ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
@@ -994,6 +995,8 @@ class PeriodOpeningWorkflowTest extends TestCase
         $this->assertNotEmpty($content);
 
         $file = UploadedFile::fake()->createWithContent('penawaran.xlsx', $content);
+        JadwalMingguan::query()->delete();
+        PenawaranMataKuliah::query()->delete();
 
         $this->actingAs($data['actor'])
             ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
@@ -1008,6 +1011,133 @@ class PeriodOpeningWorkflowTest extends TestCase
             'taka_id' => $data['period']->id,
         ]);
         $this->assertDatabaseCount('penawaran_mata_kuliahs', 1);
+        $restoredOffering = PenawaranMataKuliah::query()->where('code', 'OFF-READY')->firstOrFail();
+        $this->assertDatabaseHas('jadwal_mingguans', [
+            'penawaran_mata_kuliah_id' => $restoredOffering->id,
+            'ruang_id' => $originalSchedule->ruang_id,
+            'hari' => $originalSchedule->hari,
+            'mulai' => $originalSchedule->mulai,
+            'selesai' => $originalSchedule->selesai,
+        ]);
+    }
+
+    public function test_web_administrator_can_create_an_offering_and_weekly_schedule_atomically(): void
+    {
+        $data = $this->readyPeriod();
+        $master = MasterMataKuliah::create([
+            'program_studi' => $data['offering']->masterMataKuliah->program_studi,
+            'semester' => 2,
+            'name' => 'Penawaran dan Jadwal Baru',
+            'sks' => 2,
+        ]);
+        $roomId = JadwalMingguan::query()->value('ruang_id');
+
+        $response = $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('web-admin.master.penawaran-store'), [
+                '_form' => 'create-offering',
+                'master_mata_kuliah_id' => $master->id,
+                'pstudi_id' => $data['offering']->pstudi_id,
+                'kuri_id' => $data['offering']->kuri_id,
+                'kelas_ids' => [$data['classId']],
+                'dosen_utama_id' => $data['advisor']->id,
+                'kapasitas' => 30,
+                'buat_jadwal' => 1,
+                'jadwal_ruang_id' => $roomId,
+                'jadwal_hari' => 2,
+                'jadwal_mulai' => '10:00',
+                'jadwal_selesai' => '11:40',
+            ]);
+
+        $response->assertSessionHasNoErrors()
+            ->assertSessionHas('success', fn (string $message) => str_contains($message, 'Jadwal mingguan juga berhasil dibuat'));
+        $offering = PenawaranMataKuliah::query()->where('master_mata_kuliah_id', $master->id)->firstOrFail();
+        $this->assertDatabaseHas('jadwal_mingguans', [
+            'penawaran_mata_kuliah_id' => $offering->id,
+            'kelas_id' => $data['classId'],
+            'dosen_id' => $data['advisor']->id,
+            'ruang_id' => $roomId,
+            'hari' => 2,
+            'mulai' => '10:00',
+            'selesai' => '11:40',
+        ]);
+    }
+
+    public function test_offering_creation_rolls_back_when_inline_schedule_conflicts(): void
+    {
+        $data = $this->readyPeriod();
+        $master = MasterMataKuliah::create([
+            'program_studi' => $data['offering']->masterMataKuliah->program_studi,
+            'semester' => 2,
+            'name' => 'Penawaran Jadwal Bentrok',
+            'sks' => 2,
+        ]);
+        $existingSchedule = JadwalMingguan::query()->firstOrFail();
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('web-admin.master.penawaran-store'), [
+                '_form' => 'create-offering',
+                'master_mata_kuliah_id' => $master->id,
+                'pstudi_id' => $data['offering']->pstudi_id,
+                'kuri_id' => $data['offering']->kuri_id,
+                'kelas_ids' => [$data['classId']],
+                'dosen_utama_id' => $data['advisor']->id,
+                'kapasitas' => 30,
+                'buat_jadwal' => 1,
+                'jadwal_ruang_id' => $existingSchedule->ruang_id,
+                'jadwal_hari' => $existingSchedule->hari,
+                'jadwal_mulai' => substr($existingSchedule->mulai, 0, 5),
+                'jadwal_selesai' => substr($existingSchedule->selesai, 0, 5),
+            ])
+            ->assertSessionHasErrors(['dosen_id', 'kelas_id', 'ruang_id']);
+
+        $this->assertDatabaseMissing('penawaran_mata_kuliahs', [
+            'master_mata_kuliah_id' => $master->id,
+            'taka_id' => $data['period']->id,
+        ]);
+    }
+
+    public function test_inline_schedule_requires_exactly_one_selected_class(): void
+    {
+        $data = $this->readyPeriod();
+        $master = MasterMataKuliah::create([
+            'program_studi' => $data['offering']->masterMataKuliah->program_studi,
+            'semester' => 2,
+            'name' => 'Penawaran Jadwal Banyak Kelas',
+            'sks' => 2,
+        ]);
+        $sourceClass = DB::table('kelas')->where('id', $data['classId'])->first();
+        $secondClassId = DB::table('kelas')->insertGetId([
+            ...collect((array) $sourceClass)->except(['id', 'name', 'code', 'created_at', 'updated_at'])->all(),
+            'name' => 'Kelas Siap Kedua',
+            'code' => 'READY-CLASS-SECOND',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($data['actor'])
+            ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
+            ->post(route('web-admin.master.penawaran-store'), [
+                '_form' => 'create-offering',
+                'master_mata_kuliah_id' => $master->id,
+                'pstudi_id' => $data['offering']->pstudi_id,
+                'kuri_id' => $data['offering']->kuri_id,
+                'kelas_ids' => [$data['classId'], $secondClassId],
+                'dosen_utama_id' => $data['advisor']->id,
+                'kapasitas' => 30,
+                'buat_jadwal' => 1,
+                'jadwal_ruang_id' => JadwalMingguan::query()->value('ruang_id'),
+                'jadwal_hari' => 2,
+                'jadwal_mulai' => '10:00',
+                'jadwal_selesai' => '11:40',
+            ])
+            ->assertSessionHasErrors('kelas_ids');
+
+        $this->assertDatabaseMissing('penawaran_mata_kuliahs', [
+            'master_mata_kuliah_id' => $master->id,
+            'taka_id' => $data['period']->id,
+        ]);
     }
 
     public function test_unscheduled_offerings_page_only_lists_offerings_without_a_weekly_schedule(): void

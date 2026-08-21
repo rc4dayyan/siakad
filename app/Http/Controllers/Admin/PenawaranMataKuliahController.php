@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Helper\roleTrait;
 use App\Http\Controllers\Controller;
 use App\Models\Dosen;
+use App\Models\JadwalMingguan;
 use App\Models\KalenderAkademik;
 use App\Models\Kelas;
 use App\Models\Kurikulum;
@@ -13,8 +14,11 @@ use App\Models\MasterMataKuliah;
 use App\Models\NilaiMahasiswa;
 use App\Models\PenawaranMataKuliah;
 use App\Models\ProgramStudi;
+use App\Models\Ruang;
 use App\Models\TahunAkademik;
+use App\Models\User;
 use App\Services\Academic\AcademicPeriodContext;
+use App\Services\Academic\ScheduleConflictService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
@@ -75,6 +79,7 @@ class PenawaranMataKuliahController extends Controller
                 ->orderBy('name')
                 ->get(),
             'lecturers' => Dosen::query()->orderBy('dsn_name')->get(),
+            'rooms' => Ruang::query()->orderBy('name')->get(),
             'canManage' => $period?->isWritable() ?? false,
             'filters' => $filters,
             'krsWindow' => $period ? KalenderAkademik::query()->where('taka_id', $period->id)
@@ -129,22 +134,37 @@ class PenawaranMataKuliahController extends Controller
         return back()->with('success', 'Jadwal pengisian KRS berhasil diperbarui.');
     }
 
-    public function store(Request $request, AcademicPeriodContext $context): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        AcademicPeriodContext $context,
+        ScheduleConflictService $conflicts
+    ): RedirectResponse {
         $period = $context->requireWritableCurrent($request->user());
         $data = $this->validateOffering($request, $period->id, multipleClasses: true);
+        $schedule = $this->validateInlineSchedule($request);
+
+        if ($schedule && count($data['kelas_ids']) !== 1) {
+            throw ValidationException::withMessages([
+                'kelas_ids' => 'Pilih tepat satu kelas untuk membuat penawaran sekaligus jadwal.',
+            ]);
+        }
+
         $master = MasterMataKuliah::findOrFail($data['master_mata_kuliah_id']);
 
         try {
-            DB::transaction(function () use ($data, $master, $period): void {
+            DB::transaction(function () use ($conflicts, $data, $master, $period, $request, $schedule): void {
                 foreach ($data['kelas_ids'] as $classId) {
-                    PenawaranMataKuliah::create([
+                    $offering = PenawaranMataKuliah::create([
                         ...collect($data)->except('kelas_ids')->all(),
                         'taka_id' => $period->id,
                         'kelas_id' => $classId,
                         'sks' => $master->sks,
                         'code' => $this->newCode($period->id, $master->id, $classId),
                     ]);
+
+                    if ($schedule) {
+                        $this->createWeeklySchedule($offering, $schedule, $conflicts, $request->user());
+                    }
                 }
             });
         } catch (UniqueConstraintViolationException) {
@@ -153,7 +173,12 @@ class PenawaranMataKuliahController extends Controller
             ]);
         }
 
-        return back()->with('success', 'Penawaran berhasil dibuat untuk '.count($data['kelas_ids']).' kelas.');
+        $message = 'Penawaran berhasil dibuat untuk '.count($data['kelas_ids']).' kelas.';
+        if ($schedule) {
+            $message .= ' Jadwal mingguan juga berhasil dibuat.';
+        }
+
+        return back()->with('success', $message);
     }
 
     public function update(Request $request, PenawaranMataKuliah $penawaran, AcademicPeriodContext $context): RedirectResponse
@@ -213,33 +238,49 @@ class PenawaranMataKuliahController extends Controller
                 'dosenPendamping1',
                 'dosenPendamping2',
                 'prasyaratMaster',
+                'jadwalMingguans.dosen',
+                'jadwalMingguans.ruang',
             ])
             ->orderBy('code')
             ->get();
 
         return (new FastExcel($offerings))->download(
             'penawaran-mata-kuliah-'.$period->code.'-'.now()->format('Ymd-His').'.xlsx',
-            fn (PenawaranMataKuliah $offering) => [
-                'Kode Penawaran' => $offering->code,
-                'Kode Periode' => $period->code,
-                'Kode Program Studi' => $offering->pstudi?->code,
-                'Kode Kurikulum' => $offering->kurikulum?->code,
-                'Kode Kelas' => $offering->kelas?->code,
-                'Semester Mata Kuliah' => $offering->masterMataKuliah?->semester,
-                'Nama Mata Kuliah' => $offering->masterMataKuliah?->name,
-                'NIDN Dosen Utama' => $offering->dosenUtama?->dsn_nidn,
-                'NIDN Dosen Pendamping 1' => $offering->dosenPendamping1?->dsn_nidn,
-                'NIDN Dosen Pendamping 2' => $offering->dosenPendamping2?->dsn_nidn,
-                'Semester Prasyarat' => $offering->prasyaratMaster?->semester,
-                'Nama Mata Kuliah Prasyarat' => $offering->prasyaratMaster?->name,
-                'Kapasitas' => $offering->kapasitas,
-                'Deskripsi' => $offering->deskripsi,
-            ]
+            function (PenawaranMataKuliah $offering) use ($period): array {
+                $schedule = $offering->jadwalMingguans->sortBy(['hari', 'mulai'])->first();
+
+                return [
+                    'Kode Penawaran' => $offering->code,
+                    'Kode Periode' => $period->code,
+                    'Kode Program Studi' => $offering->pstudi?->code,
+                    'Kode Kurikulum' => $offering->kurikulum?->code,
+                    'Kode Kelas' => $offering->kelas?->code,
+                    'Semester Mata Kuliah' => $offering->masterMataKuliah?->semester,
+                    'Nama Mata Kuliah' => $offering->masterMataKuliah?->name,
+                    'NIDN Dosen Utama' => $offering->dosenUtama?->dsn_nidn,
+                    'NIDN Dosen Pendamping 1' => $offering->dosenPendamping1?->dsn_nidn,
+                    'NIDN Dosen Pendamping 2' => $offering->dosenPendamping2?->dsn_nidn,
+                    'Semester Prasyarat' => $offering->prasyaratMaster?->semester,
+                    'Nama Mata Kuliah Prasyarat' => $offering->prasyaratMaster?->name,
+                    'Kapasitas' => $offering->kapasitas,
+                    'Deskripsi' => $offering->deskripsi,
+                    'Kode Jadwal' => $schedule?->code,
+                    'NIDN Dosen Jadwal' => $schedule?->dosen?->dsn_nidn,
+                    'Kode Ruang Jadwal' => $schedule?->ruang?->code,
+                    'Hari Jadwal' => $schedule?->hari_label,
+                    'Jam Mulai Jadwal' => $schedule ? substr($schedule->mulai, 0, 5) : null,
+                    'Jam Selesai Jadwal' => $schedule ? substr($schedule->selesai, 0, 5) : null,
+                    'Alasan Pengecualian Jadwal' => $schedule?->alasan_pengecualian,
+                ];
+            }
         );
     }
 
-    public function import(Request $request, AcademicPeriodContext $context): RedirectResponse
-    {
+    public function import(
+        Request $request,
+        AcademicPeriodContext $context,
+        ScheduleConflictService $conflicts
+    ): RedirectResponse {
         $period = $context->requireWritableCurrent($request->user());
         $request->validate([
             '_form' => ['required', 'in:import-offerings'],
@@ -305,12 +346,16 @@ class PenawaranMataKuliahController extends Controller
             $prepared[] = $this->prepareImportedOffering($row, $rowNumber, $period);
         }
 
-        $result = DB::transaction(function () use ($prepared, $period): array {
+        $result = DB::transaction(function () use ($conflicts, $period, $prepared, $request): array {
             $created = 0;
+            $scheduled = 0;
             $skipped = 0;
             $seen = [];
+            $seenScheduleCodes = [];
 
             foreach ($prepared as $attributes) {
+                $schedule = $attributes['schedule'];
+                unset($attributes['schedule']);
                 $combination = implode(':', [
                     $attributes['master_mata_kuliah_id'],
                     $attributes['pstudi_id'],
@@ -332,22 +377,35 @@ class PenawaranMataKuliahController extends Controller
                     continue;
                 }
 
+                $scheduleCode = $schedule['code'] ?? null;
+                if ($scheduleCode && (isset($seenScheduleCodes[$scheduleCode]) || JadwalMingguan::where('code', $scheduleCode)->exists())) {
+                    $this->rejectImportRow($schedule['row_number'], "Kode Jadwal {$scheduleCode} sudah digunakan.");
+                }
+
                 $seen[$combination] = true;
+                if ($scheduleCode) {
+                    $seenScheduleCodes[$scheduleCode] = true;
+                }
                 $attributes['code'] ??= $this->newCode(
                     $period->id,
                     $attributes['master_mata_kuliah_id'],
                     $attributes['kelas_id']
                 );
-                PenawaranMataKuliah::create(['taka_id' => $period->id, ...$attributes]);
+                $offering = PenawaranMataKuliah::create(['taka_id' => $period->id, ...$attributes]);
                 $created++;
+
+                if ($schedule) {
+                    $this->createWeeklySchedule($offering, $schedule, $conflicts, $request->user());
+                    $scheduled++;
+                }
             }
 
-            return compact('created', 'skipped');
+            return compact('created', 'scheduled', 'skipped');
         });
 
         return back()->with(
             'success',
-            "Import selesai: {$result['created']} penawaran dibuat dan {$result['skipped']} duplikat dilewati."
+            "Import selesai: {$result['created']} penawaran dan {$result['scheduled']} jadwal dibuat; {$result['skipped']} duplikat dilewati."
         );
     }
 
@@ -639,6 +697,71 @@ class PenawaranMataKuliahController extends Controller
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    private function validateInlineSchedule(Request $request): ?array
+    {
+        $data = $request->validate([
+            'buat_jadwal' => ['nullable', 'boolean'],
+            'jadwal_ruang_id' => ['exclude_unless:buat_jadwal,1', 'required', 'exists:ruangs,id'],
+            'jadwal_hari' => ['exclude_unless:buat_jadwal,1', 'required', 'integer', 'between:0,6'],
+            'jadwal_mulai' => ['exclude_unless:buat_jadwal,1', 'required', 'date_format:H:i'],
+            'jadwal_selesai' => ['exclude_unless:buat_jadwal,1', 'required', 'date_format:H:i', 'after:jadwal_mulai'],
+        ], [
+            'jadwal_selesai.after' => 'Jam selesai jadwal harus setelah jam mulai.',
+        ]);
+
+        if (! $request->boolean('buat_jadwal')) {
+            return null;
+        }
+
+        return [
+            'dosen_id' => $request->integer('dosen_utama_id'),
+            'ruang_id' => (int) $data['jadwal_ruang_id'],
+            'hari' => (int) $data['jadwal_hari'],
+            'mulai' => $data['jadwal_mulai'],
+            'selesai' => $data['jadwal_selesai'],
+            'code' => null,
+            'alasan_pengecualian' => null,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $schedule
+     */
+    private function createWeeklySchedule(
+        PenawaranMataKuliah $offering,
+        array $schedule,
+        ScheduleConflictService $conflicts,
+        User $actor
+    ): JadwalMingguan {
+        $attributes = [
+            'penawaran_mata_kuliah_id' => $offering->id,
+            'kelas_id' => $offering->kelas_id,
+            'dosen_id' => $schedule['dosen_id'],
+            'ruang_id' => $schedule['ruang_id'],
+            'hari' => $schedule['hari'],
+            'mulai' => $schedule['mulai'],
+            'selesai' => $schedule['selesai'],
+        ];
+        $reason = trim((string) ($schedule['alasan_pengecualian'] ?? ''));
+        $override = $conflicts->validate(
+            $offering,
+            $attributes,
+            actor: $actor,
+            override: $reason !== '',
+            reason: $reason
+        );
+
+        return JadwalMingguan::create([
+            ...$attributes,
+            ...$override,
+            'code' => $schedule['code'] ?: 'JMG-'.Str::upper(Str::random(12)),
+            'fingerprint' => JadwalMingguan::fingerprint($attributes),
+        ]);
+    }
+
+    /**
      * @param  array<string, mixed>  $row
      * @return array<string, mixed>
      */
@@ -754,6 +877,12 @@ class PenawaranMataKuliahController extends Controller
             $this->rejectImportRow($rowNumber, 'Kode Penawaran maksimal 255 karakter.');
         }
 
+        $schedule = $this->prepareImportedInlineSchedule($row, $rowNumber, [
+            $mainLecturer->id,
+            $assistant1?->id,
+            $assistant2?->id,
+        ]);
+
         return [
             'master_mata_kuliah_id' => $master->first()->id,
             'pstudi_id' => $program->id,
@@ -767,6 +896,84 @@ class PenawaranMataKuliahController extends Controller
             'sks' => $master->first()->sks,
             'kapasitas' => $capacity,
             'deskripsi' => $this->importedText($row['Deskripsi'] ?? null) ?: null,
+            'schedule' => $schedule,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @param  array<int, int|null>  $offeringLecturerIds
+     * @return array<string, mixed>|null
+     */
+    private function prepareImportedInlineSchedule(array $row, int $rowNumber, array $offeringLecturerIds): ?array
+    {
+        $scheduleColumns = [
+            'Kode Jadwal',
+            'NIDN Dosen Jadwal',
+            'Kode Ruang Jadwal',
+            'Hari Jadwal',
+            'Jam Mulai Jadwal',
+            'Jam Selesai Jadwal',
+            'Alasan Pengecualian Jadwal',
+        ];
+        $values = collect($scheduleColumns)
+            ->mapWithKeys(function (string $column) use ($row): array {
+                $value = $row[$column] ?? null;
+
+                return [$column => $value instanceof \DateTimeInterface
+                    ? $value->format('H:i')
+                    : $this->importedText($value)];
+            });
+
+        if ($values->every(fn (string $value) => $value === '')) {
+            return null;
+        }
+
+        foreach (['Kode Ruang Jadwal', 'Hari Jadwal', 'Jam Mulai Jadwal', 'Jam Selesai Jadwal'] as $column) {
+            if ($values[$column] === '') {
+                $this->rejectImportRow($rowNumber, "{$column} wajib diisi ketika jadwal disertakan.");
+            }
+        }
+
+        $lecturer = $values['NIDN Dosen Jadwal'] === ''
+            ? Dosen::find($offeringLecturerIds[0])
+            : Dosen::query()->where('dsn_nidn', $values['NIDN Dosen Jadwal'])->first();
+        $allowedLecturerIds = array_map('intval', array_filter($offeringLecturerIds));
+
+        if (! $lecturer || ! in_array((int) $lecturer->id, $allowedLecturerIds, true)) {
+            $this->rejectImportRow($rowNumber, 'Dosen jadwal harus merupakan pengampu pada penawaran.');
+        }
+
+        $room = Ruang::query()->where('code', $values['Kode Ruang Jadwal'])->first();
+        if (! $room) {
+            $this->rejectImportRow($rowNumber, "Kode Ruang Jadwal {$values['Kode Ruang Jadwal']} tidak ditemukan.");
+        }
+
+        $start = $this->importedTime($row['Jam Mulai Jadwal'] ?? null, $rowNumber, 'Jam Mulai Jadwal');
+        $end = $this->importedTime($row['Jam Selesai Jadwal'] ?? null, $rowNumber, 'Jam Selesai Jadwal');
+        if ($end <= $start) {
+            $this->rejectImportRow($rowNumber, 'Jam Selesai Jadwal harus setelah Jam Mulai Jadwal.');
+        }
+
+        $code = $values['Kode Jadwal'];
+        if (mb_strlen($code) > 255) {
+            $this->rejectImportRow($rowNumber, 'Kode Jadwal maksimal 255 karakter.');
+        }
+
+        $reason = $values['Alasan Pengecualian Jadwal'];
+        if ($reason !== '' && mb_strlen($reason) < 10) {
+            $this->rejectImportRow($rowNumber, 'Alasan Pengecualian Jadwal minimal 10 karakter jika diisi.');
+        }
+
+        return [
+            'row_number' => $rowNumber,
+            'dosen_id' => $lecturer->id,
+            'ruang_id' => $room->id,
+            'hari' => $this->importedDay($row['Hari Jadwal'] ?? null, $rowNumber),
+            'mulai' => $start,
+            'selesai' => $end,
+            'code' => $code === '' ? null : $code,
+            'alasan_pengecualian' => $reason === '' ? null : $reason,
         ];
     }
 
@@ -808,6 +1015,48 @@ class PenawaranMataKuliahController extends Controller
         }
 
         return $integer;
+    }
+
+    private function importedDay(mixed $value, int $rowNumber): int
+    {
+        $day = Str::lower($this->importedText($value));
+        $days = [
+            'minggu' => 0, 'ahad' => 0, 'senin' => 1, 'selasa' => 2, 'rabu' => 3,
+            'kamis' => 4, "jum'at" => 5, 'jumat' => 5, 'jum’at' => 5, 'sabtu' => 6,
+        ];
+
+        if (isset($days[$day])) {
+            return $days[$day];
+        }
+
+        $integer = filter_var($day, FILTER_VALIDATE_INT);
+
+        if ($integer === false || $integer < 0 || $integer > 6) {
+            $this->rejectImportRow($rowNumber, 'Hari Jadwal harus berupa nama hari atau angka 0 sampai 6.');
+        }
+
+        return $integer;
+    }
+
+    private function importedTime(mixed $value, int $rowNumber, string $column): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('H:i');
+        }
+
+        if (is_numeric($value) && (float) $value >= 0 && (float) $value < 1) {
+            $minutes = (int) round((float) $value * 1440) % 1440;
+
+            return sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+        }
+
+        $time = $this->importedText($value);
+
+        if (! preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/', $time)) {
+            $this->rejectImportRow($rowNumber, "{$column} harus menggunakan format HH:MM.");
+        }
+
+        return substr($time, 0, 5);
     }
 
     private function importedSemester(mixed $value, int $rowNumber, string $column): int
