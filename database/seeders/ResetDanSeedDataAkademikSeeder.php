@@ -49,7 +49,6 @@ class ResetDanSeedDataAkademikSeeder extends Seeder
         'kurikulums',
         'ruangs',
         'gedungs',
-        'dosens',
         'tahun_akademiks',
         'tahun_akademik',
     ];

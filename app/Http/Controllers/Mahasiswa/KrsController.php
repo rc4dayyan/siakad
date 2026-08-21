@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Mahasiswa;
 
 use App\Http\Controllers\Controller;
 use App\Models\PenawaranMataKuliah;
+use App\Models\Settings\webSettings;
 use App\Services\Academic\AcademicPeriodContext;
 use App\Services\Academic\KrsService;
 use App\Services\Academic\StudentAcademicContext;
@@ -89,12 +90,16 @@ class KrsController extends Controller
     public function print(StudentAcademicContext $context, KrsService $service): View
     {
         $krs = $this->currentKrs($context, $service)->load([
-            'registrasiMahasiswa.mahasiswa', 'registrasiMahasiswa.taka', 'registrasiMahasiswa.kelas',
+            'registrasiMahasiswa.mahasiswa', 'registrasiMahasiswa.taka', 'registrasiMahasiswa.kelas.pstudi',
             'registrasiMahasiswa.dosenWali', 'items.penawaranMataKuliah.masterMataKuliah',
-            'items.penawaranMataKuliah.dosenUtama',
+            'items.penawaranMataKuliah.kelas', 'items.penawaranMataKuliah.dosenUtama',
         ]);
 
-        return view('base.cetak.cetak-krs', compact('krs'));
+        return view('base.cetak.cetak-krs', [
+            'krs' => $krs,
+            'web' => webSettings::query()->first(),
+            'printedAt' => now(),
+        ]);
     }
 
     private function currentKrs(StudentAcademicContext $context, KrsService $service)

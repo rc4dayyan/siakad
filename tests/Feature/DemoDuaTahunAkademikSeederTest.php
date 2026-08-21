@@ -6,12 +6,15 @@ use App\Models\Mahasiswa;
 use App\Models\MasterMataKuliah;
 use App\Models\RegistrasiMahasiswa;
 use App\Models\TahunAkademik;
+use App\Services\Academic\PeriodReadinessService;
 use Database\Seeders\DemoDuaTahunAkademikSeeder;
 use Database\Seeders\DemoDuaTahunLaluAkademikSeeder;
 use Database\Seeders\DemoSatuTahunLaluAkademikSeeder;
+use Database\Seeders\DosenSeeder;
 use Database\Seeders\ResetDanSeedDataAkademikSeeder;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -88,7 +91,17 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
         $this->assertSame(0, TahunAkademik::query()->whereNull('tid')->count());
         $this->assertSame(1, TahunAkademik::query()->where('is_active', true)->count());
 
-        $this->assertSame(4, DB::table('dosens')->where('dsn_code', 'like', 'DEMO-%')->count());
+        $this->assertSame(39, DB::table('dosens')->count());
+        $this->assertDatabaseHas('dosens', [
+            'dsn_nidn' => '2008017601',
+            'dsn_name' => 'NIDA NURJUNAEDAH',
+            'dsn_code' => 'zlKgc9W30aYt',
+        ]);
+        $this->assertDatabaseHas('dosens', [
+            'dsn_nidn' => '2126099101',
+            'dsn_name' => "DEDEH SYA'ADATUL KAMILAH",
+            'dsn_code' => 'MP28JoFKebH0',
+        ]);
         $this->assertSame(1, DB::table('fakultas')->count());
         $this->assertSame(1, DB::table('program_studis')->count());
         $this->assertSame(
@@ -129,16 +142,37 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
                 ->sortKeys()
                 ->all()
         );
+        foreach ([2023, 2024, 2025] as $entryYear) {
+            $this->assertSame(12, Mahasiswa::query()
+                ->where('mhs_code', 'like', 'DEMO-%')
+                ->where('years_id', $entryYear)
+                ->whereDate('mhs_register_date', $entryYear.'-08-01')
+                ->count());
+        }
         $this->assertSame(24, DB::table('kelas')->where('code', 'like', 'DEMO-%')->count());
         $this->assertSame(216, DB::table('mata_kuliahs')->where('code', 'like', 'DEMO-%')->count());
         $this->assertSame(216, DB::table('jadwal_kuliahs')->where('code', 'like', 'DEMO-%')->count());
         $this->assertSame(1296, DB::table('absensi_mahasiswas')->where('code', 'like', 'DEMO-%')->count());
-        $this->assertSame(144, DB::table('hasil_studis')->where('code', 'like', 'DEMO-%')->count());
+        $this->assertSame(108, DB::table('hasil_studis')->where('code', 'like', 'DEMO-%')->count());
         $this->assertSame(24, DB::table('student_tasks')->where('code', 'like', 'DEMO-%')->count());
         $this->assertSame(2, DB::table('users')->where('code', 'like', 'DEMO-STAFF-%')->count());
         $this->assertSame(24, DB::table('kalender_akademiks')->where('nama', 'like', '% Demo')->count());
         $this->assertSame(216, DB::table('penawaran_mata_kuliahs')->where('code', 'like', 'DEMO-%')->count());
+        $classesWithRepeatedLecturers = DB::table('penawaran_mata_kuliahs')
+            ->where('code', 'like', 'DEMO-%')
+            ->get(['kelas_id', 'dosen_utama_id'])
+            ->groupBy('kelas_id')
+            ->filter(fn ($offerings): bool => $offerings->count() !== $offerings->pluck('dosen_utama_id')->unique()->count());
+        $this->assertCount(0, $classesWithRepeatedLecturers);
         $this->assertSame(216, DB::table('jadwal_mingguans')->where('code', 'like', 'DEMO-%')->count());
+        $this->assertSame(0, DB::table('jadwal_mingguans')
+            ->where('code', 'like', 'DEMO-%')
+            ->whereNotBetween('hari', [4, 6])
+            ->count());
+        $this->assertSame(0, DB::table('jadwal_mingguans')
+            ->where('code', 'like', 'DEMO-%')
+            ->where(fn ($query) => $query->where('mulai', '<', '13:00:00')->orWhere('selesai', '>', '20:00:00'))
+            ->count());
         $this->assertSame(864, DB::table('pertemuan_kuliahs')->where('code', 'like', 'DEMO-%')->count());
         $this->assertSame(144, DB::table('krs')->count());
         $this->assertSame(1296, DB::table('krs_items')->count());
@@ -172,6 +206,7 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
         $demoStudentIds = Mahasiswa::query()
             ->where('mhs_code', 'like', 'DEMO-%')
             ->pluck('id');
+        $latestPeriodId = TahunAkademik::where('code', '252602')->value('id');
         $this->assertSame(144, RegistrasiMahasiswa::query()->whereIn('mahasiswa_id', $demoStudentIds)->count());
         foreach (['232401', '242501', '252601'] as $firstSemesterPeriodCode) {
             $this->assertSame(
@@ -186,6 +221,16 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
         $this->assertSame(0, RegistrasiMahasiswa::query()->whereIn('mahasiswa_id', $demoStudentIds)->where('semester_mahasiswa', '>', 8)->where('status_akademik', RegistrasiMahasiswa::STATUS_AKADEMIK_AKTIF)->count());
         $this->assertSame(1296, DB::table('nilai_mahasiswas')->whereIn('mahasiswa_id', $demoStudentIds)->count());
         $this->assertSame(144, DB::table('student_scores')->whereIn('student_id', $demoStudentIds)->count());
+        $this->assertSame(0, DB::table('nilai_mahasiswas')
+            ->where('taka_id', $latestPeriodId)
+            ->whereNotNull('nilai')
+            ->count());
+        $this->assertSame(0, DB::table('hasil_studis')->where('taka_id', $latestPeriodId)->count());
+        $this->assertSame(0, DB::table('student_scores')
+            ->join('student_tasks', 'student_tasks.id', '=', 'student_scores.stask_id')
+            ->where('student_tasks.code', 'like', 'DEMO-TGS-252602-%')
+            ->whereNotNull('student_scores.score')
+            ->count());
 
         $firstStudent = Mahasiswa::query()->where('mhs_code', 'DEMO-MHS-86208-23-01')->firstOrFail();
         $this->assertSame(
@@ -196,7 +241,6 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
         $newestStudent = Mahasiswa::query()->where('mhs_code', 'DEMO-MHS-86208-25-01')->firstOrFail();
         $this->assertSame([1, 2], $newestStudent->registrasiAkademik()->orderBy('semester_mahasiswa')->pluck('semester_mahasiswa')->all());
         $this->assertSame(2025, $newestStudent->years_id);
-        $latestPeriodId = TahunAkademik::where('code', '252602')->value('id');
         $this->assertSame(
             [2 => 12, 4 => 12, 6 => 12],
             RegistrasiMahasiswa::where('taka_id', $latestPeriodId)
@@ -237,7 +281,7 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
         $this->assertSame(0, DB::table('krs')->count());
         $this->assertSame(0, DB::table('tagihan_kuliahs')->count());
         $this->assertSame(36, Mahasiswa::where('mhs_code', 'like', 'DEMO-%')->count());
-        $this->assertSame(4, DB::table('dosens')->where('dsn_code', 'like', 'DEMO-%')->count());
+        $this->assertSame(39, DB::table('dosens')->count());
         $this->assertSame(2, DB::table('users')->where('code', 'like', 'DEMO-STAFF-%')->count());
         $this->assertSame(186, DB::table('master_mata_kuliahs')->count());
         $this->assertSame(0, Mahasiswa::where('mhs_code', 'like', 'DEMO-%')->where(fn ($query) => $query->where('taka_id', '!=', 0)->orWhere('class_id', '!=', 0))->count());
@@ -271,6 +315,18 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
 
     public function test_reset_seeder_removes_old_academic_data_before_creating_the_three_year_demo(): void
     {
+        DB::table('dosens')->insert([
+            'dsn_stat' => 1,
+            'dsn_nidn' => 'LOCAL-001',
+            'dsn_name' => 'Dosen Master Lokal',
+            'dsn_code' => 'LOCAL-DSN-001',
+            'dsn_user' => 'dosen.master.lokal',
+            'password' => Hash::make('RahasiaLokal!'),
+            'dsn_mail' => 'dosen.master.lokal@example.test',
+            'dsn_phone' => '080000009999',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         Mahasiswa::query()->create([
             'taka_id' => 0,
             'years_id' => 2020,
@@ -292,10 +348,41 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
         $this->assertSame(6, TahunAkademik::query()->count());
         $this->assertSame(1, TahunAkademik::query()->where('is_active', true)->count());
         $this->assertSame(1, DB::table('program_studis')->count());
-        $this->assertSame(4, DB::table('dosens')->where('dsn_code', 'like', 'DEMO-%')->count());
+        $this->assertSame(40, DB::table('dosens')->count());
+        $this->assertDatabaseHas('dosens', [
+            'dsn_nidn' => 'LOCAL-001',
+            'dsn_name' => 'Dosen Master Lokal',
+        ]);
         $this->assertSame(216, DB::table('penawaran_mata_kuliahs')->count());
         $this->assertSame(144, DB::table('krs')->count());
         $this->assertSame(144, DB::table('tagihan_kuliahs')->count());
+    }
+
+    public function test_dosen_seeder_uses_source_identity_without_replacing_existing_password(): void
+    {
+        $existingPassword = Hash::make('KataSandiTetap!');
+        DB::table('dosens')->insert([
+            'dsn_stat' => 0,
+            'dsn_nidn' => '2008017601',
+            'dsn_name' => 'Nama Sebelum Sinkronisasi',
+            'dsn_code' => 'KODE-LAMA',
+            'dsn_image' => 'dosen/foto-tetap.jpg',
+            'dsn_user' => 'user-lama',
+            'password' => $existingPassword,
+            'dsn_mail' => 'lama@example.test',
+            'dsn_phone' => '080000008888',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->seed(DosenSeeder::class);
+        $lecturer = DB::table('dosens')->where('dsn_nidn', '2008017601')->first();
+
+        $this->assertSame(39, DB::table('dosens')->count());
+        $this->assertSame('NIDA NURJUNAEDAH', $lecturer->dsn_name);
+        $this->assertSame('zlKgc9W30aYt', $lecturer->dsn_code);
+        $this->assertSame('dosen/foto-tetap.jpg', $lecturer->dsn_image);
+        $this->assertTrue(Hash::check('KataSandiTetap!', $lecturer->password));
     }
 
     public function test_seeder_creates_twelve_students_and_two_parallel_classes_for_each_study_program(): void
@@ -313,12 +400,25 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $thirdStudyProgramId = DB::table('program_studis')->insertGetId([
+            'faku_id' => $facultyId,
+            'name' => 'Pendidikan Islam Anak Usia Dini Existing',
+            'cnim' => '22',
+            'code' => '86233',
+            'slug' => 'pendidikan-islam-anak-usia-dini-existing',
+            'head_id' => 0,
+            'title' => 'S.Pd.',
+            'level' => 'S1',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $this->seed(ResetDanSeedDataAkademikSeeder::class);
 
         $studyProgramIds = [
             DB::table('program_studis')->where('code', '86208')->value('id'),
             $secondStudyProgramId,
+            $thirdStudyProgramId,
         ];
 
         foreach ($studyProgramIds as $studyProgramId) {
@@ -379,19 +479,57 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
                 ))
             );
             $this->assertSame(
-                [],
-                array_values(array_intersect(
-                    $firstClassSchedules->pluck('dosen_id')->all(),
-                    $secondClassSchedules->pluck('dosen_id')->all()
-                ))
+                $firstClassSchedules->count(),
+                $firstClassSchedules->pluck('dosen_id')->unique()->count()
+            );
+            $this->assertSame(
+                $secondClassSchedules->count(),
+                $secondClassSchedules->pluck('dosen_id')->unique()->count()
             );
         }
 
-        $this->assertSame(72, Mahasiswa::query()->where('mhs_code', 'like', 'DEMO-MHS-%')->count());
-        $this->assertSame(48, DB::table('kelas')->where('code', 'like', 'DEMO-KLS-%')->count());
-        $this->assertSame(442, DB::table('penawaran_mata_kuliahs')->count());
-        $this->assertSame(288, DB::table('krs')->count());
-        $this->assertSame(288, DB::table('tagihan_kuliahs')->count());
+        $this->assertSame(108, Mahasiswa::query()->where('mhs_code', 'like', 'DEMO-MHS-%')->count());
+        $this->assertSame(72, DB::table('kelas')->where('code', 'like', 'DEMO-KLS-%')->count());
+        $this->assertSame(658, DB::table('penawaran_mata_kuliahs')->count());
+        $this->assertSame(432, DB::table('krs')->count());
+        $this->assertSame(432, DB::table('tagihan_kuliahs')->count());
+
+        $latestPeriod = TahunAkademik::query()->where('code', '252602')->firstOrFail();
+        $readiness = app(PeriodReadinessService::class)->check($latestPeriod);
+        $scheduleCheck = collect($readiness['checks'])->firstWhere('key', 'jadwal');
+
+        $this->assertSame('siap', $scheduleCheck['status']);
+        $this->assertSame(
+            '162 jadwal; 0 penawaran belum dijadwalkan; 0 bentrok ditemukan.',
+            $scheduleCheck['message']
+        );
+
+        $latestSchedules = DB::table('jadwal_mingguans')
+            ->join(
+                'penawaran_mata_kuliahs',
+                'penawaran_mata_kuliahs.id',
+                '=',
+                'jadwal_mingguans.penawaran_mata_kuliah_id'
+            )
+            ->where('penawaran_mata_kuliahs.taka_id', $latestPeriod->id)
+            ->select('jadwal_mingguans.*')
+            ->get()
+            ->values();
+        $lecturerConflicts = 0;
+
+        for ($left = 0; $left < $latestSchedules->count(); $left++) {
+            for ($right = $left + 1; $right < $latestSchedules->count(); $right++) {
+                $first = $latestSchedules[$left];
+                $second = $latestSchedules[$right];
+                $sameLecturerAndDay = $first->dosen_id === $second->dosen_id
+                    && $first->hari === $second->hari;
+                $overlaps = $first->mulai < $second->selesai
+                    && $first->selesai > $second->mulai;
+                $lecturerConflicts += $sameLecturerAndDay && $overlaps ? 1 : 0;
+            }
+        }
+
+        $this->assertSame(0, $lecturerConflicts);
     }
 
     public function test_seeder_requires_an_existing_study_program(): void
@@ -471,6 +609,7 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
             '2024_04_26_060533_create_tahun_akademiks_table.php',
             '2026_07_17_000003_extend_tahun_akademiks_for_period_lifecycle.php',
             '2024_03_09_024013_create_mahasiswas_table.php',
+            '2025_06_15_153738_add__to_mahasiswas_table.php',
             '2024_03_09_024021_create_dosens_table.php',
             '2024_04_25_082451_create_fakultas_table.php',
             '2024_04_25_082531_create_program_studis_table.php',

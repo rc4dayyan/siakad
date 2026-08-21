@@ -35,6 +35,8 @@ use App\Models\TahunAkademikInduk;
 use App\Models\TemplateTagihan;
 use App\Models\User;
 use App\Services\Academic\PeriodReadinessService;
+use App\Services\Academic\ScheduleConflictService;
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -52,15 +54,19 @@ class DemoDuaTahunAkademikSeeder extends Seeder
 
     private const MAX_ACTIVE_STUDENT_SEMESTER = 8;
 
+    /** @var list<Dosen> */
+    private array $availableLecturers = [];
+
     public function run(): void
     {
         DB::transaction(function (): void {
             $this->resetDemoTransactions();
-            $lecturers = $this->seedLecturers();
             $studyPrograms = $this->studyPrograms();
-            $curriculum = $this->seedCurriculum();
-            $rooms = $this->seedRooms($studyPrograms);
             $periods = $this->seedPeriods();
+            $this->call(DosenSeeder::class);
+            $lecturers = $this->assignLecturers($studyPrograms, $periods);
+            $curriculum = $this->seedCurriculum();
+            $rooms = $this->seedRooms($studyPrograms, $periods);
             $this->call(MasterMataKuliahSeeder::class);
             $masters = [];
 
@@ -74,16 +80,15 @@ class DemoDuaTahunAkademikSeeder extends Seeder
             foreach (array_values($periods) as $periodIndex => $period) {
                 $this->seedAcademicCalendar($period);
 
-                foreach ($studyPrograms as $studyProgramIndex => $studyProgram) {
+                foreach ($studyPrograms as $studyProgram) {
                     $studyProgramToken = $this->studyProgramToken($studyProgram);
-                    $advisor = $lecturers[($studyProgramIndex * 2) % count($lecturers)];
                     $program = ProgramKuliah::updateOrCreate([
                         'code' => 'DEMO-REG-'.$period->code.'-'.$studyProgramToken,
                     ], [
                         'taka_id' => $period->id,
                         'pstudi_id' => $studyProgram->id,
-                        'name' => 'Reguler Pagi Demo '.$studyProgram->name,
-                        'wave' => 'Gelombang Demo',
+                        'name' => 'Reguler Sore',
+                        'wave' => 'Gelombang 1',
                         'wave_start' => $period->starts_at,
                         'wave_ended' => $period->ends_at,
                     ]);
@@ -98,7 +103,13 @@ class DemoDuaTahunAkademikSeeder extends Seeder
 
                         if ($studentSemester > self::MAX_ACTIVE_STUDENT_SEMESTER) {
                             if ($studentSemester === self::MAX_ACTIVE_STUDENT_SEMESTER + 1) {
-                                $this->seedDropOutRegistrations($period, $studentSemester, $entryYear, $students, $advisor);
+                                $this->seedDropOutRegistrations(
+                                    $period,
+                                    $studentSemester,
+                                    $entryYear,
+                                    $students,
+                                    $lecturers[$studyProgram->id][$entryYear][0]
+                                );
                             }
 
                             continue;
@@ -109,8 +120,11 @@ class DemoDuaTahunAkademikSeeder extends Seeder
 
                         foreach ($studentGroups as $classIndex => $classStudents) {
                             $classLabel = chr(65 + $classIndex);
-                            $classLecturer = $lecturers[(($studyProgramIndex * 2) + $classIndex) % count($lecturers)];
-                            $room = $rooms[$studyProgram->id][$classIndex];
+                            $classLecturer = $lecturers[$studyProgram->id][$entryYear][$classIndex];
+                            $room = $rooms[$studyProgram->id][$entryYear][$classIndex];
+                            $studyProgramSingkat = collect(explode(' ', $studyProgram->name))
+                                ->map(fn ($word) => strtoupper(substr($word, 0, 1)))
+                                ->implode('');
                             $class = Kelas::updateOrCreate([
                                 'code' => 'DEMO-KLS-'.$studyProgramToken.'-A'.$entryYear.'-S'.$studentSemester.'-'.$classLabel,
                             ], [
@@ -119,7 +133,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                                 'proku_id' => $program->id,
                                 'dosen_id' => $classLecturer->id,
                                 'capacity' => 30,
-                                'name' => 'Kelas '.$classLabel.' '.$studyProgram->name.' Angkatan '.$entryYear.' Semester '.$studentSemester,
+                                'name' => 'Kelas '.$classLabel.' '.$studyProgramSingkat.' '.$studentSemester,
                             ]);
 
                             foreach ($classStudents as $student) {
@@ -153,7 +167,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                             ));
 
                             foreach ($availableMasters as $courseIndex => $master) {
-                                $lecturer = $lecturers[(($studyProgramIndex * 2) + $classIndex + ($courseIndex * 2)) % count($lecturers)];
+                                $courseLecturer = $this->lecturerForCourse($classLecturer, $courseIndex);
                                 $legacyOfferings[] = MataKuliah::updateOrCreate([
                                     'code' => 'DEMO-MK-'.$period->code.'-K'.$class->id.'-'.($courseIndex + 1),
                                 ], [
@@ -162,7 +176,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                                     'taka_id' => $period->id,
                                     'pstudi_id' => $studyProgram->id,
                                     'kelas_id' => $class->id,
-                                    'dosen_1' => $lecturer->id,
+                                    'dosen_1' => $courseLecturer->id,
                                     'name' => $master->name,
                                     'bsks' => $master->sks,
                                     'desc' => 'Penawaran mata kuliah demo angkatan '.$entryYear.'.',
@@ -354,24 +368,69 @@ class DemoDuaTahunAkademikSeeder extends Seeder
         return $periods;
     }
 
-    private function seedLecturers(): array
+    /**
+     * @param  array<int, ProgramStudi>  $studyPrograms
+     * @param  array<string, TahunAkademik>  $periods
+     * @return array<int, array<int, array<int, Dosen>>>
+     */
+    private function assignLecturers(array $studyPrograms, array $periods): array
     {
-        $definitions = [
-            ['DEMO-DSN-01', '9900000001', 'DEVI GANJAR MUSTHOFA, M.Pd', 'demo.dosen1', 'demo.dosen1@example.test', '089900000001'],
-            ['DEMO-DSN-02', '9900000002', 'ENIH HARTIANI, M.Pd', 'demo.dosen2', 'demo.dosen2@example.test', '089900000002'],
-            ['DEMO-DSN-03', '9900000003', 'ANTO FEBRIANTO, M.Pd', 'demo.dosen3', 'demo.dosen3@example.test', '089900000003'],
-            ['DEMO-DSN-04', '9900000004', 'MUHAMMAD ZAKIYAMAN, M.Pd.I', 'demo.dosen4', 'demo.dosen4@example.test', '089900000004'],
-        ];
+        $lecturers = [];
+        $lecturersByNidn = Dosen::query()
+            ->whereIn('dsn_nidn', array_column(DosenSeeder::rows(), 'dsn_nidn'))
+            ->where('dsn_stat', 1)
+            ->get()
+            ->keyBy('dsn_nidn');
+        $availableLecturers = array_values(array_filter(array_map(
+            fn (array $row): ?Dosen => $lecturersByNidn->get($row['dsn_nidn']),
+            DosenSeeder::rows(),
+        )));
+        $requiredClasses = count($studyPrograms) * count($this->entryYears($periods)) * 2;
+        $requiredLecturers = ($requiredClasses * 2) - 1;
 
-        return array_map(fn (array $data) => Dosen::updateOrCreate(['dsn_code' => $data[0]], [
-            'dsn_stat' => 1,
-            'dsn_nidn' => $data[1],
-            'dsn_name' => $data[2],
-            'dsn_user' => $data[3],
-            'dsn_mail' => $data[4],
-            'dsn_phone' => $data[5],
-            'password' => Hash::make('Demo123!'),
-        ]), $definitions);
+        if (count($availableLecturers) < $requiredLecturers) {
+            throw new RuntimeException(sprintf(
+                'Seeder membutuhkan %d dosen aktif untuk merotasi pengampu tanpa bentrok, tetapi data sumber hanya menyediakan %d.',
+                $requiredLecturers,
+                count($availableLecturers),
+            ));
+        }
+
+        $this->availableLecturers = $availableLecturers;
+        $serial = 0;
+
+        foreach ($studyPrograms as $studyProgram) {
+            foreach ($this->entryYears($periods) as $entryYear) {
+                foreach ([0, 1] as $classIndex) {
+                    $lecturers[$studyProgram->id][$entryYear][$classIndex] = $availableLecturers[$serial * 2];
+                    $serial++;
+                }
+            }
+        }
+
+        return $lecturers;
+    }
+
+    private function lecturerForCourse(Dosen $classLecturer, int $courseIndex): Dosen
+    {
+        if ($courseIndex >= count($this->availableLecturers)) {
+            throw new RuntimeException(sprintf(
+                'Kelas memiliki lebih dari %d mata kuliah sehingga dosen pengampu unik tidak mencukupi.',
+                count($this->availableLecturers),
+            ));
+        }
+
+        $classLecturerIndex = array_search(
+            $classLecturer->id,
+            array_map(fn (Dosen $lecturer): int => $lecturer->id, $this->availableLecturers),
+            true,
+        );
+
+        if ($classLecturerIndex === false) {
+            throw new RuntimeException('Dosen wali kelas tidak ditemukan dalam data sumber dosen.');
+        }
+
+        return $this->availableLecturers[($classLecturerIndex + $courseIndex) % count($this->availableLecturers)];
     }
 
     /** @return array<int, ProgramStudi> */
@@ -394,6 +453,21 @@ class DemoDuaTahunAkademikSeeder extends Seeder
         return strtoupper(Str::slug($studyProgram->code));
     }
 
+    /**
+     * @param  array<string, TahunAkademik>  $periods
+     * @return list<int>
+     */
+    private function entryYears(array $periods): array
+    {
+        $entryYears = array_values(array_unique(array_map(
+            fn (TahunAkademik $period): int => (int) $period->year_start,
+            $periods,
+        )));
+        sort($entryYears);
+
+        return $entryYears;
+    }
+
     private function seedCurriculum(): Kurikulum
     {
         return Kurikulum::updateOrCreate(['code' => 'DEMO-KUR-2024'], [
@@ -406,24 +480,28 @@ class DemoDuaTahunAkademikSeeder extends Seeder
 
     /**
      * @param  array<int, ProgramStudi>  $studyPrograms
-     * @return array<int, array<int, Ruang>>
+     * @param  array<string, TahunAkademik>  $periods
+     * @return array<int, array<int, array<int, Ruang>>>
      */
-    private function seedRooms(array $studyPrograms): array
+    private function seedRooms(array $studyPrograms, array $periods): array
     {
         $building = Gedung::updateOrCreate(['code' => 'DEMO-GDG'], ['name' => 'Gedung Perkuliahan Demo']);
         $rooms = [];
+        $serial = 0;
 
         foreach ($studyPrograms as $studyProgramIndex => $studyProgram) {
-            foreach ([0 => 'A', 1 => 'B'] as $classIndex => $classLabel) {
-                $roomNumber = (($studyProgramIndex + 1) * 100) + $classIndex + 1;
-                $rooms[$studyProgram->id][$classIndex] = Ruang::updateOrCreate([
-                    'code' => 'DEMO-R-'.$this->studyProgramToken($studyProgram).'-'.$classLabel,
-                ], [
-                    'gedu_id' => $building->id,
-                    'type' => 0,
-                    'floor' => $studyProgramIndex + 1,
-                    'name' => 'Ruang Demo '.$roomNumber.' '.$studyProgram->name,
-                ]);
+            foreach ($this->entryYears($periods) as $entryYear) {
+                foreach ([0 => 'A', 1 => 'B'] as $classIndex => $classLabel) {
+                    $serial++;
+                    $rooms[$studyProgram->id][$entryYear][$classIndex] = Ruang::updateOrCreate([
+                        'code' => 'DEMO-R-'.$this->studyProgramToken($studyProgram).'-'.$entryYear.'-'.$classLabel,
+                    ], [
+                        'gedu_id' => $building->id,
+                        'type' => 0,
+                        'floor' => $studyProgramIndex + 1,
+                        'name' => 'Ruang Demo '.str_pad((string) $serial, 3, '0', STR_PAD_LEFT).' '.$studyProgram->name,
+                    ]);
+                }
             }
         }
 
@@ -470,17 +548,23 @@ class DemoDuaTahunAkademikSeeder extends Seeder
             'Nadia Rahmawati',
         ];
         $cohorts = [];
-        $entryYears = array_values(array_unique(array_map(
-            fn (TahunAkademik $period): int => (int) $period->year_start,
-            $periods,
-        )));
-        sort($entryYears);
+        $entryYears = $this->entryYears($periods);
 
         foreach ($studyPrograms as $studyProgramIndex => $studyProgram) {
             $studyProgramToken = strtolower($this->studyProgramToken($studyProgram));
             $studyProgramNumber = str_pad((string) ($studyProgramIndex + 1), 2, '0', STR_PAD_LEFT);
 
             foreach ($entryYears as $entryYear) {
+                $entryPeriod = array_values(array_filter(
+                    $periods,
+                    fn (TahunAkademik $period): bool => (int) $period->year_start === $entryYear
+                        && (int) $period->raw_semester === 1,
+                ))[0] ?? null;
+
+                if (! $entryPeriod) {
+                    throw new RuntimeException('Periode masuk semester ganjil untuk angkatan '.$entryYear.' tidak ditemukan.');
+                }
+
                 $yearSuffix = substr((string) $entryYear, -2);
                 $definitions = [];
 
@@ -506,6 +590,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                         'mhs_user' => $data[3],
                         'mhs_mail' => $data[4],
                         'mhs_phone' => $data[5],
+                        'mhs_register_date' => $entryPeriod->starts_at->copy()->startOfDay(),
                         'password' => Hash::make('Demo123!'),
                     ]),
                     $definitions
@@ -596,18 +681,25 @@ class DemoDuaTahunAkademikSeeder extends Seeder
 
         foreach ($offerings as $courseIndex => $offering) {
             [$startsAt, $endsAt] = $this->scheduleTimes($classIndex, $courseIndex);
+            $scheduleCode = 'DEMO-JM-'.$period->code.'-'.$class->id.'-'.($courseIndex + 1);
             $attributes = [
                 'penawaran_mata_kuliah_id' => $offering->id,
                 'kelas_id' => $class->id,
                 'dosen_id' => $offering->dosen_utama_id,
                 'ruang_id' => $room->id,
-                'hari' => intdiv($courseIndex, 2) + 1,
+                'hari' => $this->scheduleDay($courseIndex),
                 'mulai' => $startsAt,
                 'selesai' => $endsAt,
             ];
+            $existingSchedule = JadwalMingguan::query()->where('code', $scheduleCode)->first();
+            app(ScheduleConflictService::class)->validate(
+                $offering,
+                $attributes,
+                $existingSchedule
+            );
             $fingerprint = JadwalMingguan::fingerprint($attributes);
-            $weekly = JadwalMingguan::updateOrCreate(['fingerprint' => $fingerprint], $attributes + [
-                'code' => 'DEMO-JM-'.$period->code.'-'.$class->id.'-'.($courseIndex + 1),
+            $weekly = JadwalMingguan::updateOrCreate(['code' => $scheduleCode], $attributes + [
+                'fingerprint' => $fingerprint,
             ]);
             $legacySchedule = JadwalKuliah::where('code', 'DEMO-JDW-'.$period->code.'-'.$class->id.'-'.($courseIndex + 1))->firstOrFail();
 
@@ -619,7 +711,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                     'legacy_jadwal_kuliah_id' => $meetingNumber === 1 ? $legacySchedule->id : null,
                     'dosen_id' => $weekly->dosen_id,
                     'ruang_id' => $weekly->ruang_id,
-                    'tanggal' => $period->starts_at->copy()->addWeeks($meetingNumber + 1)->addDays($courseIndex),
+                    'tanggal' => $this->scheduleDate($period, $courseIndex, $meetingNumber + 1),
                     'mulai' => $weekly->mulai,
                     'selesai' => $weekly->selesai,
                     'metode' => $meetingNumber === 3 ? 'daring' : 'tatap_muka',
@@ -834,8 +926,10 @@ class DemoDuaTahunAkademikSeeder extends Seeder
         array $students,
         int $classIndex
     ): void {
+        $isUngradedPeriod = $period->code === self::LATEST_PERIOD_CODE;
+
         foreach ($offerings as $courseIndex => $course) {
-            $date = $period->starts_at->copy()->addWeeks(2 + $courseIndex)->toDateString();
+            $date = $this->scheduleDate($period, $courseIndex, 2)->toDateString();
             [$startsAt, $endsAt, $attendanceAt] = $this->scheduleTimes($classIndex, $courseIndex);
             $schedule = JadwalKuliah::updateOrCreate(['code' => 'DEMO-JDW-'.$period->code.'-'.$class->id.'-'.($courseIndex + 1)], [
                 'makul_id' => $course->id,
@@ -844,7 +938,7 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                 'ruang_id' => $room->id,
                 'pert_id' => 1,
                 'meth_id' => 0,
-                'days_id' => intdiv($courseIndex, 2) + 1,
+                'days_id' => $this->scheduleDay($courseIndex),
                 'bsks' => min(8, (int) $course->bsks),
                 'date' => $date,
                 'start' => $startsAt,
@@ -860,8 +954,8 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                 ], [
                     'taka_id' => $period->id,
                     'dosen_id' => $course->dosen_1,
-                    'nilai' => $gradePoint === 4 ? 'A' : 'B',
-                    'keterangan' => 'Nilai demo telah dipublikasikan.',
+                    'nilai' => $isUngradedPeriod ? null : ($gradePoint === 4 ? 'A' : 'B'),
+                    'keterangan' => $isUngradedPeriod ? null : 'Nilai demo telah dipublikasikan.',
                 ]);
                 AbsensiMahasiswa::updateOrCreate([
                     'jadkul_code' => $schedule->code,
@@ -891,12 +985,16 @@ class DemoDuaTahunAkademikSeeder extends Seeder
                         'stask_id' => $task->id,
                         'student_id' => $student->id,
                     ], [
-                        'score' => $taskScore,
+                        'score' => $isUngradedPeriod ? null : $taskScore,
                         'desc' => 'Jawaban tugas demo.',
                         'code' => 900000000 + ($task->id * 10000) + $student->id,
                     ]);
                 }
             }
+        }
+
+        if ($isUngradedPeriod) {
+            return;
         }
 
         foreach ($students as $studentIndex => $student) {
@@ -926,15 +1024,41 @@ class DemoDuaTahunAkademikSeeder extends Seeder
     {
         $slots = [
             0 => [
-                ['08:00:00', '09:40:00', '08:05:00'],
-                ['10:00:00', '11:40:00', '10:05:00'],
+                ['13:00:00', '14:20:00', '13:05:00'],
+                ['14:25:00', '15:45:00', '14:30:00'],
+                ['15:50:00', '17:10:00', '15:55:00'],
+                ['17:15:00', '18:35:00', '17:20:00'],
+                ['18:35:00', '19:55:00', '18:40:00'],
             ],
             1 => [
-                ['13:00:00', '14:40:00', '13:05:00'],
-                ['15:00:00', '16:40:00', '15:05:00'],
+                ['13:05:00', '14:25:00', '13:10:00'],
+                ['14:30:00', '15:50:00', '14:35:00'],
+                ['15:55:00', '17:15:00', '16:00:00'],
+                ['17:20:00', '18:40:00', '17:25:00'],
+                ['18:40:00', '20:00:00', '18:45:00'],
             ],
         ];
+        $slotIndex = $courseIndex % 5;
 
-        return $slots[$classIndex][$courseIndex % 2];
+        return $slots[$classIndex][$slotIndex];
+    }
+
+    private function scheduleDay(int $courseIndex): int
+    {
+        $day = intdiv($courseIndex, 5) + 4;
+
+        if ($day > 6) {
+            throw new RuntimeException('Jumlah mata kuliah melebihi 15 slot yang tersedia pada Kamis sampai Sabtu.');
+        }
+
+        return $day;
+    }
+
+    private function scheduleDate(TahunAkademik $period, int $courseIndex, int $weekOffset): Carbon
+    {
+        $date = $period->starts_at->copy()->startOfDay();
+        $daysUntilSchedule = ($this->scheduleDay($courseIndex) - $date->dayOfWeekIso + 7) % 7;
+
+        return $date->addDays($daysUntilSchedule)->addWeeks($weekOffset);
     }
 }
