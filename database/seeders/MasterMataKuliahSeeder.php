@@ -4,199 +4,51 @@ namespace Database\Seeders;
 
 use App\Models\MasterMataKuliah;
 use Illuminate\Database\Seeder;
+use RuntimeException;
 
 class MasterMataKuliahSeeder extends Seeder
 {
+    /**
+     * Salinan terkompresi dari 186 baris pada
+     * master-mata-kuliah-20260821-094126.xlsx agar seeder portabel.
+     */
+    private const SOURCE_DATA = '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';
+
     public function run(): void
     {
-        $curricula = [
-            '86208' => [
-                1 => [
-                    ['Pend. Kewarganegaraan', 2], ['Bahasa Inggris 1', 2], ['Bahasa Arab 1', 2],
-                    ['Pengantar Studi Islam', 2], ['Akhlak Tasawuf', 2], ['ISD/IAD/IBD', 3],
-                    ['Sejarah Peradaban Islam', 2], ['Ke-PUI-an', 2], ['Sej. Pendidikan Islam', 2],
-                ],
-                2 => [
-                    ['Bahasa Indonesia', 2], ['Bahasa Inggris 1', 2], ['Bahasa Arab 2', 2],
-                    ['Pengantar Ilmu Fiqih', 2], ['Ulumul Qur’an al hadis', 3], ['Dasar-Dasar Pendidikan', 2],
-                    ['Ilmu Pendidikan Islam', 2], ['Ilmu Kalam', 2], ['Filsafat Umum', 2],
-                ],
-                3 => [
-                    ['Bahasa Ianggris 3', 2], ['Bahasa arab 3', 2], ["Al-Qur'an/Hadits", 2],
-                    ['Tafsir', 2], ['Fiqih', 2], ['Bimbingan Konseling', 2],
-                    ['Administrasi Pendidikan', 2], ['iIlmu Jiwa Belajar PAI', 3], ['Pembiayaan pendidikan', 2],
-                ],
-                4 => [
-                    ['Tafsir Tarbawi', 2], ['Ushul Fiqih', 2], ['MKPAI', 3], ['Materi PAI', 2],
-                    ['Etika dan Profesi Guru', 2], ['Perbandingan Pendidikan', 2],
-                    ['Filsafat Pendidikan Islam', 2], ['Media Pembelajaran PAI', 2],
-                    ['Pengembangan Kur. PAI', 2],
-                ],
-                5 => [
-                    ['Perencanaan Pembelajaran', 2], ['Sis. Info & Teknologi Pend', 2], ['Masailul Fiqih', 2],
-                    ['Metode Penelitian/PTK', 3], ['Hadist', 2], ['Manaj Pengelolaan Kelas', 2],
-                    ['kiroatul Kutub', 2], ['Pengemb Sis Eval PAI', 2], ['Strategi Pembelajaran', 2],
-                ],
-                6 => [
-                    ['Ilmu Mantik', 2], ['Kapita Selekta Pendidikan', 2], ['Mod. Pengmb. Lemb Pend.', 2],
-                    ['Analisa Kebijakan Pendidikan', 2], ['Manaj Pengelolaan Kelas', 2], ['Ilmu rosmi', 2],
-                    ['Strategi Pembelajaran', 2], ['Statistik Pendidikan', 3], ['Metode Penelitian/PTK', 2],
-                ],
-                7 => self::semesterTujuh(),
-                8 => self::semesterDelapan(),
-            ],
-            '86233' => [
-                1 => [
-                    ['Pend. Kewarganegaraan', 2], ['Bahasa Inggris 1', 2], ['Bahasa Arab 1', 2],
-                    ['Pengantar Studi Islam', 2], ['Akhlak Tasawuf', 2], ['ISD/IAD/IBD', 3],
-                    ['Sejarah Peradaban Islam', 2], ['Ke-PUI-an', 2], ['Sej. Pendidikan Islam', 2],
-                ],
-                2 => [
-                    ['Bahasa Indonesia', 2], ['Bahasa Inggris PAUDNI', 2], ['Bahasa Arab PAUDNI', 2],
-                    ['Fiqih', 2], ['Ulumul Qur’an al hadist', 3], ['Ilmu Pendidikan Islam', 2],
-                    ['Administrasi Pendidikan', 2], ["Tahsin Al-Qur'an", 2], ['Filsafat Umum', 2],
-                ],
-                3 => [
-                    ['Ushul Fiqih', 2], ['Pembiayaan Pendidikan', 2], ['Bimbingan Peng Ibadah', 2],
-                    ['Paedagogic', 3], ['Pengem. Sains di PAUD', 2], ['Bimbingan Konseling Islam', 2],
-                    ['Pend. Seni Rupa', 2], ['Ilmu Jiwa Belajar Anak', 2], ['Peng. Anak Usia Dini', 2],
-                ],
-                4 => [
-                    ['Filsapat Pend. Islam', 2], ['Kesehatan dan Gizi', 2], ['Deteksi Dini Tumbuh Kembang', 2],
-                    ['Kompetensi Propesi PAUD', 2], ['Bermain dan permainan', 2], ['Pengemb fisik/Motorik', 3],
-                    ['Pengembangan sosial,emosi', 2], ['Media pembelajaran RA', 2],
-                    ['Pengembangan Kurikulum', 2],
-                ],
-                5 => [
-                    ['Perencanaan Pembelajaran', 2], ['Pend. Anak Berkebutuhan Khusus+E80', 2],
-                    ['Matematika Anak Usia Dini', 2], ['Metode Penelitian/PTK', 3],
-                    ['Pembel. Anak Usia Dini', 2], ['Manaj Penyeleng PAUDNI', 2],
-                    ['Pengeb Seni Tari, Musik', 2], ['Peng Eval Pembel RA', 2],
-                    ['Strategi Pembelajaran PAUD', 2],
-                ],
-                6 => [
-                    ['Pengembangan Kur. PAUDNI', 2], ['Kapita Selekta Pend PAUD', 2],
-                    ['Mod. Pengmb. Lemb Pend.', 2], ['Perlindungan Hak Anak', 2],
-                    ['Manaj Pengelolaan Kelas', 2], ['Ilmu rosmi', 2], ['Strategi Pembelajaran PAUD', 2],
-                    ['Statistik Pendidikan', 3], ['Pemb al-quran anak PAUD', 2],
-                ],
-                7 => self::semesterTujuh(),
-                8 => self::semesterDelapan(),
-            ],
-            'MI' => [
-                1 => [
-                    ['Pend. Kewarganegaraan', 2], ['Bahasa Inggris 1', 2], ['Bahasa Arab 1', 2],
-                    ['Pengantar Studi Islam', 2], ['Akhlak Tasowuf', 2], ['ISD/IAD/IBD', 3],
-                    ['Sejarah Peradaban Islam,', 2], ['Ke-PUI-an', 2], ['Sej. Pendidikan Islam', 2],
-                ],
-                2 => [
-                    ['Bahasa Indonesia', 2], ['Bahasa Inggris', 2], ['Ilmu Kalam', 2], ['Fiqih', 2],
-                    ['Ulumul Qur’an alhadist', 3], ['Ilmu Pendidikan Islam', 2], ['Psikologi Umum', 2],
-                    ['Tahfidz Al-Qur;an/Hadits', 2], ['Filsafat Umum', 2],
-                ],
-                3 => [
-                    ['Ushul Fiqih', 2], ['Pend. Keterampilan Tangan', 3], ['Pendidikan kesehatan Anak', 2],
-                    ['Pendidikan kesenian', 2], ['Bahasa Daerah', 2], ['Bimbingan Konseling', 2],
-                    ['Sosisologi Pendidikan', 2], ['Ilmu Jiwa Belajar', 2], ['Psikologi Anak', 2],
-                ],
-                4 => [
-                    ['Hadits Tarbawi', 2], ['Matematika 1', 2], ['Pembelajaran IPS MI', 2],
-                    ['Manaj Pengelolaan Kelas', 2], ['Model Pembelajaran Tematik', 2],
-                    ['Pend. Kepribadian Anak', 3], ['Pengeb. Bakat dan Kreativitas', 2],
-                    ['Pengembangan sumber belajar MI', 2], ['Pengembangan Kur MI', 2],
-                ],
-                5 => [
-                    ['Perencanaan Pembelajaran', 2], ['Pend. Olahraga', 2], ['Pembelajaran Bahasa Inggris', 2],
-                    ['Metode Penelitian/PTK', 3], ['Etika dan Profesi Guru', 2], ['Pembelajaran PPKN', 2],
-                    ['Pengeb Seni Tari, Musik', 2], ['Pengp Sis Eval Pemb MI', 2],
-                    ['Ket. Menulis & Menggambar', 2],
-                ],
-                6 => [
-                    ['Pembelajaran IPA', 2], ['Pembelajaran Matematika', 2], ['Pembelajaran SKI', 2],
-                    ['Pembelajaran IPS', 2], ['Pembelajaran Aqidah Akhlak', 2], ['Pembelajaran Bhs Indo', 2],
-                    ['Pembelajaran Bhs Arab', 2], ['Pembelajaran Fiqih', 2], ['Statistik Pendidikan', 3],
-                ],
-                7 => self::semesterTujuh(),
-                8 => self::semesterDelapan(),
-            ],
-            '88204' => [
-                1 => [
-                    ['Pend. Kewarganegaraan', 2], ['Bahasa Inggris 1', 2], ['Nahwu 1', 2],
-                    ['Pengantar Studi Islam', 2], ['Akhlak Tasawuf', 2], ['ISD/IAD/IBD', 3],
-                    ['Sejarah Peradaban Islam', 2], ['Ke-PUI-an', 2], ['Sej. Pendidikan Islam', 2],
-                ],
-                2 => [
-                    ['Bahasa Indonesia', 2], ['Bahasa Inggris', 2], ['Ilmu Kalam', 2], ['Fiqih Lughoh', 2],
-                    ['Ulumul Qur’an al hadist', 3], ['Ilmu Pendidikan Islam', 2], ['Nahwu 2', 2],
-                    ['Sharaf 1', 2], ['Filsafat Umum', 2],
-                ],
-                3 => [
-                    ['Ushul Fiqih', 1], ['Nahwu 3', 2], ['Sharaf 2', 2], ['Insya 1', 2],
-                    ['Pembiayayan Pendidikan', 2], ['Ilmu Jiwa Belajar PBA', 2],
-                    ['Administrasi Pembelajaran', 2], ["Muthola'ah 1", 2], ['Tafsir', 2],
-                ],
-                4 => [
-                    ['Balaghah 1', 2], ["Muthola'ah 2", 2], ['Met. Pembelajaran B Arab', 3],
-                    ['Ilmu lughoh / Linguistik', 2], ['Keterampilan bahasa', 4], ['Insya 2', 2],
-                    ['Psikologi Pendidikan', 3], ['Shorof 3', 2],
-                ],
-                5 => [
-                    ['Perencanaa Pembelajaran', 2], ['Balaghah 2', 2], ['Insya 3', 2],
-                    ['Metode Penelitian/PTK', 3], ['Muhadasah 1', 2], ['Manaj Pengelolaan Kelas', 2],
-                    ['Ilmu rosmi', 2], ['Pengemb Eval Pembl PBA', 2], ['Media pembelajaran', 2],
-                ],
-                6 => [
-                    ['Muhadasah 2', 2], ['Insya 2', 2], ['Tarjim', 4], ['Ilmu Mantik', 2],
-                    ['Lugoh Al-Jarald Wal Majalah', 2], ['Statistik Pendidikan', 3],
-                    ['Etika dan Profesi Guru', 2], ['Pengembangan Kurikulum', 2],
-                ],
-                7 => self::semesterTujuh(),
-                8 => self::semesterDelapan(),
-            ],
-        ];
+        MasterMataKuliah::upsert(
+            self::rows(),
+            ['code'],
+            ['program_studi', 'name', 'sks', 'semester', 'updated_at'],
+        );
+    }
+
+    /** @return list<array<string, int|string|\Illuminate\Support\Carbon>> */
+    public static function rows(): array
+    {
+        $decoded = base64_decode(self::SOURCE_DATA, true);
+        $data = $decoded === false ? false : gzinflate($decoded);
+
+        if ($data === false) {
+            throw new RuntimeException('Data master mata kuliah tertanam tidak dapat dibaca.');
+        }
 
         $now = now();
         $rows = [];
 
-        foreach ($curricula as $programStudi => $semesters) {
-            foreach ($semesters as $semester => $mataKuliahs) {
-                foreach ($mataKuliahs as [$name, $sks]) {
-                    $rows[] = [
-                        'program_studi' => $programStudi,
-                        'semester' => $semester,
-                        'name' => $name,
-                        'sks' => $sks,
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ];
-                }
-            }
+        foreach (preg_split('/\R/', trim($data)) as $line) {
+            [$programStudi, $code, $name, $sks, $semester] = explode('|', $line, 5);
+            $rows[] = [
+                'program_studi' => $programStudi,
+                'code' => $code,
+                'name' => $name,
+                'sks' => (int) $sks,
+                'semester' => (int) $semester,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
         }
 
-        MasterMataKuliah::upsert(
-            $rows,
-            ['program_studi', 'semester', 'name'],
-            ['sks', 'updated_at'],
-        );
-    }
-
-    private static function semesterTujuh(): array
-    {
-        return [
-            ['Kewirausahaan', 2],
-            ['microteaching', 4],
-            ['Pramuka', 2],
-            ['PPK', 7],
-            ['KKM', 4],
-        ];
-    }
-
-    private static function semesterDelapan(): array
-    {
-        return [
-            ['SKRIPSI', 4],
-            ['Komprehensif', 4],
-            ['MUNAQOSYAH', 2],
-        ];
+        return $rows;
     }
 }
