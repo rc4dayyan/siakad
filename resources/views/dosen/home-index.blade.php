@@ -1,181 +1,216 @@
 @extends('base.base-dash-index')
-@section('title')
-    {!! config('app.name') !!}
-@endsection
-@section('menu')
-    Contoh Menu
-@endsection
-@section('submenu')
-    Dashboard
-@endsection
-@section('urlmenu')
-    #
-@endsection
-@section('subdesc')
-    Halaman Dashboard
-@endsection
+
+@section('title', 'Dashboard Dosen')
+@section('menu', 'Dashboard')
+@section('submenu', 'Dashboard Dosen')
+@section('urlmenu', route('dosen.home-index'))
+@section('subdesc', 'Ringkasan aktivitas mengajar dan bimbingan akademik Anda')
+
 @section('custom-css')
+    @include('base.components.professional-dashboard-styles')
     <style>
-        @media (max-width: 768px) {
-            .card-body {
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-            }
-
-            .icon {
-                margin: 10px 0;
-            }
-
-            .text-white {
-                margin-left: 0px !important;
-                /* Mengatur margin-left menjadi 0 */
-                margin-top: 10px;
-                margin-bottom: 10px;
-            }
+        .lecturer-chart { min-height: 310px; }
+        .lecturer-chart__canvas { min-height: 265px; }
+        .lecturer-announcement {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            text-align: left;
         }
+        .lecturer-announcement:hover strong { color: var(--dash-green-dark); }
+        .lecturer-announcement:focus-visible {
+            border-radius: 10px;
+            outline: 3px solid rgba(17, 122, 101, .18);
+        }
+        .lecturer-chart__legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px 16px;
+            color: var(--dash-muted);
+            font-size: 11px;
+        }
+        .lecturer-chart__legend span { display: inline-flex; align-items: center; gap: 6px; }
+        .lecturer-chart__legend i { width: 8px; height: 8px; border-radius: 50%; }
     </style>
 @endsection
-@section('content')
-    <section class="section">
-        <div class="row">
 
-            <div class="col-lg-9 col-12 row">
-                <div class="col-lg-3 col-6 mb-2">
-                    <a href="{{ route('dosen.akademik.jadwal-index') }}">
-                        <div class="card btn btn-outline-success">
-                            <div class="card-body d-flex justify-content-around align-items-center p-1">
-                                <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-calendar" style="font-size: 32px"></i></span>
-                                <span class="" style="margin-left: 10px; font-size: 14px;">Jadwal Mengajar <br>{{ \App\Models\JadwalKuliah::where('dosen_id', Auth::guard('dosen')->user()->id)->count() }}</span>
-                            </div>
-                        </div>
+@section('content')
+    <section class="section professional-dashboard">
+        <div class="dashboard-hero mb-4">
+            <div class="dashboard-hero__content">
+                <span class="dashboard-hero__eyebrow">Portal Dosen</span>
+                <h2>Selamat datang, {{ $lecturer->dsn_name }}</h2>
+                <p>Kelola kegiatan mengajar, penilaian, tugas, dan bimbingan akademik dari satu ruang kerja.</p>
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    <a href="{{ route('dosen.akademik.jadwal-index') }}" class="btn btn-light">
+                        <i class="fas fa-calendar-week me-1"></i> Lihat Jadwal
                     </a>
-                </div>
-                <div class="col-lg-3 col-6 mb-2">
-                    <a href="{{ route('dosen.akademik.jadwal-index') }}">
-                        <div class="card btn btn-outline-success">
-                            <div class="card-body d-flex justify-content-around align-items-center p-1">
-                                <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-star" style="font-size: 32px"></i></span>
-                                <span class="" style="margin-left: 10px; font-size: 14px;">FeedBack <br>{{ $feedback->count() }}</span>
-                            </div>
-                        </div>
+                    <a href="{{ route('dosen.akademik.krs-index') }}" class="btn btn-outline-light">
+                        <i class="fas fa-file-signature me-1"></i> Persetujuan KRS
                     </a>
                 </div>
             </div>
-            <div class="col-lg-3 col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="card-title">Pengumuman - {{ \Carbon\Carbon::now()->format('d M Y') }}</h4>
-                    </div>
-                    <div class="card-body">
-                        @forelse ($notify as $item)
+            <div class="dashboard-hero__aside">
+                <small>Periode akademik</small>
+                <strong>{{ $period?->name ?? 'Belum tersedia' }}</strong>
+                <span>{{ $period ? $period->term_label.' · '.$period->status_label : 'Belum ada periode yang dipublikasikan' }}</span>
+                <span class="mt-1">NIDN {{ $lecturer->dsn_nidn ?: 'belum dilengkapi' }}</span>
+            </div>
+        </div>
 
-                        <span>{{ \Carbon\Carbon::parse($item->created_at)->format('d-m-Y'.' - '.'H'.'.'.'i') }} - <a href="#" data-bs-toggle="modal" data-bs-target="#updateFakultas{{ $item->code }}">{{ $item->name }}</a></span><br>
+        <div class="row g-3 mb-4">
+            <div class="col-xl-3 col-sm-6">
+                <a href="{{ route('dosen.akademik.jadwal-index') }}" class="dashboard-metric">
+                    <span class="dashboard-metric__icon"><i class="fas fa-calendar-check"></i></span>
+                    <span class="dashboard-metric__content"><small>Jadwal Mengajar</small><strong>{{ number_format($scheduleCount) }}</strong><em>Jadwal pada periode berjalan</em></span>
+                </a>
+            </div>
+            <div class="col-xl-3 col-sm-6">
+                <a href="{{ route('dosen.akademik.stask-index') }}" class="dashboard-metric">
+                    <span class="dashboard-metric__icon"><i class="fas fa-list-check"></i></span>
+                    <span class="dashboard-metric__content"><small>Tugas Aktif</small><strong>{{ number_format($taskCount) }}</strong><em>Tugas yang telah diterbitkan</em></span>
+                </a>
+            </div>
+            <div class="col-xl-3 col-sm-6">
+                <a href="{{ route('dosen.akademik.jadwal-index') }}" class="dashboard-metric">
+                    <span class="dashboard-metric__icon is-gold"><i class="fas fa-star"></i></span>
+                    <span class="dashboard-metric__content"><small>Respons Evaluasi</small><strong>{{ number_format($feedbackCount) }}</strong><em>Umpan balik mahasiswa</em></span>
+                </a>
+            </div>
+            <div class="col-xl-3 col-sm-6">
+                <a href="{{ route('dosen.akademik.krs-index') }}" class="dashboard-metric">
+                    <span class="dashboard-metric__icon {{ $pendingKrsCount > 0 ? 'is-red' : '' }}"><i class="fas fa-file-circle-check"></i></span>
+                    <span class="dashboard-metric__content"><small>KRS Menunggu</small><strong>{{ number_format($pendingKrsCount) }}</strong><em>Perlu ditinjau dan diputuskan</em></span>
+                </a>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-xl-7">
+                <div class="card dashboard-panel lecturer-chart">
+                    <div class="card-header d-flex justify-content-between align-items-start gap-3">
+                        <div>
+                            <h5 class="mb-1">Kepuasan Mengajar</h5>
+                            <small class="text-muted">Distribusi evaluasi mahasiswa pada periode berjalan</small>
+                        </div>
+                        <span class="badge bg-light-primary text-primary">{{ number_format($feedbackCount) }} respons</span>
+                    </div>
+                    <div class="card-body pt-0">
+                        @if ($feedbackCount > 0)
+                            <div id="lecturerSatisfactionChart" class="lecturer-chart__canvas" aria-label="Grafik kepuasan mengajar"></div>
+                            <div class="lecturer-chart__legend" aria-hidden="true">
+                                <span><i style="background: #dc6575"></i>Tidak Puas</span>
+                                <span><i style="background: #e9b949"></i>Cukup Puas</span>
+                                <span><i style="background: #117a65"></i>Sangat Puas</span>
+                            </div>
+                        @else
+                            <div class="dashboard-empty py-5">
+                                <i class="far fa-chart-bar"></i>
+                                Belum ada respons evaluasi pada periode ini.
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-5">
+                <div class="card dashboard-panel">
+                    <div class="card-header">
+                        <h5 class="mb-1">Pengumuman Terbaru</h5>
+                        <small class="text-muted">Informasi penting untuk dosen</small>
+                    </div>
+                    <div class="card-body pt-2">
+                        @forelse ($notify as $item)
+                            <button type="button" class="dashboard-list-item lecturer-announcement" data-bs-toggle="modal" data-bs-target="#lecturerNotification{{ $loop->iteration }}">
+                                <span class="dashboard-list-item__icon is-gold"><i class="fas fa-bullhorn"></i></span>
+                                <span>
+                                    <strong>{{ $item->name }}</strong>
+                                    <small>{{ $item->created_at?->translatedFormat('d M Y · H.i') }}</small>
+                                </span>
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
                         @empty
-                        <span class="">Tidak Ada Pengumuman Hari Ini</span>
+                            <div class="dashboard-empty py-5">
+                                <i class="far fa-bell-slash"></i>
+                                Belum ada pengumuman terbaru.
+                            </div>
                         @endforelse
                     </div>
                 </div>
             </div>
-            <div class="col-lg-4 col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="card-title text-center">Presentasi Kepuasan Mengajar</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="form-group">
-                            <div id="grafikChart"></div>
-                        </div>
-                        <div class="text-center">
-                            <small>Grafik Presentasi Presentasi Kepuasan Mengajar</small>
-                        </div>
-                    </div>
+        </div>
+
+        <div class="card dashboard-panel">
+            <div class="card-header">
+                <h5 class="mb-1">Akses Cepat</h5>
+                <small class="text-muted">Menu yang paling sering digunakan dalam kegiatan akademik</small>
+            </div>
+            <div class="card-body pt-2">
+                <div class="dashboard-action-grid">
+                    <a href="{{ route('dosen.akademik.jadwal-index') }}"><i class="fas fa-calendar-week"></i><span>Jadwal Mengajar</span></a>
+                    <a href="{{ route('dosen.akademik.matkul-index') }}"><i class="fas fa-graduation-cap"></i><span>Mata Kuliah &amp; Nilai</span></a>
+                    <a href="{{ route('dosen.akademik.stask-index') }}"><i class="fas fa-list-check"></i><span>Tugas &amp; Penilaian</span></a>
+                    <a href="{{ route('dosen.akademik.krs-index') }}"><i class="fas fa-file-signature"></i><span>Persetujuan KRS</span></a>
                 </div>
             </div>
         </div>
-    <div class="me-1 mb-1 d-inline-block">
+    </section>
 
-        <!--Extra Large Modal -->
-        @foreach ($notify as $item)
-            <div class="modal fade text-left w-100" id="updateFakultas{{$item->code}}" tabindex="-1" role="dialog"
-                aria-labelledby="myModalLabel16" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-l"
-                    role="document">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h4 class="modal-title" id="myModalLabel16">Notifikasi - {{ $item->name }}</h4>
-                            <div class="">
-
-                                <button type="button" class="btn btn-outline-danger" data-bs-dismiss="modal"
-                                    aria-label="Close">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
+    @foreach ($notify as $item)
+        <div class="modal fade" id="lecturerNotification{{ $loop->iteration }}" tabindex="-1" aria-labelledby="lecturerNotificationLabel{{ $loop->iteration }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div>
+                            <small class="text-muted d-block mb-1">Pengumuman dosen</small>
+                            <h5 class="modal-title" id="lecturerNotificationLabel{{ $loop->iteration }}">{{ $item->name }}</h5>
                         </div>
-                        <div class="modal-body">
-                            <div class="row">
-                                <div class="form-group">
-                                    <p class="text-center"><b>{{ $item->name }}</b></p>
-                                    <p>{!! $item->desc !!}</p>
-                                </div>
-                            </div>
-                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                     </div>
+                    <div class="modal-body">{!! $item->desc !!}</div>
+                    <div class="modal-footer"><button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Tutup</button></div>
                 </div>
             </div>
-        @endforeach
-    </div>
-    </section>
+        </div>
+    @endforeach
 @endsection
-@section('custom-js')
-    <script src="{{ asset('dist') }}/assets/extensions/apexcharts/apexcharts.min.js"></script>
-    <script>
-        var ajaxRunning = false;
 
-        $(document).ready(function() {
-            // Fungsi untuk melakukan permintaan AJAX
-            function fetchData() {
-                // Jika sedang berjalan, hentikan fungsi
-                if (ajaxRunning) {
+@section('custom-js')
+    @if ($feedbackCount > 0)
+        <script src="{{ asset('dist/assets/extensions/apexcharts/apexcharts.min.js') }}"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const chartElement = document.querySelector('#lecturerSatisfactionChart');
+
+                if (!chartElement || typeof ApexCharts === 'undefined') {
                     return;
                 }
 
-                ajaxRunning = true;
-
-                $.ajax({
-                    url: '{{ route('dosen.services.ajax.graphic.kepuasan-mengajar-dosen') }}',
-                    method: 'GET',
-                    success: function(response) {
-                        var tidakPuasCount = response.tidakpuas;
-                        var cukupPuasCount = response.cukuppuas;
-                        var sangatPuasCount = response.sangatpuas;
-
-                        var options = {
-                            chart: {
-                                type: 'pie',
-                            },
-                            series: [tidakPuasCount, cukupPuasCount, sangatPuasCount],
-                            labels: ['Tidak Puas', 'Cukup Puas', 'Sangat Puas'],
-                            legend: {
-                                position: 'bottom'
+                new ApexCharts(chartElement, {
+                    chart: { type: 'donut', height: 275, toolbar: { show: false } },
+                    series: @json($feedbackChart),
+                    labels: ['Tidak Puas', 'Cukup Puas', 'Sangat Puas'],
+                    colors: ['#dc6575', '#e9b949', '#117a65'],
+                    dataLabels: { enabled: false },
+                    legend: { show: false },
+                    stroke: { colors: ['#ffffff'], width: 4 },
+                    plotOptions: {
+                        pie: {
+                            donut: {
+                                size: '72%',
+                                labels: {
+                                    show: true,
+                                    name: { show: true, offsetY: 18 },
+                                    value: { show: true, fontSize: '24px', fontWeight: 700, offsetY: -18 },
+                                    total: { show: true, label: 'Total Respons', formatter: function () { return '{{ number_format($feedbackCount) }}'; } }
+                                }
                             }
-                        };
-
-                        var chart = new ApexCharts(document.querySelector('#grafikChart'), options);
-                        chart.render();
-
+                        }
                     },
-                    error: function(xhr, status, error) {
-                        console.error(error);
-                    },
-                    complete: function() {
-                        ajaxRunning = false; // Setelah permintaan selesai, set status menjadi false
-                    }
-                });
-            }
-
-            // Panggil fungsi untuk pertama kalinya
-            fetchData();
-        });
-    </script>
+                    responsive: [{ breakpoint: 576, options: { chart: { height: 245 } } }]
+                }).render();
+            });
+        </script>
+    @endif
 @endsection
