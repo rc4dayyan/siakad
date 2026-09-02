@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AbsensiMahasiswa;
 use App\Models\FeedBack\FBPerkuliahan;
 use App\Models\JadwalKuliah;
+use App\Models\JadwalMingguan;
 use App\Models\Kelas;
 use App\Models\Ruang;
 use App\Models\Settings\webSettings;
@@ -15,6 +16,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use PDF;
 
 class JadwalAjarController extends Controller
 {
@@ -82,6 +84,31 @@ class JadwalAjarController extends Controller
             'web' => webSettings::where('id', 1)->first(),
             'absen' => AbsensiMahasiswa::where('jadkul_code', $jadwal->code)->with('mahasiswa')->get(),
         ]);
+    }
+
+    public function downloadWeeklySchedule(AcademicPeriodContext $context)
+    {
+        $dosen = auth('dosen')->user();
+        $period = $context->published();
+        $schedules = JadwalMingguan::query()
+            ->forAcademicPeriod($period)
+            ->where('dosen_id', $dosen->id)
+            ->with(['penawaranMataKuliah.masterMataKuliah', 'kelas', 'ruang.gedung'])
+            ->orderBy('hari')
+            ->orderBy('mulai')
+            ->get();
+        $lecturerIdentifier = preg_replace('/[^A-Za-z0-9_-]+/', '-', $dosen->dsn_nidn ?: $dosen->id);
+        $periodCode = preg_replace('/[^A-Za-z0-9_-]+/', '-', $period?->code ?? 'periode-aktif');
+
+        return PDF::loadView('base.cetak.cetak-jadwal-mingguan-dosen', [
+            'lecturer' => $dosen,
+            'period' => $period,
+            'schedules' => $schedules,
+            'web' => webSettings::query()->first(),
+            'printedAt' => now(),
+        ])
+            ->setPaper('a4', 'landscape')
+            ->download("jadwal-mingguan-dosen-{$lecturerIdentifier}-{$periodCode}.pdf");
     }
 
     public function viewFeedBack(string $code, AcademicPeriodContext $context): View

@@ -73,9 +73,16 @@
 @section('content')
     <section class="section">
         <div class="card lecturer-schedule-card">
-            <div class="card-header">
-                <h5 class="mb-1">Agenda Mengajar</h5>
-                <small class="text-muted">Periode {{ $selectedPeriod?->name ?? 'belum tersedia' }}</small>
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <h5 class="mb-1">Agenda Mengajar</h5>
+                    <small class="text-muted">Periode {{ $selectedPeriod?->name ?? 'belum tersedia' }}</small>
+                </div>
+                @if ($selectedPeriod)
+                    <a href="{{ route('dosen.akademik.jadwal-weekly-download') }}" class="btn btn-outline-success text-nowrap">
+                        <i class="fas fa-file-pdf me-1"></i> Download Jadwal Mingguan
+                    </a>
+                @endif
             </div>
             <div class="card-body">
                 @include('base.partials.schedule-filter', [
