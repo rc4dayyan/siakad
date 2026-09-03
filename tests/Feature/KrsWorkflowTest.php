@@ -78,6 +78,8 @@ class KrsWorkflowTest extends TestCase
         (require database_path('migrations/2026_07_17_000008_create_course_offerings_and_krs_tables.php'))->up();
         (require database_path('migrations/2026_07_17_000009_create_weekly_schedules_and_course_meetings.php'))->up();
         (require database_path('migrations/2026_08_18_000001_normalize_grades_by_course_offering.php'))->up();
+        (require database_path('migrations/2026_09_03_000001_add_sks_to_jadwal_mingguans_table.php'))->up();
+        (require database_path('migrations/2026_09_03_000002_add_schedule_requirement_to_course_offerings.php'))->up();
     }
 
     public function test_migration_prevents_duplicate_course_offering_combination(): void
@@ -775,7 +777,7 @@ class KrsWorkflowTest extends TestCase
         $attributes = [
             'penawaran_mata_kuliah_id' => $offering->id, 'kelas_id' => $data['classId'],
             'dosen_id' => $data['advisor']->id, 'ruang_id' => $roomId, 'hari' => 1,
-            'mulai' => '08:00', 'selesai' => '09:40',
+            'mulai' => '08:00', 'selesai' => '09:40', 'sks' => 2,
         ];
         $schedule = JadwalMingguan::create([...$attributes, 'code' => 'JMG-GEN', 'fingerprint' => JadwalMingguan::fingerprint($attributes)]);
         KalenderAkademik::create([
@@ -790,6 +792,7 @@ class KrsWorkflowTest extends TestCase
         $this->assertSame(['created' => 0, 'skipped' => 2], $generator->generate($schedule, '2026-08-01', '2026-08-31', 2));
         $this->assertSame(2, PertemuanKuliah::where('jadwal_mingguan_id', $schedule->id)->count());
         $this->assertDatabaseCount('jadwal_kuliahs', 2);
+        $this->assertSame([2], DB::table('jadwal_kuliahs')->distinct()->pluck('bsks')->map(fn ($credits) => (int) $credits)->all());
     }
 
     public function test_attendance_requires_approved_krs_participant(): void

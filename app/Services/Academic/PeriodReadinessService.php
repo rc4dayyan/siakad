@@ -130,15 +130,21 @@ class PeriodReadinessService
         }
 
         $schedules = JadwalMingguan::forAcademicPeriod($period)->get();
-        $offeringCount = PenawaranMataKuliah::forAcademicPeriod($period)->count();
-        $scheduledOfferings = $schedules->pluck('penawaran_mata_kuliah_id')->filter()->unique()->count();
+        $requiredOfferingIds = PenawaranMataKuliah::forAcademicPeriod($period)
+            ->where('wajib_dijadwalkan', true)
+            ->pluck('id');
+        $offeringCount = $requiredOfferingIds->count();
+        $excludedCount = PenawaranMataKuliah::forAcademicPeriod($period)
+            ->where('wajib_dijadwalkan', false)
+            ->count();
+        $scheduledOfferings = $schedules->pluck('penawaran_mata_kuliah_id')->intersect($requiredOfferingIds)->unique()->count();
         $conflicts = $this->scheduleConflictCount($schedules);
         $missing = max(0, $offeringCount - $scheduledOfferings);
-        $status = ($schedules->isEmpty() || $missing > 0 || $conflicts > 0) ? self::FAILED
+        $status = (($offeringCount > 0 && $scheduledOfferings === 0) || $missing > 0 || $conflicts > 0) ? self::FAILED
             : ($schedules->whereNotNull('alasan_pengecualian')->isNotEmpty() ? self::WARNING : self::READY);
 
         return $this->result('jadwal', 'Jadwal dan bentrok', $status,
-            "{$schedules->count()} jadwal; {$missing} penawaran belum dijadwalkan; {$conflicts} bentrok ditemukan.",
+            "{$schedules->count()} jadwal; {$missing} penawaran wajib belum dijadwalkan; {$excludedCount} dikecualikan; {$conflicts} bentrok ditemukan.",
             '/web-admin/master/jadwal-mingguan');
     }
 

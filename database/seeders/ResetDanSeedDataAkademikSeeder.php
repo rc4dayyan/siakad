@@ -46,9 +46,9 @@ class ResetDanSeedDataAkademikSeeder extends Seeder
         'program_kuliahs',
         'mahasiswas',
         'master_mata_kuliahs',
-        'kurikulums',
-        'ruangs',
-        'gedungs',
+        // 'kurikulums',
+        // 'ruangs',
+        // 'gedungs',
         'tahun_akademiks',
         'tahun_akademik',
     ];

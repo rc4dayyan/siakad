@@ -13,7 +13,11 @@ class PenawaranMataKuliah extends Model
 
     protected function casts(): array
     {
-        return ['sks' => 'integer', 'kapasitas' => 'integer'];
+        return [
+            'sks' => 'integer',
+            'kapasitas' => 'integer',
+            'wajib_dijadwalkan' => 'boolean',
+        ];
     }
 
     public function scopeForAcademicPeriod(Builder $query, PeriodeAkademik|int|null $period): Builder

@@ -85,7 +85,13 @@
                 <div class="form-group"><label for="create-ruang-floor">Lokasi Lantai Gedung</label><input type="number" class="form-control" name="floor" id="create-ruang-floor" value="{{ old('floor') }}" placeholder="Ada di lantai berapa ruangan ini?">@error('floor')<small class="text-danger">{{ $message }}</small>@enderror</div>
                 <div class="form-group"><label for="create-ruang-capacity">Kapasitas Ruangan</label><input type="number" min="1" max="1000" class="form-control" name="kapasitas" id="create-ruang-capacity" value="{{ old('kapasitas', 40) }}" required>@error('kapasitas')<small class="text-danger">{{ $message }}</small>@enderror</div>
                 <div class="form-group"><label for="create-ruang-name">Nama Ruangan</label><input type="text" class="form-control" name="name" id="create-ruang-name" value="{{ old('name') }}" placeholder="Inputkan nama ruangan...">@error('name')<small class="text-danger">{{ $message }}</small>@enderror</div>
-                <div class="form-group"><label for="create-ruang-code">Kode Ruangan (5 Huruf Bebas)</label><input type="text" class="form-control" name="code" id="create-ruang-code" value="{{ old('code') }}" placeholder="Inputkan kode ruangan..." maxlength="5" uppercase onkeydown="return /[a-zA-Z0-9]/i.test(event.key)">@error('code')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label for="create-ruang-code">Kode Dasar Ruangan (maksimal 5 huruf/angka)</label><input type="text" class="form-control" name="code" id="create-ruang-code" value="{{ old('code') }}" placeholder="Contoh: R" maxlength="5" uppercase onkeydown="return /[a-zA-Z0-9]/i.test(event.key)">@error('code')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group">
+                    <label for="create-ruang-quantity">Jumlah Record</label>
+                    <input type="number" min="1" max="100" class="form-control" name="jumlah" id="create-ruang-quantity" value="{{ old('jumlah', request('jumlah', 1)) }}" required>
+                    <small class="text-muted">Jika lebih dari 1, nama dan kode dasar otomatis diberi nomor urut. Contoh: Ruang 01, Ruang 02 dan R01, R02.</small>
+                    @error('jumlah')<small class="text-danger d-block">{{ $message }}</small>@enderror
+                </div>
             </div>
             <div class="modal-footer"><button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-primary">Simpan</button></div>
         </div></div>
@@ -210,7 +216,7 @@
 </div>
 @endsection
 @section('custom-js')
-    @if ($errors->any() && old('_form') === 'create-ruang')
+    @if (($errors->any() && old('_form') === 'create-ruang') || $openCreateModal)
         <script>document.addEventListener('DOMContentLoaded', () => bootstrap.Modal.getOrCreateInstance(document.getElementById('createRuangModal')).show());</script>
     @endif
 @endsection

@@ -11,7 +11,10 @@ class JadwalMingguan extends Model
 
     protected function casts(): array
     {
-        return ['hari' => 'integer'];
+        return [
+            'hari' => 'integer',
+            'sks' => 'integer',
+        ];
     }
 
     public function scopeForAcademicPeriod(Builder $query, PeriodeAkademik|int|null $period): Builder

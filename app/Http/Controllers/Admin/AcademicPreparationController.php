@@ -4,11 +4,17 @@ namespace App\Http\Controllers\Admin;
 
 use App\Helper\roleTrait;
 use App\Http\Controllers\Controller;
+use App\Models\JadwalMingguan;
+use App\Models\Krs;
 use App\Models\Kurikulum;
+use App\Models\PenawaranMataKuliah;
 use App\Models\ProgramStudi;
+use App\Models\Ruang;
 use App\Models\TahunAkademik;
 use App\Models\TahunAkademikInduk;
 use App\Services\Academic\AcademicPeriodContext;
+use App\Services\Academic\AcademicScheduleGeneratorService;
+use App\Services\Academic\AdminKrsManagementService;
 use App\Services\Imports\DosenPengajarOpenFeederImportService;
 use App\Services\Imports\KelasOpenFeederImportService;
 use App\Services\Imports\KrsOpenFeederImportService;
@@ -28,7 +34,7 @@ class AcademicPreparationController extends Controller
     public function index(Request $request): View
     {
         $step = (int) old('_wizard_step', $request->integer('step', 1));
-        $step = in_array($step, [1, 2, 3, 4, 5], true) ? $step : 1;
+        $step = in_array($step, [1, 2, 3, 4, 5, 6, 7], true) ? $step : 1;
 
         $academicYears = TahunAkademikInduk::query()
             ->withCount('periodeAkademiks')
@@ -47,9 +53,84 @@ class AcademicPreparationController extends Controller
             ->orderByDesc('starts_at')
             ->get();
         $selectedPeriodId = old('taka_id', $request->integer('taka_id'));
-        if (! $selectedPeriodId && $step === 3) {
+        if (! $selectedPeriodId && $step >= 3) {
             $selectedPeriodId = $periods->first()?->id;
         }
+
+        $krsStatusCounts = $selectedPeriodId
+            ? Krs::query()
+                ->whereHas('registrasiMahasiswa', fn ($query) => $query->where('taka_id', $selectedPeriodId))
+                ->selectRaw('status, COUNT(*) as aggregate')
+                ->groupBy('status')
+                ->pluck('aggregate', 'status')
+            : collect();
+        $actionableStatuses = [Krs::STATUS_DRAFT, Krs::STATUS_REJECTED, Krs::STATUS_SUBMITTED];
+        $krsSummary = [
+            'total' => (int) $krsStatusCounts->sum(),
+            'editable' => (int) $krsStatusCounts->only([Krs::STATUS_DRAFT, Krs::STATUS_REJECTED])->sum(),
+            'submitted' => (int) $krsStatusCounts->get(Krs::STATUS_SUBMITTED, 0),
+            'completed' => (int) $krsStatusCounts->only([Krs::STATUS_APPROVED, Krs::STATUS_LOCKED])->sum(),
+            'actionable' => (int) $krsStatusCounts->only($actionableStatuses)->sum(),
+            'empty' => $selectedPeriodId
+                ? Krs::query()
+                    ->whereIn('status', $actionableStatuses)
+                    ->whereHas('registrasiMahasiswa', fn ($query) => $query->where('taka_id', $selectedPeriodId))
+                    ->whereDoesntHave('items')
+                    ->count()
+                : 0,
+        ];
+        $scheduleOfferings = $selectedPeriodId
+            ? PenawaranMataKuliah::query()
+                ->forAcademicPeriod($selectedPeriodId)
+                ->with(['masterMataKuliah', 'kelas'])
+                ->withCount('jadwalMingguans')
+                ->orderBy('kelas_id')
+                ->orderBy('code')
+                ->get()
+            : collect();
+        $requiredScheduleOfferings = $scheduleOfferings->where('wajib_dijadwalkan', true);
+        $offeringCount = $scheduleOfferings->count();
+        $requiredOfferingCount = $requiredScheduleOfferings->count();
+        $totalOfferingCredits = (int) $requiredScheduleOfferings->sum('sks');
+        $largestClassCapacity = $selectedPeriodId
+            ? (int) PenawaranMataKuliah::query()
+                ->forAcademicPeriod($selectedPeriodId)
+                ->where('wajib_dijadwalkan', true)
+                ->whereDoesntHave('jadwalMingguans')
+                ->max('kapasitas')
+            : 0;
+        $scheduleCount = $selectedPeriodId
+            ? JadwalMingguan::query()->forAcademicPeriod($selectedPeriodId)->count()
+            : 0;
+        $scheduledOfferingCount = $selectedPeriodId
+            ? JadwalMingguan::query()
+                ->forAcademicPeriod($selectedPeriodId)
+                ->whereHas('penawaranMataKuliah', fn ($query) => $query->where('wajib_dijadwalkan', true))
+                ->whereNotNull('penawaran_mata_kuliah_id')
+                ->distinct()
+                ->count('penawaran_mata_kuliah_id')
+            : 0;
+        $availableRoomCount = Ruang::query()->whereIn('type', [0, 1])->count();
+        $defaultWeeklyMinutesPerRoom = 6 * 9 * 60;
+        $defaultRequiredRooms = $requiredOfferingCount > 0
+            ? (int) ceil((($totalOfferingCredits * 50) + ($requiredOfferingCount * 10)) / $defaultWeeklyMinutesPerRoom)
+            : 0;
+        $scheduleSummary = [
+            'offerings' => $offeringCount,
+            'required_offerings' => $requiredOfferingCount,
+            'excluded_offerings' => $offeringCount - $requiredOfferingCount,
+            'total_credits' => $totalOfferingCredits,
+            'schedules' => $scheduleCount,
+            'scheduled_offerings' => $scheduledOfferingCount,
+            'unscheduled_offerings' => max(0, $requiredOfferingCount - $scheduledOfferingCount),
+            'rooms' => $availableRoomCount,
+            'estimated_rooms' => $defaultRequiredRooms,
+            'room_shortage' => max(0, $defaultRequiredRooms - $availableRoomCount),
+            'largest_capacity' => $largestClassCapacity,
+            'adequate_rooms' => $largestClassCapacity > 0
+                ? Ruang::query()->whereIn('type', [0, 1])->where('kapasitas', '>=', $largestClassCapacity)->count()
+                : $availableRoomCount,
+        ];
 
         return view('user.admin.academic-preparation-wizard', [
             'academicYears' => $academicYears,
@@ -61,6 +142,9 @@ class AcademicPreparationController extends Controller
             'periods' => $periods,
             'curricula' => Kurikulum::query()->orderByDesc('year_start')->orderBy('name')->get(),
             'programs' => ProgramStudi::query()->orderBy('name')->get(),
+            'krsSummary' => $krsSummary,
+            'scheduleSummary' => $scheduleSummary,
+            'scheduleOfferings' => $scheduleOfferings,
         ]);
     }
 
@@ -312,9 +396,112 @@ class AcademicPreparationController extends Controller
             : "Import berhasil: {$result['students_created']} mahasiswa, {$result['registrations_created']} registrasi, {$result['krs_created']} KRS, dan {$result['items_created']} item KRS dibuat; {$result['items_skipped']} item lama dilewati dan kapasitas {$result['classes_resized']} kelas disesuaikan.";
 
         return redirect()
-            ->route('web-admin.academic-preparation.index', ['step' => 5, 'taka_id' => $period->id])
+            ->route('web-admin.academic-preparation.index', ['step' => 6, 'taka_id' => $period->id])
             ->with('status', $message)
             ->with('krs_imported', ! $request->boolean('dry_run'));
+    }
+
+    public function finalizeKrs(Request $request, AdminKrsManagementService $management): RedirectResponse
+    {
+        $validated = $request->validate([
+            'taka_id' => ['required', 'integer', Rule::exists('tahun_akademiks', 'id')],
+            'confirmation' => ['accepted'],
+        ], [
+            'taka_id.required' => 'Periode akademik wajib dipilih.',
+            'taka_id.exists' => 'Periode akademik yang dipilih tidak tersedia.',
+            'confirmation.accepted' => 'Konfirmasi pengajuan dan persetujuan seluruh KRS wajib dicentang.',
+        ]);
+
+        $period = TahunAkademik::findOrFail($validated['taka_id']);
+        if (! $period->isWritable()) {
+            throw ValidationException::withMessages([
+                'taka_id' => 'KRS pada periode yang ditutup atau diarsipkan tidak dapat diproses.',
+            ]);
+        }
+
+        $krsCollection = Krs::query()
+            ->whereHas('registrasiMahasiswa', fn ($query) => $query->where('taka_id', $period->id))
+            ->with(['registrasiMahasiswa.taka', 'items.penawaranMataKuliah.masterMataKuliah'])
+            ->orderBy('id')
+            ->get();
+        $result = $management->submitAndApproveAll($krsCollection, $request->user());
+        session()->put(AcademicPeriodContext::SESSION_KEY, $period->id);
+
+        return redirect()
+            ->route('web-admin.academic-preparation.index', ['step' => 7, 'taka_id' => $period->id])
+            ->with('status', "Proses selesai: {$result['submitted']} KRS diajukan dan {$result['approved']} KRS disetujui; {$result['skipped']} KRS yang sudah selesai dilewati.")
+            ->with('krs_finalized', true);
+    }
+
+    public function generateSchedules(
+        Request $request,
+        AcademicScheduleGeneratorService $generator
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'taka_id' => ['required', 'integer', Rule::exists('tahun_akademiks', 'id')],
+            'days' => ['required', 'array', 'min:1', 'max:7'],
+            'days.*' => ['required', 'integer', 'distinct', 'between:0,6'],
+            'day_starts_at' => ['required', 'date_format:H:i'],
+            'day_ends_at' => ['required', 'date_format:H:i', 'after:day_starts_at'],
+            'minutes_per_credit' => ['required', 'integer', 'between:30,60'],
+            'gap_minutes' => ['required', 'integer', 'between:0,60'],
+            'dry_run' => ['nullable', 'boolean'],
+            'excluded_offering_ids' => ['nullable', 'array'],
+            'excluded_offering_ids.*' => [
+                'integer',
+                'distinct',
+                Rule::exists('penawaran_mata_kuliahs', 'id')->where(
+                    fn ($query) => $query->where('taka_id', $request->integer('taka_id'))
+                ),
+            ],
+        ], [
+            'taka_id.required' => 'Periode akademik wajib dipilih.',
+            'taka_id.exists' => 'Periode akademik yang dipilih tidak tersedia.',
+            'days.required' => 'Pilih minimal satu hari kuliah.',
+            'days.min' => 'Pilih minimal satu hari kuliah.',
+            'days.*.distinct' => 'Hari kuliah tidak boleh duplikat.',
+            'day_ends_at.after' => 'Jam selesai operasional harus setelah jam mulai.',
+            'minutes_per_credit.between' => 'Durasi per SKS harus antara 30 sampai 60 menit.',
+            'gap_minutes.between' => 'Jeda antarjadwal harus antara 0 sampai 60 menit.',
+        ]);
+
+        $period = TahunAkademik::findOrFail($validated['taka_id']);
+        if (! $period->isWritable()) {
+            throw ValidationException::withMessages([
+                'taka_id' => 'Jadwal pada periode yang ditutup atau diarsipkan tidak dapat dibuat.',
+            ]);
+        }
+
+        $configurableOfferings = PenawaranMataKuliah::query()
+            ->forAcademicPeriod($period)
+            ->whereDoesntHave('jadwalMingguans');
+        (clone $configurableOfferings)->update(['wajib_dijadwalkan' => true]);
+        $excludedOfferingIds = array_map('intval', $validated['excluded_offering_ids'] ?? []);
+        if ($excludedOfferingIds !== []) {
+            (clone $configurableOfferings)
+                ->whereIn('id', $excludedOfferingIds)
+                ->update(['wajib_dijadwalkan' => false]);
+        }
+
+        $result = $generator->generate(
+            $period,
+            array_map('intval', $validated['days']),
+            $validated['day_starts_at'],
+            $validated['day_ends_at'],
+            $validated['minutes_per_credit'],
+            $validated['gap_minutes'],
+            $request->boolean('dry_run')
+        );
+        session()->put(AcademicPeriodContext::SESSION_KEY, $period->id);
+
+        $message = $request->boolean('dry_run')
+            ? "Validasi berhasil: {$result['created']} jadwal dapat dibuat, {$result['skipped']} sudah terjadwal, dan ".count($excludedOfferingIds).' penawaran dikecualikan.'
+            : "Generator selesai: {$result['created']} jadwal dibuat, {$result['skipped']} sudah terjadwal, dan ".count($excludedOfferingIds).' penawaran dikecualikan.';
+
+        return redirect()
+            ->route('web-admin.academic-preparation.index', ['step' => 7, 'taka_id' => $period->id])
+            ->with('status', $message)
+            ->with('schedules_generated', ! $request->boolean('dry_run'));
     }
 
     private function legacySemesterValue(string $term): int

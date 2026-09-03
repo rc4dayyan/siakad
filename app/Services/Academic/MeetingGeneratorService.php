@@ -70,7 +70,7 @@ class MeetingGeneratorService
                     'pert_id' => $candidate['pertemuan_ke'],
                     'meth_id' => 0,
                     'days_id' => $schedule->hari,
-                    'bsks' => min(8, $schedule->penawaranMataKuliah->sks),
+                    'bsks' => min(8, $schedule->sks ?? $schedule->penawaranMataKuliah->sks),
                     'date' => $candidate['tanggal'],
                     'start' => $schedule->mulai,
                     'ended' => $schedule->selesai,

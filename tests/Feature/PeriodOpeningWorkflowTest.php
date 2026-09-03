@@ -75,6 +75,8 @@ class PeriodOpeningWorkflowTest extends TestCase
         (require database_path('migrations/2026_07_17_000009_create_weekly_schedules_and_course_meetings.php'))->up();
         (require database_path('migrations/2026_07_17_000010_normalize_period_billing_and_financial_krs_policy.php'))->up();
         (require database_path('migrations/2026_07_17_000011_create_period_opening_workflow_and_audit.php'))->up();
+        (require database_path('migrations/2026_09_03_000001_add_sks_to_jadwal_mingguans_table.php'))->up();
+        (require database_path('migrations/2026_09_03_000002_add_schedule_requirement_to_course_offerings.php'))->up();
         DB::table('web_settings')->insert([
             'school_apps' => 'SIAKAD', 'school_name' => 'Kampus Uji', 'school_head' => 'Ketua',
             'school_link' => 'https://example.test', 'school_desc' => '-', 'school_email' => 'info@example.test',
@@ -1233,6 +1235,7 @@ class PeriodOpeningWorkflowTest extends TestCase
         $this->assertDatabaseHas('jadwal_mingguans', [
             'code' => 'SCH-READY',
             'penawaran_mata_kuliah_id' => $data['offering']->id,
+            'sks' => $data['offering']->sks,
             'kelas_id' => $data['classId'],
             'dosen_id' => $data['advisor']->id,
             'hari' => 1,
@@ -1249,16 +1252,16 @@ class PeriodOpeningWorkflowTest extends TestCase
         $courseName = $data['offering']->masterMataKuliah->name;
         $headers = [
             'Kode Jadwal', 'Kode Periode', 'Kode Penawaran', 'Nama Mata Kuliah',
-            'Kode Kelas', 'Nama Kelas', 'NIDN Dosen', 'Nama Dosen', 'Kode Ruang',
+            'SKS Sesi', 'Kode Kelas', 'Nama Kelas', 'NIDN Dosen', 'Nama Dosen', 'Kode Ruang',
             'Nama Ruang', 'Hari', 'Jam Mulai', 'Jam Selesai', 'Alasan Pengecualian',
         ];
         $first = [
-            'SCH-IMPORT-1', $data['period']->code, $data['offering']->code, $courseName,
+            'SCH-IMPORT-1', $data['period']->code, $data['offering']->code, $courseName, $data['offering']->sks,
             $class->code, $class->name, $data['advisor']->dsn_nidn, $data['advisor']->dsn_name,
             'R01', 'Ruang', 'Senin', '08:00', '09:40', '',
         ];
         $second = [
-            'SCH-IMPORT-2', $data['period']->code, $data['offering']->code, $courseName,
+            'SCH-IMPORT-2', $data['period']->code, $data['offering']->code, $courseName, $data['offering']->sks,
             $class->code, $class->name, $data['advisor']->dsn_nidn, $data['advisor']->dsn_name,
             'R01', 'Ruang', 'Senin', '09:00', '10:30', '',
         ];

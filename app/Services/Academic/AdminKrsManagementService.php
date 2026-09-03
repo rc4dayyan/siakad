@@ -172,6 +172,57 @@ class AdminKrsManagementService
         });
     }
 
+    /** @return array{submitted: int, approved: int, skipped: int} */
+    public function submitAndApproveAll(Collection $krsCollection, User $actor): array
+    {
+        $this->authorize($actor);
+        $this->authorizeApproval($actor);
+
+        if ($krsCollection->isEmpty()) {
+            throw ValidationException::withMessages([
+                'krs' => 'Belum ada KRS pada periode akademik yang dipilih.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($krsCollection, $actor): array {
+            $submitted = 0;
+            $approved = 0;
+            $skipped = 0;
+
+            foreach ($krsCollection as $krs) {
+                if (in_array($krs->status, [Krs::STATUS_APPROVED, Krs::STATUS_LOCKED], true)) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                if ($krs->isEditable()) {
+                    $krs = $this->submit(
+                        $krs->fresh(['registrasiMahasiswa.taka']),
+                        $actor,
+                        'Penyelesaian massal melalui wizard persiapan akademik baru.'
+                    );
+                    $submitted++;
+                }
+
+                if ($krs->status !== Krs::STATUS_SUBMITTED) {
+                    throw ValidationException::withMessages([
+                        'krs' => "KRS nomor {$krs->id} memiliki status yang tidak dapat diproses.",
+                    ]);
+                }
+
+                $this->approve(
+                    $krs->fresh(['registrasiMahasiswa.taka']),
+                    $actor,
+                    'Disetujui melalui wizard persiapan akademik baru.'
+                );
+                $approved++;
+            }
+
+            return compact('submitted', 'approved', 'skipped');
+        });
+    }
+
     public function reopenMany(Collection $krsCollection, User $actor, string $reason): int
     {
         $this->authorize($actor);

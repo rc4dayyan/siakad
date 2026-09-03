@@ -139,7 +139,7 @@
                                                     {{ $schedule->kelas?->name ?? 'Tanpa kelas' }} ·
                                                     {{ $schedule->ruang?->name ?? 'Ruang belum ditentukan' }}
                                                     @if ($schedule->ruang?->gedung?->name) ({{ $schedule->ruang->gedung->name }}) @endif ·
-                                                    {{ $schedule->penawaranMataKuliah?->sks ?? 0 }} SKS
+                                                    {{ $schedule->sks ?? $schedule->penawaranMataKuliah?->sks ?? 0 }} SKS
                                                 </span>
                                             </div>
                                         @endforeach

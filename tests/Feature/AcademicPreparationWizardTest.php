@@ -24,6 +24,7 @@ class AcademicPreparationWizardTest extends TestCase
         DB::purge('sqlite');
 
         $this->createUsersTable();
+        (require database_path('migrations/2024_05_30_004205_create_notifications_table.php'))->up();
         (require database_path('migrations/2024_04_26_060533_create_tahun_akademiks_table.php'))->up();
         (require database_path('migrations/2026_07_17_000003_extend_tahun_akademiks_for_period_lifecycle.php'))->up();
         (require database_path('migrations/2026_08_20_000001_create_tahun_akademik_and_link_periods.php'))->up();
@@ -301,7 +302,7 @@ class AcademicPreparationWizardTest extends TestCase
         $this->assertDatabaseCount('penawaran_mata_kuliahs', 1);
     }
 
-    public function test_fifth_step_imports_krs_by_program_and_student_semester(): void
+    public function test_steps_five_to_seven_import_finalize_and_schedule_krs(): void
     {
         $admin = $this->staffUser(0, 'WEBADMIN');
         $academicYear = TahunAkademikInduk::create([
@@ -354,6 +355,20 @@ class AcademicPreparationWizardTest extends TestCase
             'code' => 'OFFER-PAI-01-A',
             'sks' => 2,
             'kapasitas' => 1,
+        ]);
+        $secondMasterId = DB::table('master_mata_kuliahs')->insertGetId([
+            'program_studi' => '86208', 'semester' => 1, 'code' => 'PAI.02', 'name' => 'Bahasa Inggris', 'sks' => 2,
+        ]);
+        $secondOfferingId = DB::table('penawaran_mata_kuliahs')->insertGetId([
+            'master_mata_kuliah_id' => $secondMasterId,
+            'taka_id' => $period->id,
+            'pstudi_id' => $programId,
+            'kuri_id' => $curriculumId,
+            'kelas_id' => $classId,
+            'dosen_utama_id' => $lecturerId,
+            'code' => 'OFFER-PAI-02-A',
+            'sks' => 2,
+            'kapasitas' => 2,
         ]);
         $csv = $this->openFeederKrsHeaders()
             ."\n225862085432,ALDI HERDIANSYAH,20251,PAI.01,PPKN,A,86208,,,,"
@@ -426,6 +441,96 @@ class AcademicPreparationWizardTest extends TestCase
         $this->assertDatabaseCount('registrasi_mahasiswas', 2);
         $this->assertDatabaseCount('krs', 2);
         $this->assertDatabaseCount('krs_items', 2);
+
+        $unconfirmedResponse = $this->actingAs($admin)->post(
+            route('web-admin.academic-preparation.krs.finalize'),
+            ['_wizard_step' => 6, 'taka_id' => $period->id]
+        );
+        $unconfirmedResponse->assertSessionHasErrors('confirmation');
+        $this->assertSame(2, DB::table('krs')->where('status', 'draft')->count());
+
+        $finalizeResponse = $this->actingAs($admin)->post(
+            route('web-admin.academic-preparation.krs.finalize'),
+            ['_wizard_step' => 6, 'taka_id' => $period->id, 'confirmation' => '1']
+        );
+
+        $finalizeResponse
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('krs_finalized', true)
+            ->assertRedirect(route('web-admin.academic-preparation.index', [
+                'step' => 7,
+                'taka_id' => $period->id,
+            ]));
+        $this->assertSame(2, DB::table('krs')->where('status', 'approved')->count());
+        $this->assertSame(0, DB::table('krs')->whereNull('diajukan_at')->count());
+        $this->assertSame(0, DB::table('krs')->whereNull('diputuskan_at')->count());
+        $this->assertDatabaseCount('notifications', 4);
+
+        DB::table('ruangs')->insert([
+            'gedu_id' => 1,
+            'type' => 0,
+            'floor' => 1,
+            'kapasitas' => 40,
+            'name' => 'Ruang 101',
+            'code' => 'R101',
+        ]);
+        $summaryRequest = Request::create('/web-admin/persiapan-akademik-baru', 'GET', [
+            'step' => 7,
+            'taka_id' => $period->id,
+        ]);
+        $summaryRequest->setUserResolver(fn () => $admin);
+        $scheduleSummary = app(AcademicPreparationController::class)->index($summaryRequest)->getData()['scheduleSummary'];
+        $this->assertSame(2, $scheduleSummary['offerings']);
+        $this->assertSame(4, $scheduleSummary['total_credits']);
+        $this->assertSame(1, $scheduleSummary['estimated_rooms']);
+        $this->assertSame(1, $scheduleSummary['rooms']);
+        $this->assertSame(2, $scheduleSummary['largest_capacity']);
+        $this->assertSame(1, $scheduleSummary['adequate_rooms']);
+
+        $schedulePayload = [
+            '_wizard_step' => 7,
+            'taka_id' => $period->id,
+            'days' => [1],
+            'day_starts_at' => '08:00',
+            'day_ends_at' => '12:00',
+            'minutes_per_credit' => 50,
+            'gap_minutes' => 10,
+        ];
+
+        $dryRunResponse = $this->actingAs($admin)->post(
+            route('web-admin.academic-preparation.schedules.generate'),
+            [...$schedulePayload, 'dry_run' => 1]
+        );
+        $dryRunResponse->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('jadwal_mingguans', 0);
+
+        $scheduleResponse = $this->actingAs($admin)->post(
+            route('web-admin.academic-preparation.schedules.generate'),
+            [...$schedulePayload, 'dry_run' => 0]
+        );
+        $scheduleResponse
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('schedules_generated', true)
+            ->assertRedirect(route('web-admin.academic-preparation.index', [
+                'step' => 7,
+                'taka_id' => $period->id,
+            ]));
+        $this->assertDatabaseHas('jadwal_mingguans', [
+            'penawaran_mata_kuliah_id' => $offeringId,
+            'kelas_id' => $classId,
+            'dosen_id' => $lecturerId,
+            'hari' => 1,
+            'mulai' => '08:00',
+            'selesai' => '09:40',
+        ]);
+        $this->assertDatabaseHas('jadwal_mingguans', [
+            'penawaran_mata_kuliah_id' => $secondOfferingId,
+            'kelas_id' => $classId,
+            'dosen_id' => $lecturerId,
+            'hari' => 1,
+            'mulai' => '09:50',
+            'selesai' => '11:30',
+        ]);
     }
 
     public function test_period_step_rejects_invalid_parent_and_date_range(): void
@@ -461,6 +566,132 @@ class AcademicPreparationWizardTest extends TestCase
 
         $response->assertRedirect(route('error.access'));
         $this->assertDatabaseCount('tahun_akademik', 0);
+    }
+
+    public function test_schedule_generator_splits_seven_credits_into_balanced_sessions(): void
+    {
+        $academicYear = TahunAkademikInduk::create([
+            'name' => 'Tahun Akademik 2026/2027',
+            'code' => '2026-2027',
+            'year_start' => 2026,
+            'year_end' => 2027,
+        ]);
+        $period = TahunAkademik::create([
+            'tid' => $academicYear->id,
+            'name' => '2026/2027 Ganjil',
+            'code' => '2026-GANJIL',
+            'semester' => 1,
+            'year_start' => 2026,
+            'year_end' => 2027,
+            'term' => TahunAkademik::TERM_GANJIL,
+            'status' => TahunAkademik::STATUS_DRAFT,
+        ]);
+        $programId = DB::table('program_studis')->insertGetId(['name' => 'PIAUD', 'code' => '86207']);
+        $classId = DB::table('kelas')->insertGetId([
+            'taka_id' => $period->id,
+            'pstudi_id' => $programId,
+            'capacity' => 30,
+            'name' => 'PIAUD VII A',
+            'code' => '2026-GANJIL-PIAUD-S7-A',
+        ]);
+        $masterId = DB::table('master_mata_kuliahs')->insertGetId([
+            'program_studi' => '86207',
+            'semester' => 7,
+            'code' => 'PPK',
+            'name' => 'PPK',
+            'sks' => 7,
+        ]);
+        $curriculumId = DB::table('kurikulums')->insertGetId([
+            'name' => 'Kurikulum PIAUD',
+            'code' => 'KUR-PIAUD',
+            'desc' => '-',
+            'year_start' => 2026,
+            'year_ended' => 2030,
+        ]);
+        $lecturerId = DB::table('dosens')->insertGetId([
+            'dsn_stat' => 1,
+            'dsn_nidn' => '2103039305',
+            'dsn_name' => 'Dosen PPK',
+            'dsn_code' => 'DOSEN-PPK',
+            'dsn_user' => 'dosen-ppk',
+            'password' => 'password',
+            'dsn_mail' => 'dosen-ppk@example.test',
+            'dsn_phone' => '081234567890',
+        ]);
+        $offeringId = DB::table('penawaran_mata_kuliahs')->insertGetId([
+            'master_mata_kuliah_id' => $masterId,
+            'taka_id' => $period->id,
+            'pstudi_id' => $programId,
+            'kuri_id' => $curriculumId,
+            'kelas_id' => $classId,
+            'dosen_utama_id' => $lecturerId,
+            'code' => 'OFFER-PPK-7',
+            'sks' => 7,
+            'kapasitas' => 30,
+        ]);
+        $optionalMasterId = DB::table('master_mata_kuliahs')->insertGetId([
+            'program_studi' => '86207',
+            'semester' => 7,
+            'code' => 'KKM',
+            'name' => 'KKM',
+            'sks' => 4,
+        ]);
+        $optionalOfferingId = DB::table('penawaran_mata_kuliahs')->insertGetId([
+            'master_mata_kuliah_id' => $optionalMasterId,
+            'taka_id' => $period->id,
+            'pstudi_id' => $programId,
+            'kuri_id' => $curriculumId,
+            'kelas_id' => $classId,
+            'dosen_utama_id' => $lecturerId,
+            'code' => 'OFFER-KKM-OPTIONAL',
+            'sks' => 4,
+            'kapasitas' => 30,
+            'wajib_dijadwalkan' => false,
+        ]);
+        DB::table('ruangs')->insert([
+            'gedu_id' => 1,
+            'type' => 0,
+            'floor' => 1,
+            'kapasitas' => 40,
+            'name' => 'Ruang PPK',
+            'code' => 'RPPK',
+        ]);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $response = $this->actingAs($this->staffUser(0, 'SCHEDULE-ADMIN'))->post(
+            route('web-admin.academic-preparation.schedules.generate'),
+            [
+                '_wizard_step' => 7,
+                'taka_id' => $period->id,
+                'days' => [5, 6],
+                'day_starts_at' => '13:00',
+                'day_ends_at' => '18:00',
+                'minutes_per_credit' => 45,
+                'gap_minutes' => 10,
+                'dry_run' => 0,
+                'excluded_offering_ids' => [$optionalOfferingId],
+            ]
+        );
+        $generationQueryCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $response->assertSessionHasNoErrors()->assertSessionHas('schedules_generated', true);
+        $this->assertLessThan(100, $generationQueryCount, 'Pencarian slot tidak boleh menjalankan query per kandidat waktu dan ruang.');
+        $schedules = DB::table('jadwal_mingguans')
+            ->where('penawaran_mata_kuliah_id', $offeringId)
+            ->orderBy('hari')
+            ->get();
+        $this->assertCount(2, $schedules);
+        $this->assertDatabaseHas('penawaran_mata_kuliahs', [
+            'id' => $optionalOfferingId,
+            'wajib_dijadwalkan' => false,
+        ]);
+        $this->assertDatabaseMissing('jadwal_mingguans', ['penawaran_mata_kuliah_id' => $optionalOfferingId]);
+        $this->assertSame([4, 3], $schedules->pluck('sks')->map(fn ($credits) => (int) $credits)->all());
+        $this->assertSame([5, 6], $schedules->pluck('hari')->map(fn ($day) => (int) $day)->all());
+        $this->assertSame(['13:00', '16:00'], [substr($schedules[0]->mulai, 0, 5), substr($schedules[0]->selesai, 0, 5)]);
+        $this->assertSame(['13:00', '15:15'], [substr($schedules[1]->mulai, 0, 5), substr($schedules[1]->selesai, 0, 5)]);
     }
 
     private function staffUser(int $type, string $code): User
@@ -564,9 +795,38 @@ class AcademicPreparationWizardTest extends TestCase
             $table->string('code')->unique();
             $table->unsignedTinyInteger('sks');
             $table->unsignedSmallInteger('kapasitas');
+            $table->boolean('wajib_dijadwalkan')->default(true);
             $table->text('deskripsi')->nullable();
             $table->timestamps();
             $table->unique(['master_mata_kuliah_id', 'taka_id', 'pstudi_id', 'kuri_id', 'kelas_id']);
+        });
+
+        Schema::create('ruangs', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('gedu_id');
+            $table->unsignedTinyInteger('type');
+            $table->unsignedTinyInteger('floor');
+            $table->unsignedSmallInteger('kapasitas')->default(40);
+            $table->string('name');
+            $table->string('code')->unique();
+            $table->timestamps();
+        });
+
+        Schema::create('jadwal_mingguans', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('penawaran_mata_kuliah_id')->nullable();
+            $table->unsignedTinyInteger('sks')->nullable();
+            $table->unsignedBigInteger('kelas_id');
+            $table->unsignedBigInteger('dosen_id');
+            $table->unsignedBigInteger('ruang_id');
+            $table->unsignedTinyInteger('hari');
+            $table->time('mulai');
+            $table->time('selesai');
+            $table->string('code')->unique();
+            $table->string('fingerprint', 64)->unique();
+            $table->text('alasan_pengecualian')->nullable();
+            $table->unsignedBigInteger('pengecualian_oleh')->nullable();
+            $table->timestamps();
         });
 
         Schema::create('mahasiswas', function (Blueprint $table): void {

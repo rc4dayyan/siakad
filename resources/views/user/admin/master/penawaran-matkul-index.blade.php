@@ -90,7 +90,7 @@
             <thead><tr><th>Kode</th><th>Mata Kuliah</th><th>Kelas</th><th>Dosen</th><th>SKS</th><th>Kapasitas</th><th>Status Jadwal</th><th class="text-center">Aksi</th></tr></thead>
             <tbody>
                 @forelse($offerings as $item)
-                    <tr @class(['table-warning' => $item->jadwal_mingguans_count === 0])>
+                    <tr @class(['table-warning' => $item->wajib_dijadwalkan && $item->jadwal_mingguans_count === 0])>
                         <td>{{ $item->code }}</td>
                         <td>{{ $item->masterMataKuliah->name }}</td>
                         <td>{{ $item->kelas->name }}</td>
@@ -98,14 +98,16 @@
                         <td>{{ $item->sks }}</td>
                         <td>{{ $item->krs_items_count }} / {{ $item->kapasitas }}</td>
                         <td>
-                            @if($item->jadwal_mingguans_count === 0)
+                            @if(! $item->wajib_dijadwalkan)
+                                <span class="badge bg-light-secondary text-secondary"><i class="fas fa-calendar-minus me-1"></i>Tidak perlu dijadwalkan</span>
+                            @elseif($item->jadwal_mingguans_count === 0)
                                 <span class="badge bg-warning text-dark"><i class="fas fa-calendar-xmark me-1"></i>Belum dijadwalkan</span>
                             @else
                                 <span class="badge bg-light-success text-success"><i class="fas fa-calendar-check me-1"></i>Sudah dijadwalkan</span>
                             @endif
                         </td>
                         <td class="text-center">
-                            @if($canManage && $item->jadwal_mingguans_count === 0)
+                            @if($canManage && $item->wajib_dijadwalkan && $item->jadwal_mingguans_count === 0)
                                 <a href="{{ route($prefix.'master.jadwal-mingguan-index', ['penawaran_id' => $item->id, 'buat' => 1]) }}" class="btn btn-sm btn-primary me-1">
                                     <i class="fas fa-calendar-plus me-1"></i> Jadwalkan
                                 </a>

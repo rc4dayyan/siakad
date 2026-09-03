@@ -169,6 +169,7 @@ class JadwalMingguanController extends Controller
                 'Kode Periode' => $period->code,
                 'Kode Penawaran' => $schedule->penawaranMataKuliah?->code,
                 'Nama Mata Kuliah' => $schedule->penawaranMataKuliah?->masterMataKuliah?->name,
+                'SKS Sesi' => $schedule->sks ?? $schedule->penawaranMataKuliah?->sks,
                 'Kode Kelas' => $schedule->kelas?->code,
                 'Nama Kelas' => $schedule->kelas?->name,
                 'NIDN Dosen' => $schedule->dosen?->dsn_nidn,
@@ -219,7 +220,7 @@ class JadwalMingguanController extends Controller
 
         $headers = [
             'Kode Jadwal', 'Kode Periode', 'Kode Penawaran', 'Nama Mata Kuliah',
-            'Kode Kelas', 'Nama Kelas', 'NIDN Dosen', 'Nama Dosen', 'Kode Ruang',
+            'SKS Sesi', 'Kode Kelas', 'Nama Kelas', 'NIDN Dosen', 'Nama Dosen', 'Kode Ruang',
             'Nama Ruang', 'Hari', 'Jam Mulai', 'Jam Selesai', 'Alasan Pengecualian',
         ];
 
@@ -501,6 +502,11 @@ class JadwalMingguanController extends Controller
             $this->rejectImportRow($rowNumber, "Kode Penawaran {$offeringCode} tidak ditemukan pada periode aktif.");
         }
 
+        $sessionCredits = filter_var($row['SKS Sesi'] ?? null, FILTER_VALIDATE_INT);
+        if ($sessionCredits === false || $sessionCredits < 1 || $sessionCredits > $offering->sks) {
+            $this->rejectImportRow($rowNumber, "SKS Sesi harus antara 1 sampai {$offering->sks}.");
+        }
+
         $classCode = $this->importedText($row['Kode Kelas'] ?? null);
 
         if ($classCode === '' || $offering->kelas?->code !== $classCode) {
@@ -547,6 +553,7 @@ class JadwalMingguanController extends Controller
         return [
             'row_number' => $rowNumber,
             'penawaran_mata_kuliah_id' => $offering->id,
+            'sks' => $sessionCredits,
             'kelas_id' => $offering->kelas_id,
             'dosen_id' => $lecturer->id,
             'ruang_id' => $room->id,

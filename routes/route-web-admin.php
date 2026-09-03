@@ -21,6 +21,8 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
         Route::post('/persiapan-akademik-baru/import-kelas', [App\Http\Controllers\Admin\AcademicPreparationController::class, 'importClasses'])->name('academic-preparation.classes.import');
         Route::post('/persiapan-akademik-baru/import-dosen-pengajar', [App\Http\Controllers\Admin\AcademicPreparationController::class, 'importTeachingLecturers'])->name('academic-preparation.teaching-lecturers.import');
         Route::post('/persiapan-akademik-baru/import-krs', [App\Http\Controllers\Admin\AcademicPreparationController::class, 'importKrs'])->name('academic-preparation.krs.import');
+        Route::post('/persiapan-akademik-baru/finalisasi-krs', [App\Http\Controllers\Admin\AcademicPreparationController::class, 'finalizeKrs'])->name('academic-preparation.krs.finalize');
+        Route::post('/persiapan-akademik-baru/generate-jadwal', [App\Http\Controllers\Admin\AcademicPreparationController::class, 'generateSchedules'])->name('academic-preparation.schedules.generate');
 
         // MENU KHUSUS DATA PENGGUNA => DATA ADMIN
         Route::get('/workers/data-admin',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'indexAdmin'])->name('workers.admin-index');

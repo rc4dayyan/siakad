@@ -112,6 +112,7 @@ class PeriodConfigurationCopyService
                         'dosen_pendamping_2_id' => $offering->dosen_pendamping_2_id, 'prasyarat_master_id' => $offering->prasyarat_master_id,
                         'legacy_mata_kuliah_id' => null, 'code' => $this->code($offering->code, $target),
                         'sks' => $offering->sks, 'kapasitas' => $offering->kapasitas, 'deskripsi' => $offering->deskripsi,
+                        'wajib_dijadwalkan' => $offering->wajib_dijadwalkan,
                     ]);
                     $offeringMap[$offering->id] = $created;
                     $result['created']++;
@@ -129,7 +130,7 @@ class PeriodConfigurationCopyService
                     }
                     $attributes = [
                         'penawaran_mata_kuliah_id' => $targetOffering->id, 'kelas_id' => $targetClass->id,
-                        'dosen_id' => $schedule->dosen_id, 'ruang_id' => $schedule->ruang_id,
+                        'dosen_id' => $schedule->dosen_id, 'ruang_id' => $schedule->ruang_id, 'sks' => $schedule->sks,
                         'hari' => $schedule->hari, 'mulai' => $schedule->mulai, 'selesai' => $schedule->selesai,
                     ];
                     $fingerprint = JadwalMingguan::fingerprint($attributes);

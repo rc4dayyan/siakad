@@ -640,6 +640,8 @@ class DemoDuaTahunAkademikSeederTest extends TestCase
             '2026_07_17_000010_normalize_period_billing_and_financial_krs_policy.php',
             '2026_07_17_000011_create_period_opening_workflow_and_audit.php',
             '2026_08_20_000001_create_tahun_akademik_and_link_periods.php',
+            '2026_09_03_000001_add_sks_to_jadwal_mingguans_table.php',
+            '2026_09_03_000002_add_schedule_requirement_to_course_offerings.php',
         ];
     }
 }
