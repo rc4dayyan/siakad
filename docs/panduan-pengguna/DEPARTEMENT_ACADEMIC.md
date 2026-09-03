@@ -140,7 +140,7 @@ Sebelum membuka KRS, pastikan batas SKS, dosen wali, prasyarat, kapasitas, serta
 
 Untuk membuka beberapa KRS sekaligus, filter status yang diperlukan, centang KRS pada tabel, pilih **Buka kembali** pada **Aksi massal**, isi alasan minimal 10 karakter, lalu jalankan. Seluruh pilihan harus berada pada periode terpilih dan berstatus diajukan/disetujui/dikunci. Jika satu pilihan tidak valid, seluruh proses dibatalkan.
 
-Academic juga dapat menggunakan **Update KRS melalui Excel**. Gunakan pencarian/filter pada **Pilih mahasiswa** lalu klik **Unduh daftar Excel** untuk mengunduh mahasiswa sesuai hasil filter. Pertahankan kolom `NIM`, `Nama`, dan `Aksi`, lalu isi `buka_kembali` pada setiap baris yang akan diproses; aksi kosong akan diabaikan. Unggah XLSX/CSV, periksa pratinjau, isi alasan minimal 10 karakter, dan jalankan. Maksimal 100 baris beraksi, ukuran 2 MB, dan pratinjau berlaku 15 menit.
+Academic juga dapat menggunakan **Update KRS melalui Excel**. Gunakan pencarian/filter pada **Pilih mahasiswa** lalu klik **Unduh daftar Excel** untuk mengunduh mahasiswa sesuai hasil filter. Pertahankan kolom `NIM`, `Nama`, dan `Aksi`, lalu isi `buka_kembali` pada setiap baris yang akan diproses; aksi kosong akan diabaikan. Unggah XLSX/CSV, periksa pratinjau, isi alasan minimal 10 karakter, dan jalankan. Maksimal 300 baris beraksi, ukuran 2 MB, dan pratinjau berlaku 15 menit.
 
 Nilai `buka_kembali` membuka KRS berstatus diajukan, disetujui, atau dikunci agar dapat diperbaiki. File unduhan menyertakan kolom **Keterangan Aksi** yang tidak perlu diubah.
 

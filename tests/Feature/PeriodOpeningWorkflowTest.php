@@ -623,6 +623,7 @@ class PeriodOpeningWorkflowTest extends TestCase
             ->withSession([AcademicPeriodContext::SESSION_KEY => $data['period']->id])
             ->get(route('web-admin.krs-management.index'))
             ->assertOk()
+            ->assertSee('Maksimal 300 baris beraksi dan 2 MB.')
             ->assertSee('data-can-approve="1" data-can-reopen="1"', false)
             ->assertSee('Mahasiswa belum memiliki KRS.', false)
             ->assertSee("return checkbox.dataset.canApprove === '1' || checkbox.dataset.canReopen === '1';", false);

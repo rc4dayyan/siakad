@@ -14,6 +14,14 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
 
         // ADMIN AUTHORITY
 
+        // PERSIAPAN AKADEMIK BARU
+        Route::get('/persiapan-akademik-baru', [App\Http\Controllers\Admin\AcademicPreparationController::class, 'index'])->name('academic-preparation.index');
+        Route::post('/persiapan-akademik-baru/tahun-akademik', [App\Http\Controllers\Admin\AcademicPreparationController::class, 'storeAcademicYear'])->name('academic-preparation.academic-year.store');
+        Route::post('/persiapan-akademik-baru/periode-akademik', [App\Http\Controllers\Admin\AcademicPreparationController::class, 'storeAcademicPeriod'])->name('academic-preparation.academic-period.store');
+        Route::post('/persiapan-akademik-baru/import-kelas', [App\Http\Controllers\Admin\AcademicPreparationController::class, 'importClasses'])->name('academic-preparation.classes.import');
+        Route::post('/persiapan-akademik-baru/import-dosen-pengajar', [App\Http\Controllers\Admin\AcademicPreparationController::class, 'importTeachingLecturers'])->name('academic-preparation.teaching-lecturers.import');
+        Route::post('/persiapan-akademik-baru/import-krs', [App\Http\Controllers\Admin\AcademicPreparationController::class, 'importKrs'])->name('academic-preparation.krs.import');
+
         // MENU KHUSUS DATA PENGGUNA => DATA ADMIN
         Route::get('/workers/data-admin',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'indexAdmin'])->name('workers.admin-index');
         Route::get('/workers/data-admin/create',[App\Http\Controllers\Admin\Pages\WorkersController::class, 'createAdmin'])->name('workers.admin-create');

@@ -75,7 +75,7 @@ class ResetDanSeedDataAkademikSeeder extends Seeder
                     DB::table('users')->where('code', 'like', 'DEMO-STAFF-%')->delete();
                 }
 
-                $this->call(DemoDuaTahunAkademikSeeder::class);
+                // $this->call(DemoDuaTahunAkademikSeeder::class);
             });
         });
     }

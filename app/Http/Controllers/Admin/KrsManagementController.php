@@ -107,6 +107,7 @@ class KrsManagementController extends Controller
             'canManageKrs' => $canManageKrs,
             'canApproveKrs' => $canApproveKrs,
             'importPreview' => $importPreview,
+            'importMaxActionRows' => KrsBulkImportService::MAX_ACTION_ROWS,
         ]);
     }
 

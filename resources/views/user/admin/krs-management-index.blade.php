@@ -13,7 +13,7 @@
 
     <div class="card mb-3">
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div><h5 class="mb-1">Update KRS melalui Excel</h5><small>Kolom wajib: NIM, Nama, Aksi. Maksimal 100 baris beraksi dan 2 MB.</small></div>
+            <div><h5 class="mb-1">Update KRS melalui Excel</h5><small>Kolom wajib: NIM, Nama, Aksi. Maksimal {{ $importMaxActionRows }} baris beraksi dan 2 MB.</small></div>
             <a href="{{ route($prefix.'krs-management.import-template') }}" class="btn btn-outline-success"><i class="fa-solid fa-file-excel"></i> Unduh template</a>
         </div>
         <div class="card-body">

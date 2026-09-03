@@ -1,7 +1,7 @@
 @php
     $current = $item ?? null;
     $useOld = old('_form') === $formMarker;
-    $selectedYearId = $useOld ? old('tid') : $current?->tid;
+    $selectedYearId = $useOld ? old('tid') : ($current?->tid ?? $selectedAcademicYearId ?? null);
     $selectedTerm = $useOld ? old('term') : $current?->term;
 @endphp
 

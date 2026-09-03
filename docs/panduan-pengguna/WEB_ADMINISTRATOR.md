@@ -127,7 +127,7 @@ Proses bersifat atomik dan dibatasi maksimal 100 KRS: kegagalan satu pilihan mem
 1. Gunakan pencarian/filter pada **Pilih mahasiswa** dan klik **Unduh daftar Excel** agar file mengikuti daftar terfilter, atau gunakan **Unduh template** untuk seluruh mahasiswa periode.
 2. Pertahankan kolom `NIM`, `Nama`, dan `Aksi`.
 3. Isi `setujui` untuk menyetujui KRS diajukan atau `buka_kembali` untuk membuka KRS diajukan/disetujui/dikunci.
-4. Biarkan aksi kosong untuk mahasiswa yang tidak diproses, lalu unggah file XLSX/CSV maksimal 2 MB dan 100 baris beraksi.
+4. Biarkan aksi kosong untuk mahasiswa yang tidak diproses, lalu unggah file XLSX/CSV maksimal 2 MB dan 300 baris beraksi.
 5. Periksa pratinjau; sistem mencocokkan nama dengan NIM dan memvalidasi status serta kewenangan.
 6. Isi alasan minimal 10 karakter jika terdapat aksi `buka_kembali`.
 7. Eksekusi dalam waktu 15 menit.

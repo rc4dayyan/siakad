@@ -14,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class KrsBulkImportService
 {
+    public const MAX_ACTION_ROWS = 300;
+
     public const ACTION_APPROVE = 'setujui';
 
     public const ACTION_REOPEN = 'buka_kembali';
@@ -49,8 +51,8 @@ class KrsBulkImportService
         if ($normalizedRows->isEmpty()) {
             $this->reject('Tidak ada aksi KRS yang diisi. Isi setujui, buka_kembali, atau ajukan_setujui pada kolom Aksi.');
         }
-        if ($normalizedRows->count() > 100) {
-            $this->reject('Maksimal 100 baris dengan aksi dapat diproses dalam satu file.');
+        if ($normalizedRows->count() > self::MAX_ACTION_ROWS) {
+            $this->reject('Maksimal '.self::MAX_ACTION_ROWS.' baris dengan aksi dapat diproses dalam satu file.');
         }
 
         foreach ($normalizedRows as $row) {

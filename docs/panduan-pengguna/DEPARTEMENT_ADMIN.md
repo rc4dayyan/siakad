@@ -56,7 +56,7 @@ Seluruh pilihan diproses sebagai satu transaksi. Jika salah satu KRS bukan milik
 2. Gunakan pencarian/filter status pada **Pilih mahasiswa**, lalu klik **Unduh daftar Excel** agar file hanya berisi mahasiswa pada hasil filter. Gunakan **Unduh template** bila memerlukan seluruh daftar periode.
 3. Pertahankan kolom `NIM`, `Nama`, dan `Aksi`.
 4. Isi `setujui` pada kolom `Aksi` untuk KRS yang akan disetujui.
-5. Biarkan aksi kosong untuk mahasiswa yang tidak diproses. Simpan sebagai XLSX atau CSV, maksimal 2 MB dan 100 baris beraksi.
+5. Biarkan aksi kosong untuk mahasiswa yang tidak diproses. Simpan sebagai XLSX atau CSV, maksimal 2 MB dan 300 baris beraksi.
 6. Unggah file lalu klik **Validasi dan pratinjau**.
 7. Periksa NIM, nama, status sekarang, dan aksi pada pratinjau.
 8. Isi catatan bila diperlukan, kemudian klik **Jalankan update Excel**.

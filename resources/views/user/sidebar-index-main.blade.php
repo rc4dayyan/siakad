@@ -4,6 +4,14 @@
                 <span>Beranda</span>
             </a>
         </li>
+        @if ((int) Auth::user()->raw_type === 0)
+            <li class="sidebar-item {{ Route::is('web-admin.academic-preparation.*') ? 'active' : '' }}">
+                <a href="{{ route('web-admin.academic-preparation.index') }}" class="sidebar-link">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>Persiapan Akademik Baru</span>
+                </a>
+            </li>
+        @endif
         @if ((int) Auth::user()->raw_type === 4)
             <li class="sidebar-item {{ Route::is('admin.krs-management.*') ? 'active' : '' }}">
                 <a href="{{ route('admin.krs-management.index') }}" class="sidebar-link">

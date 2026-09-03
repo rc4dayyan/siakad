@@ -240,3 +240,45 @@ php scan.php
 -   Themes BackEnd <a href="https://github.com/zuramai/mazer">Mazer Dashboard By zuramai</a>
 -   Dockerize Script <a href="https://github.com/refactorian/laravel-docker">Laravel Docker</a>
 -   Midtrans Payment Gateway <a href="https://midtrans.com">Midtrans Payment Gateway</a>
+
+
+#migrasi khusus
+php artisan migrate --path=database/migrations/2026_08_16_000001_clear_academic_data.php
+php artisan migrate --path=database/migrations/2026_08_16_000002_create_wilayahs_table.php
+
+php artisan migrate --force
+php artisan db:seed --class=MasterMataKuliahSeeder --force
+php artisan optimize:clear
+
+#kenaikan kelas di tahun berikut nya
+Mahasiswa tidak perlu “dipindahkan” dengan mengubah kelas tahun 2025. Sistem membuat registrasi baru untuk periode 2026, sehingga riwayat kelas tahun 2025 tetap tersimpan.
+Untuk banyak mahasiswa sekaligus:
+Buat periode akademik 2026.
+Buat kelas tujuan untuk periode 2026, misalnya Kelas B Semester 2.
+Buka /web-admin/workers/data-mahasiswa.
+Klik tombol kuning Kenaikan Semester Massal.
+Pilih:Periode sumber: 2025
+Kelas sumber: Kelas A tahun 2025
+Periode tujuan: 2026
+Kelas tujuan: kelas tahun 2026
+Dosen wali tujuan
+Keputusan untuk mahasiswa cuti/nonaktif
+
+Klik Tampilkan Pratinjau.
+Periksa daftar mahasiswa dan perubahan semester.
+Klik Jalankan Proses.
+Hasilnya:
+Registrasi kelas tahun 2025 tetap menjadi riwayat.
+Registrasi baru dibuat untuk kelas tahun 2026.
+Semester mahasiswa otomatis bertambah satu.
+Mahasiswa yang sudah terdaftar pada periode 2026 akan dilewati.
+Mahasiswa lulus, drop out, atau mengundurkan diri juga dilewati.
+Untuk satu mahasiswa saja, pilih periode 2026 melalui pemilih periode, buka Edit Mahasiswa, lalu gunakan bagian Registrasi Mahasiswa ke 2026 dan pilih kelas tujuan.
+
+
+#Reset data dan pakai data dummy
+php artisan db:seed --class=ResetDanSeedDataAkademikSeeder --force
+
+1. tambah tahun akademik
+2. tambah periode akademik
+

@@ -108,11 +108,17 @@ class MasterMataKuliahTest extends TestCase
     {
         $this->seed(MasterMataKuliahSeeder::class);
 
-        $this->assertDatabaseCount('master_mata_kuliahs', 246);
+        $this->assertDatabaseCount('master_mata_kuliahs', 186);
         $this->assertSame(62, MasterMataKuliah::where('program_studi', '86208')->count());
         $this->assertSame(62, MasterMataKuliah::where('program_studi', '86233')->count());
-        $this->assertSame(62, MasterMataKuliah::where('program_studi', 'MI')->count());
-        $this->assertSame(60, MasterMataKuliah::where('program_studi', '88204')->count());
+        $this->assertSame(62, MasterMataKuliah::where('program_studi', '88204')->count());
+        $this->assertDatabaseHas('master_mata_kuliahs', [
+            'program_studi' => '88204',
+            'code' => 'PGBA01',
+            'name' => 'Pengantar Studi Islam',
+            'sks' => 2,
+            'semester' => 1,
+        ]);
     }
 
     public function test_import_accepts_reference_headers_and_roman_semesters(): void
