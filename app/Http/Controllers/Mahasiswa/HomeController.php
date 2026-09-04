@@ -34,6 +34,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
@@ -96,12 +97,8 @@ class HomeController extends Controller
 
     public function jadkulIndex(Request $request, AcademicPeriodContext $context, StudentAcademicContext $studentContext)
     {
-        $listing = $this->studentScheduleListing($request, $context, $studentContext);
+        $listing = $this->studentWeeklyScheduleListing($request, $context, $studentContext);
         $period = $listing['period'];
-        $data['kuri'] = Kurikulum::all();
-        $data['taka'] = $period ? collect([$period]) : collect();
-        $data['pstudi'] = ProgramStudi::all();
-        $data['matkul'] = MataKuliah::query()->forAcademicPeriod($period)->get();
         $data['jadkul'] = $listing['schedules'];
         $data['filters'] = $listing['filters'];
         $data['filterClasses'] = Kelas::query()->whereIn('id', $listing['classIds'])->orderBy('name')->get();
@@ -111,6 +108,41 @@ class HomeController extends Controller
         $data['web'] = webSettings::where('id', 1)->first();
 
         return view('mahasiswa.pages.mhs-jadkul-index', $data);
+    }
+
+    public function jadkulMeetings(
+        string $scheduleCode,
+        AcademicPeriodContext $context,
+        StudentAcademicContext $studentContext
+    ) {
+        $student = Auth::guard('mahasiswa')->user();
+        $schedule = $this->studentActiveWeeklySchedule($scheduleCode, $student, $context)
+            ->load([
+                'penawaranMataKuliah.masterMataKuliah',
+                'kelas',
+                'dosen',
+                'ruang.gedung',
+                'pertemuans' => fn ($query) => $query
+                    ->with('legacyJadwalKuliah')
+                    ->orderBy('pertemuan_ke'),
+            ]);
+        $meetingCodes = $schedule->pertemuans->pluck('code');
+        $legacyScheduleCodes = $schedule->pertemuans->pluck('legacyJadwalKuliah.code')->filter();
+
+        return view('mahasiswa.pages.mhs-jadkul-pertemuan', [
+            'web' => webSettings::query()->first(),
+            'schedule' => $schedule,
+            'selectedPeriod' => $context->published(),
+            'attendances' => AbsensiMahasiswa::query()
+                ->where('author_id', $student->id)
+                ->whereIn('jadkul_code', $meetingCodes)
+                ->get()
+                ->keyBy('jadkul_code'),
+            'evaluatedCodes' => FBPerkuliahan::query()
+                ->where('fb_users_code', $student->mhs_code)
+                ->whereIn('fb_jakul_code', $legacyScheduleCodes)
+                ->pluck('fb_jakul_code'),
+        ]);
     }
 
     public function jadkulPrint(Request $request, AcademicPeriodContext $context, StudentAcademicContext $studentContext)
@@ -534,6 +566,31 @@ class HomeController extends Controller
             ->download('Invoice-Pembayaran-'.$safeBillName.'-'.$data['history']->tagihan_code.'.pdf');
     }
 
+    public function feedbackForm(
+        string $code,
+        AcademicPeriodContext $context,
+        StudentAcademicContext $studentContext
+    ) {
+        $user = Auth::guard('mahasiswa')->user();
+        $classId = $studentContext->classIdFor($user, $context->published());
+        $jadwal = $this->studentActiveSchedule($code, $classId, $context);
+
+        if (FBPerkuliahan::query()
+            ->where('fb_jakul_code', $jadwal->code)
+            ->where('fb_users_code', $user->mhs_code)
+            ->exists()) {
+            Alert::info('Informasi', 'Kamu sudah mengisi evaluasi untuk perkuliahan ini.');
+
+            return redirect()->route('mahasiswa.home-jadkul-index');
+        }
+
+        return view('mahasiswa.pages.mhs-jadkul-feedback', [
+            'web' => webSettings::where('id', 1)->first(),
+            'jadwal' => $jadwal,
+            'evaluation' => config('lecturer_evaluation'),
+        ]);
+    }
+
     public function storeFBPerkuliahan(
         Request $request,
         string $code,
@@ -544,37 +601,67 @@ class HomeController extends Controller
         $classId = $studentContext->classIdFor($user, $context->published());
         $jadwal = $this->studentActiveSchedule($code, $classId, $context);
 
-        $checkData = FBPerkuliahan::where('fb_jakul_code', $jadwal->code)->where('fb_users_code', $user->mhs_code)->first();
+        if (FBPerkuliahan::query()
+            ->where('fb_jakul_code', $jadwal->code)
+            ->where('fb_users_code', $user->mhs_code)
+            ->exists()) {
+            Alert::error('Gagal', 'Kamu sudah mengisi evaluasi untuk perkuliahan ini.');
 
-        $request->validate([
-            'fb_score' => 'required|in:Tidak Puas,Cukup Puas,Sangat Puas',
-            'fb_reason' => 'required',
-        ], [
-            'fb_score.required' => 'Skor feedback harus diisi.',
-            'fb_score.in' => 'Skor feedback harus salah satu dari: Tidak Puas, Cukup Puas, Sangat Puas.',
-            'fb_reason.required' => 'Alasan feedback harus diisi.',
+            return redirect()->route('mahasiswa.home-jadkul-index');
+        }
+
+        $evaluation = config('lecturer_evaluation');
+        $ratingKeys = collect($evaluation['sections'])
+            ->flatMap(fn (array $section) => array_keys($section['questions']))
+            ->values();
+        $narrativeKeys = collect($evaluation['narratives'])->keys()->values();
+        $rules = [
+            'ratings' => ['required', 'array:'.$ratingKeys->implode(',')],
+            'narratives' => ['required', 'array:'.$narrativeKeys->implode(',')],
+        ];
+
+        foreach ($ratingKeys as $key) {
+            $rules['ratings.'.$key] = ['required', 'integer', 'between:1,5'];
+        }
+
+        foreach ($narrativeKeys as $key) {
+            $rules['narratives.'.$key] = ['required', 'string', 'max:5000'];
+        }
+
+        $validated = $request->validate($rules, [
+            'ratings.required' => 'Seluruh penilaian wajib diisi.',
+            'ratings.*.required' => 'Setiap pernyataan wajib diberi nilai.',
+            'ratings.*.between' => 'Nilai harus berada pada skala 1 sampai 5.',
+            'narratives.required' => 'Seluruh jawaban uraian wajib diisi.',
+            'narratives.*.required' => 'Setiap jawaban uraian wajib diisi.',
+            'narratives.*.max' => 'Jawaban uraian maksimal 5.000 karakter.',
         ]);
 
-        if ($checkData !== null) {
-            Alert::error('Error', 'Kamu sudah memberikan FeedBack pada perkuliahan ini.');
+        $averageScore = round(collect($validated['ratings'])->average(), 2);
+        $legacyScore = match (true) {
+            $averageScore < 2.34 => 'Tidak Puas',
+            $averageScore < 3.67 => 'Cukup Puas',
+            default => 'Sangat Puas',
+        };
+        $legacyReason = collect($evaluation['narratives'])
+            ->map(fn (string $question, string $key) => $question."\n".$validated['narratives'][$key])
+            ->implode("\n\n");
 
-            return back();
-        } else {
-            $fb = new FBPerkuliahan;
+        DB::transaction(function () use ($user, $jadwal, $validated, $averageScore, $legacyScore, $legacyReason): void {
+            FBPerkuliahan::create([
+                'fb_users_code' => $user->mhs_code,
+                'fb_jakul_code' => $jadwal->code,
+                'fb_code' => Str::upper(Str::random(16)),
+                'fb_score' => $legacyScore,
+                'fb_reason' => $legacyReason,
+                'fb_answers' => $validated,
+                'fb_average_score' => $averageScore,
+            ]);
+        });
 
-            $fb->fb_users_code = $user->mhs_code;
-            $fb->fb_jakul_code = $jadwal->code;
-            $fb->fb_code = uniqid(8);
-            $fb->fb_score = $request->fb_score;
-            $fb->fb_reason = $request->fb_reason;
+        Alert::success('Sukses', 'Terima kasih, evaluasi perkuliahan berhasil dikirim.');
 
-            $fb->save();
-
-            Alert::success('Sukses', 'Terima kasih telah memberi FeedBack ^_^');
-
-            return back();
-
-        }
+        return redirect()->route('mahasiswa.home-jadkul-index');
 
     }
 
@@ -649,6 +736,77 @@ class HomeController extends Controller
         );
     }
 
+    private function studentWeeklyScheduleListing(
+        Request $request,
+        AcademicPeriodContext $context,
+        StudentAcademicContext $studentContext
+    ): array {
+        $period = $context->published();
+        $student = Auth::guard('mahasiswa')->user();
+        $academicClass = $studentContext->classFor($student, $period);
+        $academicClass?->loadMissing('pstudi');
+        $baseQuery = JadwalMingguan::query()
+            ->forAcademicPeriod($period)
+            ->whereHas('penawaranMataKuliah.krsItems.krs', fn ($krs) => $krs
+                ->whereIn('status', [Krs::STATUS_APPROVED, Krs::STATUS_LOCKED])
+                ->whereHas('registrasiMahasiswa', fn ($registration) => $registration
+                    ->where('mahasiswa_id', $student->id)));
+        $classIds = (clone $baseQuery)->distinct()->pluck('kelas_id');
+        $lecturerIds = (clone $baseQuery)->distinct()->pluck('dosen_id');
+        $roomIds = (clone $baseQuery)->distinct()->pluck('ruang_id');
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'kelas_id' => ['nullable', 'integer', Rule::in($classIds->all())],
+            'dosen_id' => ['nullable', 'integer', Rule::in($lecturerIds->all())],
+            'ruang_id' => ['nullable', 'integer', Rule::in($roomIds->all())],
+            'days_id' => ['nullable', 'integer', 'between:0,6'],
+        ]);
+        $schedules = (clone $baseQuery)
+            ->with(['penawaranMataKuliah.masterMataKuliah', 'kelas', 'dosen', 'ruang.gedung'])
+            ->withCount('pertemuans')
+            ->when($filters['q'] ?? null, function ($query, string $keyword): void {
+                $query->where(function ($query) use ($keyword): void {
+                    $query->where('code', 'like', "%{$keyword}%")
+                        ->orWhereHas('penawaranMataKuliah', fn ($offering) => $offering
+                            ->where('code', 'like', "%{$keyword}%")
+                            ->orWhereHas('masterMataKuliah', fn ($course) => $course
+                                ->where('name', 'like', "%{$keyword}%")
+                                ->orWhere('code', 'like', "%{$keyword}%")));
+                });
+            })
+            ->when($filters['kelas_id'] ?? null, fn ($query, $classId) => $query->where('kelas_id', $classId))
+            ->when($filters['dosen_id'] ?? null, fn ($query, $lecturerId) => $query->where('dosen_id', $lecturerId))
+            ->when($filters['ruang_id'] ?? null, fn ($query, $roomId) => $query->where('ruang_id', $roomId))
+            ->when(isset($filters['days_id']) && $filters['days_id'] !== null, fn ($query) => $query->where('hari', $filters['days_id']))
+            ->orderBy('hari')
+            ->orderBy('mulai')
+            ->paginate(25)
+            ->withQueryString();
+
+        return compact(
+            'period',
+            'student',
+            'academicClass',
+            'classIds',
+            'lecturerIds',
+            'roomIds',
+            'filters',
+            'schedules'
+        );
+    }
+
+    private function studentActiveWeeklySchedule(string $code, $student, AcademicPeriodContext $context): JadwalMingguan
+    {
+        return JadwalMingguan::query()
+            ->forAcademicPeriod($context->published())
+            ->whereHas('penawaranMataKuliah.krsItems.krs', fn ($krs) => $krs
+                ->whereIn('status', [Krs::STATUS_APPROVED, Krs::STATUS_LOCKED])
+                ->whereHas('registrasiMahasiswa', fn ($registration) => $registration
+                    ->where('mahasiswa_id', $student->id)))
+            ->where('code', $code)
+            ->firstOrFail();
+    }
+
     private function studentActiveSchedule(string $code, ?int $classId, AcademicPeriodContext $context): JadwalKuliah
     {
         return JadwalKuliah::query()
@@ -659,7 +817,7 @@ class HomeController extends Controller
                 fn ($query) => $query->when($classId, fn ($query) => $query->forStudentClass($classId))
             )
             ->when(! $classId, fn ($query) => $query->whereRaw('1 = 0'))
-            ->with(['matkul', 'kelas'])
+            ->with(['matkul', 'kelas', 'dosen', 'ruang.gedung'])
             ->where('code', $code)
             ->firstOrFail();
     }

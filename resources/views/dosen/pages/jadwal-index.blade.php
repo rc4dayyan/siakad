@@ -85,38 +85,44 @@
                 @endif
             </div>
             <div class="card-body">
-                @include('base.partials.schedule-filter', [
-                    'filterRoute' => 'dosen.akademik.jadwal-index',
-                    'filterContext' => 'mengajar Anda',
-                ])
+                @if (! $selectedPeriod)
+                    <div class="alert alert-warning">
+                        <i class="fas fa-triangle-exclamation me-1"></i>
+                        Belum ada periode akademik aktif yang dipublikasikan. Jadwal akan tersedia setelah Web Administrator mempublikasikan periode.
+                    </div>
+                @else
+                    @include('base.partials.schedule-filter', [
+                        'filterRoute' => 'dosen.akademik.jadwal-index',
+                        'filterContext' => 'mengajar Anda',
+                        'showMethodFilter' => false,
+                        'showDateFilters' => false,
+                    ])
+                @endif
 
                 <div class="lecturer-schedule-list">
                     @forelse ($jadkul as $item)
-                        @php $scheduleDate = \Carbon\Carbon::parse($item->date); @endphp
                         <article class="lecturer-schedule-item">
-                            <div class="lecturer-schedule-date" aria-label="{{ $scheduleDate->translatedFormat('l, d F Y') }}">
-                                <span>{{ $item->days_id }}</span>
-                                <strong>{{ $scheduleDate->format('d') }}</strong>
-                                <small>{{ $scheduleDate->translatedFormat('M Y') }}</small>
+                            <div class="lecturer-schedule-date" aria-label="Jadwal setiap hari {{ $item->hari_label }}">
+                                <span>Setiap</span>
+                                <strong>{{ mb_substr($item->hari_label, 0, 3) }}</strong>
+                                <small>Minggu</small>
                             </div>
 
                             <div>
-                                <h6 class="lecturer-schedule-title">{{ $item->matkul?->name ?? 'Mata kuliah tidak tersedia' }}</h6>
+                                <h6 class="lecturer-schedule-title">{{ $item->penawaranMataKuliah?->masterMataKuliah?->name ?? 'Mata kuliah tidak tersedia' }}</h6>
                                 <div class="lecturer-schedule-meta">
-                                    <span><i class="far fa-clock"></i>{{ substr($item->start, 0, 5) }}–{{ substr($item->ended, 0, 5) }}</span>
+                                    <span><i class="far fa-clock"></i>{{ substr($item->mulai, 0, 5) }}–{{ substr($item->selesai, 0, 5) }}</span>
                                     <span><i class="fas fa-users"></i>Kelas {{ $item->kelas?->code ?? $item->kelas?->name ?? '—' }}</span>
                                     <span><i class="fas fa-location-dot"></i>{{ $item->ruang?->name ?? 'Tanpa ruangan' }}{{ $item->ruang?->gedung?->name ? ' · '.$item->ruang->gedung->name : '' }}</span>
-                                    <span><i class="fas fa-book-open"></i>{{ $item->pert_id }} · {{ $item->bsks }} SKS</span>
-                                    <span class="lecturer-schedule-badge">{{ $item->meth_id }}</span>
+                                    <span><i class="fas fa-book-open"></i>{{ $item->sks ?? $item->penawaranMataKuliah?->sks }} SKS</span>
+                                    <span class="lecturer-schedule-badge">{{ $item->hari_label }}</span>
                                 </div>
                             </div>
 
                             <div class="lecturer-schedule-actions">
-                                <a href="{{ route('dosen.akademik.jadwal-view-absen', $item->code) }}" class="btn btn-sm btn-primary">
-                                    <i class="fas fa-calendar-check me-1"></i> Presensi
-                                </a>
-                                <a href="{{ route('dosen.akademik.jadwal-view-feedback', $item->code) }}" class="btn btn-sm btn-outline-warning">
-                                    <i class="fas fa-star me-1"></i> Evaluasi
+                                <a href="{{ route('dosen.akademik.jadwal-meetings', $item->code) }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-calendar-check me-1"></i>
+                                    {{ $item->pertemuans->isNotEmpty() ? $item->pertemuans->count().' Pertemuan' : 'Lihat Pertemuan' }}
                                 </a>
                             </div>
                         </article>
@@ -128,6 +134,14 @@
                         </div>
                     @endforelse
                 </div>
+                @if ($jadkul->hasPages())
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4">
+                        <small class="text-muted">
+                            Menampilkan {{ $jadkul->firstItem() }}–{{ $jadkul->lastItem() }} dari {{ number_format($jadkul->total()) }} jadwal
+                        </small>
+                        {{ $jadkul->onEachSide(1)->links('pagination::bootstrap-5') }}
+                    </div>
+                @endif
             </div>
         </div>
     </section>

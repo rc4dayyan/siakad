@@ -23,6 +23,10 @@ class MeetingGeneratorService
             ->where('kategori', 'libur')
             ->where('dipublikasikan', true)
             ->get(['mulai_at', 'selesai_at']);
+        $schedule->loadMissing('pertemuans');
+        $existingDates = $schedule->pertemuans
+            ->pluck('tanggal')
+            ->map(fn ($date) => CarbonImmutable::parse($date)->toDateString());
         $dates = collect();
 
         for ($date = $startDate; $date->lte($endDate) && $dates->count() < $count; $date = $date->addDay()) {
@@ -39,7 +43,7 @@ class MeetingGeneratorService
             $dates->push([
                 'pertemuan_ke' => $dates->count() + 1,
                 'tanggal' => $date->toDateString(),
-                'sudah_ada' => $schedule->pertemuans()->whereDate('tanggal', $date)->exists(),
+                'sudah_ada' => $existingDates->contains($date->toDateString()),
             ]);
         }
 
@@ -48,13 +52,15 @@ class MeetingGeneratorService
 
     public function generate(JadwalMingguan $schedule, string $start, string $end, int $count): array
     {
+        $schedule->unsetRelation('pertemuans')->load('pertemuans');
         $preview = $this->preview($schedule, $start, $end, $count);
         $result = ['created' => 0, 'skipped' => 0];
+        $existingMeetingNumbers = $schedule->pertemuans->pluck('pertemuan_ke')->map(fn ($number) => (int) $number);
 
-        DB::transaction(function () use ($schedule, $preview, &$result): void {
+        DB::transaction(function () use ($schedule, $preview, $existingMeetingNumbers, &$result): void {
             $legacyCourse = $this->ensureLegacyCourse($schedule);
             foreach ($preview as $candidate) {
-                if ($candidate['sudah_ada'] || $schedule->pertemuans()->where('pertemuan_ke', $candidate['pertemuan_ke'])->exists()) {
+                if ($candidate['sudah_ada'] || $existingMeetingNumbers->contains($candidate['pertemuan_ke'])) {
                     $result['skipped']++;
 
                     continue;

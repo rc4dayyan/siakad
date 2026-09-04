@@ -191,7 +191,7 @@ Halaman untuk mengelola Jadwal Kuliah
                             Cari jadwal berdasarkan mata kuliah, kelas, dosen, metode, hari, atau rentang tanggal.
                         </p>
                     </div>
-                    <span class="badge bg-primary rounded-pill px-3 py-2">{{ $jadkul->count() }} data ditemukan</span>
+                    <span class="badge bg-primary rounded-pill px-3 py-2">{{ number_format($jadkul->total()) }} data ditemukan</span>
                 </div>
 
                 <form method="GET" action="{{ route($prefix.'master.jadkul-index') }}" class="row g-3 align-items-end">
@@ -292,7 +292,7 @@ Halaman untuk mengelola Jadwal Kuliah
             </div>
 
             <div class="table-responsive">
-                <table class="table table-hover schedule-table" id="table1">
+                <table class="table table-hover schedule-table">
                     <thead>
                         <tr>
                             <th class="text-center">#</th>
@@ -304,9 +304,9 @@ Halaman untuk mengelola Jadwal Kuliah
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse ($jadkul as $key => $item)
+                        @forelse ($jadkul as $item)
                             <tr>
-                                <td class="text-center" data-label="Nomor">{{ ++$key }}</td>
+                                <td class="text-center" data-label="Nomor">{{ $jadkul->firstItem() + $loop->index }}</td>
                                 <td data-label="Kelas & Prodi">
                                     <span class="schedule-table__primary">{{ $item->kelas->name ?? $item->kelas->code ?? '—' }}</span>
                                     <small class="schedule-table__meta">
@@ -375,6 +375,14 @@ Halaman untuk mengelola Jadwal Kuliah
                     </tbody>
                 </table>
             </div>
+            @if ($jadkul->hasPages())
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4">
+                    <small class="text-muted">
+                        Menampilkan {{ $jadkul->firstItem() }}–{{ $jadkul->lastItem() }} dari {{ number_format($jadkul->total()) }} jadwal
+                    </small>
+                    {{ $jadkul->onEachSide(1)->links('pagination::bootstrap-5') }}
+                </div>
+            @endif
         </div>
     </div>
 

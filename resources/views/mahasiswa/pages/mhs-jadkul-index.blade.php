@@ -4,137 +4,103 @@
 @section('menu', 'Akademik')
 @section('submenu', 'Jadwal Kuliah')
 @section('urlmenu', route('mahasiswa.home-index'))
-@section('subdesc', 'Daftar perkuliahan pada periode akademik berjalan')
+@section('subdesc', 'Jadwal kuliah mingguan pada periode akademik berjalan')
 
 @section('custom-css')
     <style>
-        .student-schedule-card { border: 1px solid var(--dash-line); border-radius: 15px; box-shadow: 0 8px 24px rgba(12, 44, 55, .05); }
-        .student-schedule-card .card-header { padding: 21px 22px 14px; background: transparent; }
-        .student-schedule-card .card-body { padding: 16px 22px 22px; }
-        .student-schedule-filter { padding: 14px; border: 1px solid var(--dash-line); border-radius: 12px; background: #f7faf9; }
-        .student-schedule-filter .form-control, .student-schedule-filter .form-select, .student-schedule-filter .input-group-text { min-height: 40px; border-color: #d7e4df; }
-        .student-schedule-filter .input-group-text { border-right: 0; border-radius: 9px 0 0 9px; background: #fff; }
-        .student-schedule-filter .input-group .form-control { border-left: 0; border-radius: 0 9px 9px 0; }
-        .student-schedule-filter .form-select { border-radius: 9px; }
-        .student-schedule-table thead th { padding: 12px 14px; color: var(--dash-muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
-        .student-schedule-table td { padding: 16px 14px; vertical-align: middle; }
-        .student-schedule-table__primary { display: block; color: var(--dash-navy); font-weight: 700; }
-        .student-schedule-table__meta { display: block; margin-top: 4px; color: var(--dash-muted); font-size: 12px; }
-        .student-schedule-table__course { min-width: 205px; }
-        .student-schedule-table__time { min-width: 175px; }
-        .student-schedule-table__place { min-width: 165px; }
-        .student-schedule-actions { display: flex; justify-content: flex-end; gap: 7px; white-space: nowrap; }
-        .student-schedule-actions .btn { border-radius: 8px; font-weight: 600; }
-        .student-schedule-empty { padding: 44px 16px !important; color: var(--dash-muted); text-align: center; }
-        .student-schedule-empty i { display: block; margin-bottom: 10px; color: #aab8b4; font-size: 28px; }
+        .student-weekly-card { border: 1px solid var(--dash-line); border-radius: 15px; box-shadow: 0 8px 24px rgba(12, 44, 55, .05); }
+        .student-weekly-card .card-header { padding: 21px 22px 14px; background: transparent; }
+        .student-weekly-card .card-body { padding: 16px 22px 22px; }
+        .student-weekly-list { overflow: hidden; border: 1px solid var(--dash-line); border-radius: 13px; }
+        .student-weekly-group + .student-weekly-group { border-top: 8px solid #f3f6f5; }
+        .student-weekly-group__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #cfe2db; color: var(--dash-navy); background: linear-gradient(135deg, var(--dash-green-soft), #f7fbfa); }
+        .student-weekly-group__header h6 { margin: 0; font-size: 14px; font-weight: 800; }
+        .student-weekly-group__header span { color: var(--dash-green-dark); font-size: 11px; font-weight: 700; }
+        .student-weekly-item { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 18px; border-bottom: 1px solid var(--dash-line); background: #fff; transition: background .18s ease; }
+        .student-weekly-item:last-child { border-bottom: 0; }
+        .student-weekly-item:hover { background: #f8fbfa; }
+        .student-weekly-day { display: flex; min-height: 68px; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; color: var(--dash-green-dark); background: var(--dash-green-soft); text-align: center; }
+        .student-weekly-day span { font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+        .student-weekly-day strong { margin: 2px 0; color: var(--dash-navy); font-size: 22px; line-height: 1; }
+        .student-weekly-day small { color: var(--dash-muted); font-size: 10px; }
+        .student-weekly-title { margin: 0 0 7px; color: var(--dash-navy); font-size: 15px; font-weight: 750; }
+        .student-weekly-code { color: var(--dash-muted); font-size: 11px; font-weight: 600; }
+        .student-weekly-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 16px; margin-top: 7px; color: var(--dash-muted); font-size: 11px; }
+        .student-weekly-meta span { display: inline-flex; align-items: center; gap: 6px; }
+        .student-weekly-meta i { width: 13px; color: var(--dash-green); text-align: center; }
+        .student-weekly-actions .btn { border-radius: 8px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+        .student-weekly-empty { padding: 50px 18px; color: var(--dash-muted); text-align: center; }
+        .student-weekly-empty i { display: block; margin-bottom: 11px; color: #aab8b4; font-size: 30px; }
         @media (max-width: 767.98px) {
-            .student-schedule-header { align-items: flex-start !important; flex-direction: column; }
-            .student-schedule-card .card-header, .student-schedule-card .card-body { padding-right: 16px; padding-left: 16px; }
+            .student-weekly-card .card-header, .student-weekly-card .card-body { padding-right: 16px; padding-left: 16px; }
+            .student-weekly-item { grid-template-columns: 58px minmax(0, 1fr); gap: 13px; padding: 15px; }
+            .student-weekly-day { min-height: 58px; }
+            .student-weekly-day strong { font-size: 18px; }
+            .student-weekly-actions { grid-column: 1 / -1; }
+            .student-weekly-actions .btn { width: 100%; }
         }
     </style>
 @endsection
 
 @section('content')
     <section class="section">
-        @php $activePrintFilters = collect($filters)->reject(fn ($value) => $value === null || $value === ''); @endphp
-        <div class="card student-schedule-card">
-            <div class="card-header student-schedule-header d-flex justify-content-between align-items-center gap-3">
-                <div>
-                    <h5 class="mb-1">Jadwal Kuliah Saya</h5>
-                    <small class="text-muted">Periode {{ $selectedPeriod?->name ?? 'belum tersedia' }}</small>
-                </div>
-                <div class="d-flex flex-wrap justify-content-end align-items-center gap-2">
-                    <a href="{{ route('mahasiswa.home-jadkul-print', $activePrintFilters->all()) }}" target="_blank" class="btn btn-outline-primary"><i class="fas fa-calendar-days me-1"></i> Cetak Pertemuan</a>
-                    <a href="{{ route('mahasiswa.home-jadkul-weekly-print', isset($filters['days_id']) ? ['hari' => $filters['days_id']] : []) }}" target="_blank" class="btn btn-outline-success"><i class="fas fa-print me-1"></i> Cetak Mingguan</a>
-                    <span class="badge bg-primary rounded-pill px-3 py-2">{{ $jadkul->count() }} jadwal</span>
-                </div>
+        <div class="card student-weekly-card">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div><h5 class="mb-1">Jadwal Kuliah Mingguan</h5><small class="text-muted">Periode {{ $selectedPeriod?->name ?? 'belum tersedia' }} · berdasarkan KRS yang disetujui</small></div>
+                @if ($selectedPeriod)
+                    <a href="{{ route('mahasiswa.home-jadkul-weekly-print', isset($filters['days_id']) ? ['hari' => $filters['days_id']] : []) }}" target="_blank" class="btn btn-outline-success"><i class="fas fa-print me-1"></i> Cetak Jadwal Mingguan</a>
+                @endif
             </div>
             <div class="card-body">
-                <form method="GET" action="{{ route('mahasiswa.home-jadkul-index') }}" class="student-schedule-filter row g-2 align-items-center mb-3">
-                    <div class="col-lg-7">
-                        <label for="student_schedule_search" class="visually-hidden">Cari jadwal</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="fas fa-search text-muted"></i></span>
-                            <input type="search" name="q" id="student_schedule_search" class="form-control" value="{{ $filters['q'] ?? '' }}" placeholder="Cari mata kuliah, dosen, atau kode jadwal">
-                        </div>
-                    </div>
-                    <div class="col-lg-3 col-sm-7">
-                        <label for="student_schedule_day" class="visually-hidden">Hari kuliah</label>
-                        <select name="days_id" id="student_schedule_day" class="form-select">
-                            <option value="">Semua hari</option>
-                            @foreach (['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', "Jum'at", 'Sabtu'] as $dayId => $dayName)
-                                <option value="{{ $dayId }}" @selected(isset($filters['days_id']) && (int) $filters['days_id'] === $dayId)>{{ $dayName }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-lg-2 col-sm-5">
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-filter me-1"></i> Tampilkan</button>
-                            @if (collect($filters)->filter(fn ($value) => filled($value))->isNotEmpty())
-                                <a href="{{ route('mahasiswa.home-jadkul-index') }}" class="btn btn-outline-secondary" title="Reset filter" aria-label="Reset filter"><i class="fas fa-undo"></i></a>
-                            @endif
-                        </div>
-                    </div>
-                </form>
+                @if (! $selectedPeriod)
+                    <div class="alert alert-warning"><i class="fas fa-triangle-exclamation me-1"></i> Belum ada periode akademik yang dipublikasikan.</div>
+                @else
+                    @include('base.partials.schedule-filter', [
+                        'filterRoute' => 'mahasiswa.home-jadkul-index',
+                        'filterContext' => 'kuliah Anda',
+                        'showMethodFilter' => false,
+                        'showDateFilters' => false,
+                    ])
+                @endif
 
-                <div class="table-responsive">
-                    <table class="table table-hover student-schedule-table mb-0">
-                        <thead>
-                            <tr>
-                                <th>Mata Kuliah</th>
-                                <th>Jadwal</th>
-                                <th>Dosen</th>
-                                <th>Kelas &amp; Lokasi</th>
-                                <th class="text-end">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($jadkul as $item)
-                                <tr>
-                                    <td class="student-schedule-table__course">
-                                        <span class="student-schedule-table__primary">{{ $item->matkul->name ?? 'Mata kuliah tidak tersedia' }}</span>
-                                        <small class="student-schedule-table__meta">{{ $item->matkul->code ?? $item->code }} · {{ $item->pert_id }} · {{ $item->bsks }} SKS</small>
-                                    </td>
-                                    <td class="student-schedule-table__time">
-                                        <span class="student-schedule-table__primary">{{ $item->days_id }}, {{ \Carbon\Carbon::parse($item->date)->translatedFormat('d M Y') }}</span>
-                                        <small class="student-schedule-table__meta"><i class="far fa-clock me-1"></i>{{ substr($item->start, 0, 5) }}–{{ substr($item->ended, 0, 5) }}</small>
-                                    </td>
-                                    <td><span class="student-schedule-table__primary">{{ $item->dosen->dsn_name ?? 'Belum ditentukan' }}</span></td>
-                                    <td class="student-schedule-table__place">
-                                        <span class="student-schedule-table__primary">{{ $item->kelas->code ?? $item->kelas->name ?? '—' }}</span>
-                                        <small class="student-schedule-table__meta"><i class="fas fa-location-dot me-1"></i>{{ $item->ruang->name ?? 'Tanpa ruangan' }}{{ $item->ruang?->gedung?->name ? ' · '.$item->ruang->gedung->name : '' }}</small>
-                                        <span class="badge bg-light-primary text-primary mt-2">{{ $item->meth_id }}</span>
-                                    </td>
-                                    <td>
-                                        <div class="student-schedule-actions">
-                                            <a href="{{ route('mahasiswa.home-jadkul-absen', $item->code) }}" class="btn btn-sm btn-primary"><i class="fas fa-calendar-check me-1"></i> Absensi</a>
-                                            <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#giveFeedback{{ $item->code }}" title="Berikan feedback" aria-label="Berikan feedback"><i class="fas fa-star"></i></button>
+                @if ($jadkul->isNotEmpty())
+                    <div class="student-weekly-list">
+                        @foreach ($jadkul->getCollection()->groupBy('hari') as $daySchedules)
+                            <section class="student-weekly-group">
+                                <header class="student-weekly-group__header">
+                                    <h6><i class="far fa-calendar me-2"></i>{{ $daySchedules->first()->hari_label }}</h6>
+                                    <span>{{ $daySchedules->count() }} jadwal</span>
+                                </header>
+                                @foreach ($daySchedules as $item)
+                                    <article class="student-weekly-item">
+                                        <div class="student-weekly-day" aria-label="Mulai pukul {{ substr($item->mulai, 0, 5) }}"><span>Mulai</span><strong>{{ substr($item->mulai, 0, 5) }}</strong><small>WIB</small></div>
+                                        <div>
+                                            <h6 class="student-weekly-title">{{ $item->penawaranMataKuliah?->masterMataKuliah?->name ?? 'Mata kuliah tidak tersedia' }}</h6>
+                                            <span class="student-weekly-code">{{ $item->penawaranMataKuliah?->masterMataKuliah?->code ?? $item->penawaranMataKuliah?->code ?? $item->code }}</span>
+                                            <div class="student-weekly-meta">
+                                                <span><i class="far fa-clock"></i>{{ substr($item->mulai, 0, 5) }}–{{ substr($item->selesai, 0, 5) }} WIB</span>
+                                                <span><i class="fas fa-user-tie"></i>{{ $item->dosen?->dsn_name ?? 'Dosen belum ditentukan' }}</span>
+                                                <span><i class="fas fa-users"></i>{{ $item->kelas?->name ?? $item->kelas?->code ?? 'Tanpa kelas' }}</span>
+                                                <span><i class="fas fa-location-dot"></i>{{ $item->ruang?->name ?? 'Tanpa ruangan' }}{{ $item->ruang?->gedung?->name ? ' · '.$item->ruang->gedung->name : '' }}</span>
+                                                <span><i class="fas fa-book-open"></i>{{ $item->sks ?? $item->penawaranMataKuliah?->sks ?? 0 }} SKS</span>
+                                            </div>
                                         </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="5" class="student-schedule-empty"><i class="far fa-calendar-xmark"></i>Tidak ada jadwal yang sesuai dengan pencarian.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                                        <div class="student-weekly-actions"><a href="{{ route('mahasiswa.home-jadkul-meetings', $item->code) }}" class="btn btn-primary"><i class="fas fa-calendar-check me-1"></i> {{ $item->pertemuans_count > 0 ? $item->pertemuans_count.' Pertemuan' : 'Lihat Pertemuan' }}</a></div>
+                                    </article>
+                                @endforeach
+                            </section>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="student-weekly-list">
+                        <div class="student-weekly-empty"><i class="far fa-calendar-xmark"></i><strong class="d-block mb-1">Jadwal tidak ditemukan</strong><span>Belum ada jadwal mingguan yang sesuai dengan KRS atau filter Anda.</span></div>
+                    </div>
+                @endif
+
+                @if ($jadkul->hasPages())
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4"><small class="text-muted">Menampilkan {{ $jadkul->firstItem() }}–{{ $jadkul->lastItem() }} dari {{ number_format($jadkul->total()) }} jadwal</small>{{ $jadkul->onEachSide(1)->links('pagination::bootstrap-5') }}</div>
+                @endif
             </div>
         </div>
     </section>
-
-    @foreach ($jadkul as $item)
-        <form action="{{ route('mahasiswa.jadkul.feedback-store', $item->code) }}" method="POST">
-            @csrf
-            <div class="modal fade" id="giveFeedback{{ $item->code }}" tabindex="-1" aria-labelledby="giveFeedbackLabel{{ $item->code }}" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
-                    <div class="modal-header"><div><h5 class="modal-title mb-1" id="giveFeedbackLabel{{ $item->code }}">Feedback Perkuliahan</h5><small class="text-muted">{{ $item->matkul->name ?? 'Mata kuliah' }} · {{ $item->pert_id }}</small></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
-                    <div class="modal-body">
-                        <div class="mb-3"><label for="feedback_score_{{ $item->code }}" class="form-label">Tingkat Kepuasan</label><select name="fb_score" id="feedback_score_{{ $item->code }}" class="form-select" required><option value="">Pilih tingkat kepuasan</option><option value="Tidak Puas">Tidak Puas</option><option value="Cukup Puas">Cukup Puas</option><option value="Sangat Puas">Sangat Puas</option></select><small class="text-muted">Identitas Anda tidak ditampilkan pada feedback.</small></div>
-                        <div><label for="feedback_reason_{{ $item->code }}" class="form-label">Catatan</label><textarea name="fb_reason" id="feedback_reason_{{ $item->code }}" class="form-control" rows="5" placeholder="Tuliskan pengalaman atau saran Anda..."></textarea></div>
-                    </div>
-                    <div class="modal-footer"><button type="button" class="btn btn-light-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane me-1"></i> Kirim Feedback</button></div>
-                </div></div>
-            </div>
-        </form>
-    @endforeach
 @endsection

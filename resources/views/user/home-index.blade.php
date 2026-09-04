@@ -171,7 +171,7 @@
                             </a>
                         </div>
                         <div class="col-lg-3 col-6 mb-2">
-                            <a href="{{ route('web-admin.master.jadkul-index') }}">
+                            <a href="{{ route('web-admin.master.jadwal-mingguan-index') }}">
                                 <div class="card btn btn-outline-success">
                                     <div class="card-body d-flex justify-content-around align-items-center p-1">
                                         <span class="icon" style="margin-right: 5px;"><i class="fa-solid fa-book-open-reader" style="font-size: 32px"></i></span>

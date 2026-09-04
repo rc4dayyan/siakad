@@ -402,7 +402,11 @@ class JadwalMingguanController extends Controller
                 $filters
             )
                 ->with(['penawaranMataKuliah.masterMataKuliah', 'kelas', 'dosen', 'ruang', 'pertemuans'])
-                ->orderBy('hari')->orderBy('mulai')->get(),
+                ->orderBy('hari')
+                ->orderBy('mulai')
+                ->orderBy('id')
+                ->paginate(25)
+                ->withQueryString(),
             'offerings' => $offerings,
             'preferredOffering' => $preferredOffering,
             'openCreateModal' => $request->boolean('buat') && $preferredOffering && ($period?->isWritable() ?? false),

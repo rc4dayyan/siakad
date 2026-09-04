@@ -84,14 +84,14 @@ class JadwalKuliahFilterTest extends TestCase
         ]);
     }
 
-    public function test_schedules_can_be_filtered_from_the_professional_filter_panel(): void
+    public function test_legacy_schedule_page_redirects_filters_to_weekly_schedules(): void
     {
         $period = $this->period('2026-GANJIL', true);
         $matchingClass = $this->kelas($period, 1, 'Kelas Alpha', 'PAI-A');
         $otherClass = $this->kelas($period, 2, 'Kelas Beta', 'PBA-B');
         $matchingCourse = $this->course($period, 1, 1, 'Studi Islam', 'PAI-101');
         $otherCourse = $this->course($period, 2, 2, 'Bahasa Arab', 'PBA-101');
-        $matching = $this->schedule('JAD-ALPHA', $matchingCourse, $matchingClass, 1, 1, 0, 1, '2026-09-07');
+        $this->schedule('JAD-ALPHA', $matchingCourse, $matchingClass, 1, 1, 0, 1, '2026-09-07');
         $this->schedule('JAD-BETA', $otherCourse, $otherClass, 2, 2, 1, 2, '2026-09-08');
 
         $response = $this
@@ -108,13 +108,14 @@ class JadwalKuliahFilterTest extends TestCase
                 'date_to' => '2026-09-07',
             ]));
 
-        $response->assertOk();
-        $response->assertViewHas('jadkul', fn ($schedules): bool => $schedules->modelKeys() === [$matching->id]);
-        $response->assertSee('Filter Jadwal Kuliah');
-        $response->assertSee('1 data ditemukan');
-        $response->assertSee('Lihat Absensi');
-        $response->assertSee('Edit Jadwal');
-        $response->assertSee('Hapus Jadwal');
+        $response->assertRedirect(route('web-admin.master.jadwal-mingguan-index', [
+            'q' => 'Studi Islam',
+            'pstudi_id' => 1,
+            'kelas_id' => $matchingClass,
+            'dosen_id' => 1,
+            'ruang_id' => 1,
+            'hari' => 1,
+        ]));
     }
 
     public function test_class_filter_from_another_period_is_rejected(): void

@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Dosen;
 use Alert;
 use App\Http\Controllers\Controller;
 use App\Models\FeedBack\FBPerkuliahan;
-use App\Models\JadwalKuliah;
+use App\Models\JadwalMingguan;
 use App\Models\Krs;
 use App\Models\Notification;
 use App\Models\Settings\webSettings;
@@ -24,9 +24,9 @@ class HomeController extends Controller
     {
         $lecturer = Auth::guard('dosen')->user();
         $period = $context->published();
-        $scheduleQuery = JadwalKuliah::query()
+        $scheduleQuery = JadwalMingguan::query()
             ->forAcademicPeriod($period)
-            ->forLecturer($lecturer->id);
+            ->where('dosen_id', $lecturer->id);
         $feedbackQuery = FBPerkuliahan::query()
             ->whereHas('jadkul', fn ($query) => $query
                 ->forAcademicPeriod($period)

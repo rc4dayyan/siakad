@@ -11,6 +11,7 @@ use App\Services\Academic\AcademicStatusService;
 use App\Services\Academic\KrsEligibilityService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -163,6 +164,31 @@ class AcademicStatusTest extends TestCase
         $response->assertSessionHasErrors(['alasan', 'berlaku_mulai']);
         $this->assertSame(RegistrasiMahasiswa::STATUS_AKADEMIK_AKTIF, $registration->fresh()->status_akademik);
         $this->assertDatabaseCount('riwayat_status_akademik_mahasiswas', 0);
+    }
+
+    public function test_staff_can_update_student_profile_without_changing_legacy_class_or_password(): void
+    {
+        $student = Mahasiswa::factory()->create([
+            'class_id' => 77,
+            'password' => Hash::make('password-lama'),
+        ]);
+        $originalPassword = $student->getRawOriginal('password');
+
+        $response = $this
+            ->actingAs($this->webAdmin())
+            ->patch(route('web-admin.workers.student-update', $student->mhs_code), [
+                'mhs_name' => $student->mhs_name,
+                'mhs_nim' => $student->mhs_nim,
+                'mhs_phone' => $student->getRawOriginal('mhs_phone'),
+                'mhs_mail' => $student->mhs_mail,
+                'mhs_birthplace' => $student->mhs_birthplace,
+                'mhs_birthdate' => $student->mhs_birthdate,
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $student->refresh();
+        $this->assertSame(77, (int) $student->getRawOriginal('class_id'));
+        $this->assertSame($originalPassword, $student->getRawOriginal('password'));
     }
 
     public function test_staff_without_academic_authority_cannot_change_status(): void

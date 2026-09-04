@@ -53,8 +53,8 @@
         <li class="submenu-item {{ Route::is('web-admin.master.matkul-*') ? 'active' : '' }}">
             <a href="{{ route('web-admin.master.matkul-index') }}" class="submenu-link">Mata Kuliah per Kelas</a>
         </li>
-        <li class="submenu-item {{ Route::is('web-admin.master.jadkul-*') ? 'active' : '' }}">
-            <a href="{{ route('web-admin.master.jadkul-index') }}" class="submenu-link">Jadwal Kuliah</a>
+        <li class="submenu-item {{ Route::is('web-admin.master.jadwal-mingguan-*') ? 'active' : '' }}">
+            <a href="{{ route('web-admin.master.jadwal-mingguan-index') }}" class="submenu-link">Jadwal Kuliah</a>
         </li>
         <li class="submenu-item {{ Route::is('web-admin.krs-list.*') ? 'active' : '' }}">
             <a href="{{ route('web-admin.krs-list.index') }}" class="submenu-link">List KRS</a>

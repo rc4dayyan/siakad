@@ -45,8 +45,8 @@
                 <li class="submenu-item {{ Route::is($prefix.'master.matkul-*') ? 'active' : '' }}">
                     <a href="{{ route($prefix.'master.matkul-index') }}" class="submenu-link">Mata Kuliah Periode</a>
                 </li>
-                <li class="submenu-item {{ Route::is($prefix.'master.jadkul-*') ? 'active' : '' }}">
-                    <a href="{{ route($prefix.'master.jadkul-index') }}" class="submenu-link">Jadwal Kuliah</a>
+                <li class="submenu-item {{ Route::is($prefix.'master.jadwal-mingguan-*') ? 'active' : '' }}">
+                    <a href="{{ route($prefix.'master.jadwal-mingguan-index') }}" class="submenu-link">Jadwal Kuliah</a>
                 </li>
                 <li class="submenu-item {{ Route::is($prefix.'krs-list.*') ? 'active' : '' }}">
                     <a href="{{ route($prefix.'krs-list.index') }}" class="submenu-link">List KRS</a>

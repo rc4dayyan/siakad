@@ -112,14 +112,16 @@
                 </select>
             </div>
         @endisset
-        <div class="col-xl-2 col-md-6">
-            <label for="portal_schedule_method" class="form-label">Metode</label>
-            <select name="meth_id" id="portal_schedule_method" class="form-select">
-                <option value="">Semua metode</option>
-                <option value="0" @selected(isset($filters['meth_id']) && (int) $filters['meth_id'] === 0)>Tatap Muka</option>
-                <option value="1" @selected(isset($filters['meth_id']) && (int) $filters['meth_id'] === 1)>Teleconference</option>
-            </select>
-        </div>
+        @if ($showMethodFilter ?? true)
+            <div class="col-xl-2 col-md-6">
+                <label for="portal_schedule_method" class="form-label">Metode</label>
+                <select name="meth_id" id="portal_schedule_method" class="form-select">
+                    <option value="">Semua metode</option>
+                    <option value="0" @selected(isset($filters['meth_id']) && (int) $filters['meth_id'] === 0)>Tatap Muka</option>
+                    <option value="1" @selected(isset($filters['meth_id']) && (int) $filters['meth_id'] === 1)>Teleconference</option>
+                </select>
+            </div>
+        @endif
         <div class="col-xl-2 col-md-6">
             <label for="portal_schedule_day" class="form-label">Hari</label>
             <select name="days_id" id="portal_schedule_day" class="form-select">
@@ -142,16 +144,18 @@
                 @endforeach
             </select>
         </div>
-        <div class="col-xl-2 col-md-6">
-            <label for="portal_schedule_date_from" class="form-label">Tanggal Mulai</label>
-            <input type="date" name="date_from" id="portal_schedule_date_from" class="form-control"
-                value="{{ $filters['date_from'] ?? '' }}">
-        </div>
-        <div class="col-xl-2 col-md-6">
-            <label for="portal_schedule_date_to" class="form-label">Tanggal Akhir</label>
-            <input type="date" name="date_to" id="portal_schedule_date_to" class="form-control"
-                value="{{ $filters['date_to'] ?? '' }}">
-        </div>
+        @if ($showDateFilters ?? true)
+            <div class="col-xl-2 col-md-6">
+                <label for="portal_schedule_date_from" class="form-label">Tanggal Mulai</label>
+                <input type="date" name="date_from" id="portal_schedule_date_from" class="form-control"
+                    value="{{ $filters['date_from'] ?? '' }}">
+            </div>
+            <div class="col-xl-2 col-md-6">
+                <label for="portal_schedule_date_to" class="form-label">Tanggal Akhir</label>
+                <input type="date" name="date_to" id="portal_schedule_date_to" class="form-control"
+                    value="{{ $filters['date_to'] ?? '' }}">
+            </div>
+        @endif
         <div class="col-xl-2 col-md-6">
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary flex-grow-1">

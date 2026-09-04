@@ -457,9 +457,68 @@
                         </div>
                     </form>
 
+                    <div class="border rounded p-3 mb-4">
+                        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+                            <div>
+                                <strong class="d-block">Dosen Wali Registrasi Mahasiswa</strong>
+                                <small class="text-muted">
+                                    {{ number_format($advisorSummary['registrations']) }} registrasi;
+                                    {{ number_format($advisorSummary['not_synchronized']) }} belum sesuai dengan wali dosen kelas.
+                                </small>
+                            </div>
+                            <a href="{{ route('web-admin.master.kelas-index') }}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-users-rectangle me-1"></i> Kelola Wali Dosen Kelas
+                            </a>
+                        </div>
+
+                        @if ($advisorSummary['without_class'] > 0)
+                            <div class="alert alert-warning mt-3 mb-0">
+                                Terdapat {{ number_format($advisorSummary['without_class']) }} registrasi tanpa kelas. Tentukan kelas mahasiswa sebelum sinkronisasi.
+                            </div>
+                        @elseif ($advisorSummary['registrations'] === 0)
+                            <div class="alert alert-light mt-3 mb-0">Belum ada registrasi mahasiswa pada periode ini.</div>
+                        @elseif ($academicAdvisors->isEmpty())
+                            <div class="alert alert-warning mt-3 mb-0">Belum ada dosen aktif yang dapat dipilih sebagai wali dosen.</div>
+                        @else
+                            <form method="POST" action="{{ route('web-admin.academic-preparation.academic-advisors.synchronize') }}" class="mt-3" onsubmit="return confirm('Sinkronkan dosen wali seluruh registrasi sesuai wali dosen kelas?')">
+                                @csrf
+                                <input type="hidden" name="_wizard_step" value="7">
+                                <input type="hidden" name="taka_id" value="{{ $selectedPeriodId }}">
+                                @if ($advisorSummary['classes_without_advisor'] > 0)
+                                    <div class="alert alert-warning">
+                                        Pilih wali dosen untuk {{ number_format($advisorSummary['classes_without_advisor']) }} kelas yang belum lengkap. Pilihan akan disimpan ke kelas sekaligus diterapkan pada registrasi mahasiswa.
+                                    </div>
+                                @endif
+                                <div class="row g-3 mb-3">
+                                    @foreach ($advisorClasses as $class)
+                                        <div class="col-md-6 col-xl-4">
+                                            <label for="class-advisor-{{ $class->id }}" class="form-label">{{ $class->name }}</label>
+                                            <select name="class_advisors[{{ $class->id }}]" id="class-advisor-{{ $class->id }}" class="form-select" required>
+                                                <option value="">Pilih wali dosen</option>
+                                                @foreach ($academicAdvisors as $advisor)
+                                                    <option value="{{ $advisor->id }}" @selected((int) old("class_advisors.{$class->id}", $class->dosen_id) === $advisor->id)>{{ $advisor->dsn_name }}</option>
+                                                @endforeach
+                                            </select>
+                                            @error("class_advisors.{$class->id}")<small class="text-danger">{{ $message }}</small>@enderror
+                                        </div>
+                                    @endforeach
+                                </div>
+                                @error('class_advisors')<div class="alert alert-danger">{{ $message }}</div>@enderror
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" name="confirmation" id="synchronize-advisors-confirmation" class="form-check-input" value="1" required>
+                                    <label for="synchronize-advisors-confirmation" class="form-check-label">Saya menyetujui dosen wali registrasi disamakan dengan wali dosen kelas.</label>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-rotate me-1"></i> Sinkronkan Dosen Wali
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+
                     <div class="row g-3 mb-4">
                         <div class="col-6 col-lg"><div class="border rounded p-3 h-100"><small class="text-muted d-block">Penawaran</small><strong class="fs-4">{{ number_format($scheduleSummary['offerings']) }}</strong></div></div>
                         <div class="col-6 col-lg"><div class="border rounded p-3 h-100"><small class="text-muted d-block">Sudah Terjadwal</small><strong class="fs-4 text-success">{{ number_format($scheduleSummary['scheduled_offerings']) }}</strong></div></div>
+                        <div class="col-6 col-lg"><div class="border rounded p-3 h-100"><small class="text-muted d-block">Pertemuan Terbentuk</small><strong class="fs-4 text-success">{{ number_format($scheduleSummary['meetings']) }}</strong></div></div>
                         <div class="col-6 col-lg"><div class="border rounded p-3 h-100"><small class="text-muted d-block">Belum Terjadwal</small><strong class="fs-4 text-warning">{{ number_format($scheduleSummary['unscheduled_offerings']) }}</strong></div></div>
                         <div class="col-6 col-lg"><div class="border rounded p-3 h-100"><small class="text-muted d-block">Dikecualikan</small><strong class="fs-4 text-secondary">{{ number_format($scheduleSummary['excluded_offerings']) }}</strong></div></div>
                         <div class="col-6 col-lg"><div class="border rounded p-3 h-100"><small class="text-muted d-block">Estimasi Ruang Dibutuhkan</small><strong id="schedule-required-rooms" class="fs-4 text-info">{{ number_format($scheduleSummary['estimated_rooms']) }}</strong></div></div>
@@ -556,6 +615,11 @@
                                     <label for="schedule-gap-minutes" class="form-label">Jeda Antarjadwal</label>
                                     <input type="number" name="gap_minutes" id="schedule-gap-minutes" class="form-control" value="{{ old('gap_minutes', 10) }}" min="0" max="60" required>
                                 </div>
+                                <div class="col-md-3">
+                                    <label for="schedule-meeting-count" class="form-label">Jumlah Pertemuan</label>
+                                    <input type="number" name="meeting_count" id="schedule-meeting-count" class="form-control" value="{{ old('meeting_count', 16) }}" min="1" max="20" required>
+                                    <small class="text-muted">Dibuat otomatis sekaligus ke jadwal lama.</small>
+                                </div>
                                 <div class="col-12">
                                     <div class="form-check">
                                         <input type="hidden" name="dry_run" value="0">
@@ -566,6 +630,30 @@
                             </div>
                             <button type="submit" class="btn btn-success mt-4" onclick="return confirm('Generate jadwal untuk seluruh penawaran yang belum dijadwalkan?')"><i class="fas fa-calendar-plus me-1"></i> Generate Jadwal Kuliah</button>
                         </form>
+                    @endif
+
+                    @if ($scheduleSummary['schedules'] > 0)
+                        <div class="border rounded p-3 mt-4">
+                            <h6 class="mb-1">Kompatibilitas Jadwal Lama</h6>
+                            <p class="text-muted mb-3">Buat pertemuan bertanggal dan isi otomatis <code>jadwal_kuliahs</code> dari seluruh jadwal mingguan yang sudah ada. Proses aman dijalankan ulang karena pertemuan lama akan dilewati.</p>
+                            <form method="POST" action="{{ route('web-admin.academic-preparation.meetings.generate') }}" class="row g-3 align-items-end" onsubmit="return confirm('Buat pertemuan dan sinkronkan seluruh jadwal lama?')">
+                                @csrf
+                                <input type="hidden" name="taka_id" value="{{ $selectedPeriodId }}">
+                                <div class="col-md-3">
+                                    <label for="compatibility-meeting-count" class="form-label">Jumlah Pertemuan</label>
+                                    <input type="number" name="meeting_count" id="compatibility-meeting-count" class="form-control" value="16" min="1" max="20" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        <input type="checkbox" name="confirmation" id="compatibility-confirmation" class="form-check-input" value="1" required>
+                                        <label for="compatibility-confirmation" class="form-check-label">Saya menyetujui pembuatan pertemuan dan jadwal kompatibilitas.</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 d-grid">
+                                    <button type="submit" class="btn btn-primary"><i class="fas fa-arrows-rotate me-1"></i> Sinkronkan Jadwal Lama</button>
+                                </div>
+                            </form>
+                        </div>
                     @endif
                 </div>
                 <div class="card-footer d-flex flex-wrap justify-content-between gap-2">

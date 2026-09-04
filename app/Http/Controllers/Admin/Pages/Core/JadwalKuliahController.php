@@ -29,7 +29,7 @@ class JadwalKuliahController extends Controller
 {
     use roleTrait;
 
-    public function index(Request $request, AcademicPeriodContext $context): View
+    public function index(Request $request, AcademicPeriodContext $context): RedirectResponse
     {
         $period = $context->current(auth()->user());
         $filters = $request->validate([
@@ -55,7 +55,16 @@ class JadwalKuliahController extends Controller
             'date_to.after_or_equal' => 'Tanggal akhir harus sama atau setelah tanggal awal.',
         ]);
 
-        return view('user.admin.master.admin-jadkul-index', $this->formData($context, $filters));
+        $weeklyFilters = array_filter([
+            'q' => $filters['q'] ?? null,
+            'pstudi_id' => $filters['pstudi_id'] ?? null,
+            'kelas_id' => $filters['kelas_id'] ?? null,
+            'dosen_id' => $filters['dosen_id'] ?? null,
+            'ruang_id' => $filters['ruang_id'] ?? null,
+            'hari' => $filters['days_id'] ?? null,
+        ], fn ($value) => $value !== null && $value !== '');
+
+        return redirect()->route($this->setPrefix().'master.jadwal-mingguan-index', $weeklyFilters);
     }
 
     public function create(AcademicPeriodContext $context): View
@@ -195,7 +204,9 @@ class JadwalKuliahController extends Controller
             ->when($filters['date_to'] ?? null, fn ($query, $date) => $query->whereDate('date', '<=', $date))
             ->orderBy('date')
             ->orderBy('start')
-            ->get();
+            ->orderBy('id')
+            ->paginate(25)
+            ->withQueryString();
 
         return [
             'web' => webSettings::where('id', 1)->first(),

@@ -4,17 +4,22 @@ namespace App\Http\Controllers\Admin;
 
 use App\Helper\roleTrait;
 use App\Http\Controllers\Controller;
+use App\Models\Dosen;
 use App\Models\JadwalMingguan;
+use App\Models\Kelas;
 use App\Models\Krs;
 use App\Models\Kurikulum;
 use App\Models\PenawaranMataKuliah;
+use App\Models\PertemuanKuliah;
 use App\Models\ProgramStudi;
+use App\Models\RegistrasiMahasiswa;
 use App\Models\Ruang;
 use App\Models\TahunAkademik;
 use App\Models\TahunAkademikInduk;
 use App\Services\Academic\AcademicPeriodContext;
 use App\Services\Academic\AcademicScheduleGeneratorService;
 use App\Services\Academic\AdminKrsManagementService;
+use App\Services\Academic\MeetingGeneratorService;
 use App\Services\Imports\DosenPengajarOpenFeederImportService;
 use App\Services\Imports\KelasOpenFeederImportService;
 use App\Services\Imports\KrsOpenFeederImportService;
@@ -122,6 +127,11 @@ class AcademicPreparationController extends Controller
             'total_credits' => $totalOfferingCredits,
             'schedules' => $scheduleCount,
             'scheduled_offerings' => $scheduledOfferingCount,
+            'meetings' => $selectedPeriodId
+                ? PertemuanKuliah::query()
+                    ->whereHas('jadwalMingguan', fn ($query) => $query->forAcademicPeriod($selectedPeriodId))
+                    ->count()
+                : 0,
             'unscheduled_offerings' => max(0, $requiredOfferingCount - $scheduledOfferingCount),
             'rooms' => $availableRoomCount,
             'estimated_rooms' => $defaultRequiredRooms,
@@ -131,6 +141,36 @@ class AcademicPreparationController extends Controller
                 ? Ruang::query()->whereIn('type', [0, 1])->where('kapasitas', '>=', $largestClassCapacity)->count()
                 : $availableRoomCount,
         ];
+        $advisorSummary = [
+            'registrations' => 0,
+            'without_class' => 0,
+            'without_advisor' => 0,
+            'not_synchronized' => 0,
+            'classes_without_advisor' => 0,
+        ];
+        if ($selectedPeriodId) {
+            $periodRegistrations = RegistrasiMahasiswa::query()->forAcademicPeriod($selectedPeriodId);
+            $advisorSummary = [
+                'registrations' => (clone $periodRegistrations)->count(),
+                'without_class' => (clone $periodRegistrations)->whereNull('kelas_id')->count(),
+                'without_advisor' => (clone $periodRegistrations)->whereNull('dosen_wali_id')->count(),
+                'not_synchronized' => RegistrasiMahasiswa::query()
+                    ->where('registrasi_mahasiswas.taka_id', $selectedPeriodId)
+                    ->join('kelas', 'kelas.id', '=', 'registrasi_mahasiswas.kelas_id')
+                    ->where(fn ($query) => $query
+                        ->whereNull('registrasi_mahasiswas.dosen_wali_id')
+                        ->orWhereColumn('registrasi_mahasiswas.dosen_wali_id', '!=', 'kelas.dosen_id'))
+                    ->count(),
+                'classes_without_advisor' => Kelas::query()
+                    ->forAcademicPeriod($selectedPeriodId)
+                    ->whereNull('dosen_id')
+                    ->count(),
+            ];
+        }
+        $advisorClasses = $selectedPeriodId
+            ? Kelas::query()->forAcademicPeriod($selectedPeriodId)->with('dosen')->orderBy('name')->get()
+            : collect();
+        $academicAdvisors = Dosen::query()->where('dsn_stat', 1)->orderBy('dsn_name')->get();
 
         return view('user.admin.academic-preparation-wizard', [
             'academicYears' => $academicYears,
@@ -143,6 +183,9 @@ class AcademicPreparationController extends Controller
             'curricula' => Kurikulum::query()->orderByDesc('year_start')->orderBy('name')->get(),
             'programs' => ProgramStudi::query()->orderBy('name')->get(),
             'krsSummary' => $krsSummary,
+            'advisorSummary' => $advisorSummary,
+            'advisorClasses' => $advisorClasses,
+            'academicAdvisors' => $academicAdvisors,
             'scheduleSummary' => $scheduleSummary,
             'scheduleOfferings' => $scheduleOfferings,
         ]);
@@ -435,7 +478,8 @@ class AcademicPreparationController extends Controller
 
     public function generateSchedules(
         Request $request,
-        AcademicScheduleGeneratorService $generator
+        AcademicScheduleGeneratorService $generator,
+        MeetingGeneratorService $meetingGenerator
     ): RedirectResponse {
         $validated = $request->validate([
             'taka_id' => ['required', 'integer', Rule::exists('tahun_akademiks', 'id')],
@@ -445,6 +489,7 @@ class AcademicPreparationController extends Controller
             'day_ends_at' => ['required', 'date_format:H:i', 'after:day_starts_at'],
             'minutes_per_credit' => ['required', 'integer', 'between:30,60'],
             'gap_minutes' => ['required', 'integer', 'between:0,60'],
+            'meeting_count' => ['required', 'integer', 'between:1,20'],
             'dry_run' => ['nullable', 'boolean'],
             'excluded_offering_ids' => ['nullable', 'array'],
             'excluded_offering_ids.*' => [
@@ -463,6 +508,7 @@ class AcademicPreparationController extends Controller
             'day_ends_at.after' => 'Jam selesai operasional harus setelah jam mulai.',
             'minutes_per_credit.between' => 'Durasi per SKS harus antara 30 sampai 60 menit.',
             'gap_minutes.between' => 'Jeda antarjadwal harus antara 0 sampai 60 menit.',
+            'meeting_count.between' => 'Jumlah pertemuan harus antara 1 sampai 20.',
         ]);
 
         $period = TahunAkademik::findOrFail($validated['taka_id']);
@@ -471,37 +517,187 @@ class AcademicPreparationController extends Controller
                 'taka_id' => 'Jadwal pada periode yang ditutup atau diarsipkan tidak dapat dibuat.',
             ]);
         }
-
-        $configurableOfferings = PenawaranMataKuliah::query()
-            ->forAcademicPeriod($period)
-            ->whereDoesntHave('jadwalMingguans');
-        (clone $configurableOfferings)->update(['wajib_dijadwalkan' => true]);
-        $excludedOfferingIds = array_map('intval', $validated['excluded_offering_ids'] ?? []);
-        if ($excludedOfferingIds !== []) {
-            (clone $configurableOfferings)
-                ->whereIn('id', $excludedOfferingIds)
-                ->update(['wajib_dijadwalkan' => false]);
+        if (! $period->starts_at || ! $period->ends_at) {
+            throw ValidationException::withMessages([
+                'taka_id' => 'Tanggal mulai dan selesai periode wajib dilengkapi sebelum membuat pertemuan.',
+            ]);
         }
 
-        $result = $generator->generate(
-            $period,
-            array_map('intval', $validated['days']),
-            $validated['day_starts_at'],
-            $validated['day_ends_at'],
-            $validated['minutes_per_credit'],
-            $validated['gap_minutes'],
-            $request->boolean('dry_run')
-        );
+        $excludedOfferingIds = array_map('intval', $validated['excluded_offering_ids'] ?? []);
+        $dryRun = $request->boolean('dry_run');
+        DB::beginTransaction();
+        try {
+            $configurableOfferings = PenawaranMataKuliah::query()
+                ->forAcademicPeriod($period)
+                ->whereDoesntHave('jadwalMingguans');
+            (clone $configurableOfferings)->update(['wajib_dijadwalkan' => true]);
+            if ($excludedOfferingIds !== []) {
+                (clone $configurableOfferings)
+                    ->whereIn('id', $excludedOfferingIds)
+                    ->update(['wajib_dijadwalkan' => false]);
+            }
+
+            $result = $generator->generate(
+                $period,
+                array_map('intval', $validated['days']),
+                $validated['day_starts_at'],
+                $validated['day_ends_at'],
+                $validated['minutes_per_credit'],
+                $validated['gap_minutes'],
+                $dryRun
+            );
+            $meetingResult = $dryRun
+                ? ['created' => 0, 'skipped' => 0, 'schedules' => 0]
+                : $this->generateCompatibleMeetings($period, $validated['meeting_count'], $meetingGenerator);
+
+            $dryRun ? DB::rollBack() : DB::commit();
+        } catch (\Throwable $exception) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
+            throw $exception;
+        }
         session()->put(AcademicPeriodContext::SESSION_KEY, $period->id);
 
-        $message = $request->boolean('dry_run')
-            ? "Validasi berhasil: {$result['created']} jadwal dapat dibuat, {$result['skipped']} sudah terjadwal, dan ".count($excludedOfferingIds).' penawaran dikecualikan.'
-            : "Generator selesai: {$result['created']} jadwal dibuat, {$result['skipped']} sudah terjadwal, dan ".count($excludedOfferingIds).' penawaran dikecualikan.';
+        $message = $dryRun
+            ? "Validasi berhasil: {$result['created']} jadwal dapat dibuat, {$result['skipped']} sudah terjadwal, dan ".count($excludedOfferingIds).' penawaran dikecualikan. Pertemuan akan dibuat setelah jadwal disimpan.'
+            : "Generator selesai: {$result['created']} jadwal dibuat; {$meetingResult['created']} pertemuan dan jadwal kompatibilitas dibuat, {$meetingResult['skipped']} pertemuan lama dilewati.";
 
         return redirect()
             ->route('web-admin.academic-preparation.index', ['step' => 7, 'taka_id' => $period->id])
             ->with('status', $message)
-            ->with('schedules_generated', ! $request->boolean('dry_run'));
+            ->with('schedules_generated', ! $dryRun);
+    }
+
+    public function generateScheduleMeetings(Request $request, MeetingGeneratorService $generator): RedirectResponse
+    {
+        $validated = $request->validate([
+            'taka_id' => ['required', 'integer', Rule::exists('tahun_akademiks', 'id')],
+            'meeting_count' => ['required', 'integer', 'between:1,20'],
+            'confirmation' => ['accepted'],
+        ], [
+            'meeting_count.between' => 'Jumlah pertemuan harus antara 1 sampai 20.',
+            'confirmation.accepted' => 'Konfirmasi pembuatan pertemuan wajib dicentang.',
+        ]);
+        $period = TahunAkademik::findOrFail($validated['taka_id']);
+        if (! $period->isWritable()) {
+            throw ValidationException::withMessages([
+                'taka_id' => 'Pertemuan pada periode yang ditutup atau diarsipkan tidak dapat dibuat.',
+            ]);
+        }
+        if (! $period->starts_at || ! $period->ends_at) {
+            throw ValidationException::withMessages([
+                'taka_id' => 'Tanggal mulai dan selesai periode wajib dilengkapi sebelum membuat pertemuan.',
+            ]);
+        }
+
+        $result = DB::transaction(fn () => $this->generateCompatibleMeetings(
+            $period,
+            $validated['meeting_count'],
+            $generator
+        ));
+
+        return redirect()
+            ->route('web-admin.academic-preparation.index', ['step' => 7, 'taka_id' => $period->id])
+            ->with('status', "Sinkronisasi selesai: {$result['created']} pertemuan dan jadwal lama dibuat untuk {$result['schedules']} jadwal mingguan; {$result['skipped']} pertemuan yang sudah ada dilewati.");
+    }
+
+    public function synchronizeAcademicAdvisors(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'taka_id' => ['required', 'integer', Rule::exists('tahun_akademiks', 'id')],
+            'confirmation' => ['accepted'],
+            'class_advisors' => ['required', 'array', 'min:1'],
+            'class_advisors.*' => [
+                'required',
+                'integer',
+                Rule::exists('dosens', 'id')->where('dsn_stat', 1),
+            ],
+        ], [
+            'taka_id.required' => 'Periode akademik wajib dipilih.',
+            'taka_id.exists' => 'Periode akademik yang dipilih tidak tersedia.',
+            'confirmation.accepted' => 'Konfirmasi sinkronisasi dosen wali wajib dicentang.',
+            'class_advisors.required' => 'Wali dosen setiap kelas wajib dipilih.',
+            'class_advisors.*.required' => 'Wali dosen setiap kelas wajib dipilih.',
+            'class_advisors.*.exists' => 'Dosen wali yang dipilih harus berstatus aktif.',
+        ]);
+
+        $period = TahunAkademik::findOrFail($validated['taka_id']);
+        if (! $period->isWritable()) {
+            throw ValidationException::withMessages([
+                'taka_id' => 'Dosen wali pada periode yang ditutup atau diarsipkan tidak dapat disinkronkan.',
+            ]);
+        }
+
+        $registrations = RegistrasiMahasiswa::query()->forAcademicPeriod($period)->get();
+        $registrationsWithoutClass = $registrations->whereNull('kelas_id')->count();
+        if ($registrationsWithoutClass > 0) {
+            throw ValidationException::withMessages([
+                'taka_id' => "Terdapat {$registrationsWithoutClass} registrasi yang belum memiliki kelas. Tentukan kelas terlebih dahulu.",
+            ]);
+        }
+
+        $classIds = $registrations->pluck('kelas_id')->filter()->unique();
+        $classes = Kelas::query()
+            ->forAcademicPeriod($period)
+            ->get()
+            ->keyBy('id');
+        $invalidClassIds = $classIds->diff($classes->keys());
+        if ($invalidClassIds->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'taka_id' => 'Terdapat registrasi dengan kelas yang bukan bagian dari periode akademik ini.',
+            ]);
+        }
+
+        $advisorAssignments = collect($validated['class_advisors'])
+            ->mapWithKeys(fn ($advisorId, $classId) => [(int) $classId => (int) $advisorId]);
+        if ($advisorAssignments->keys()->diff($classes->keys())->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'class_advisors' => 'Terdapat kelas yang bukan bagian dari periode akademik ini.',
+            ]);
+        }
+        $missingClassAssignments = $classes->keys()->diff($advisorAssignments->keys());
+        if ($missingClassAssignments->isNotEmpty()) {
+            $classNames = $classes
+                ->filter(fn (Kelas $class) => $missingClassAssignments->contains($class->id))
+                ->pluck('name')
+                ->take(5)
+                ->implode(', ');
+
+            throw ValidationException::withMessages([
+                'class_advisors' => "Wali dosen belum dipilih untuk kelas {$classNames}.",
+            ]);
+        }
+
+        [$updatedClasses, $updatedRegistrations] = DB::transaction(function () use ($advisorAssignments, $classes, $period): array {
+            $updatedClasses = 0;
+            $updatedRegistrations = 0;
+
+            foreach ($classes as $class) {
+                $advisorId = $advisorAssignments->get($class->id);
+                if ((int) $class->dosen_id !== $advisorId) {
+                    $class->update(['dosen_id' => $advisorId]);
+                    $updatedClasses++;
+                }
+
+                $updatedRegistrations += RegistrasiMahasiswa::query()
+                    ->forAcademicPeriod($period)
+                    ->where('kelas_id', $class->id)
+                    ->where(fn ($query) => $query
+                        ->whereNull('dosen_wali_id')
+                        ->orWhere('dosen_wali_id', '!=', $advisorId))
+                    ->update(['dosen_wali_id' => $advisorId]);
+            }
+
+            return [$updatedClasses, $updatedRegistrations];
+        });
+        session()->put(AcademicPeriodContext::SESSION_KEY, $period->id);
+
+        return redirect()
+            ->route('web-admin.academic-preparation.index', ['step' => 7, 'taka_id' => $period->id])
+            ->with('status', "Sinkronisasi selesai: wali dosen {$updatedClasses} kelas dan {$updatedRegistrations} registrasi mahasiswa diperbarui.")
+            ->with('academic_advisors_synchronized', true);
     }
 
     private function legacySemesterValue(string $term): int
@@ -511,5 +707,33 @@ class AcademicPreparationController extends Controller
             TahunAkademik::TERM_GENAP => 2,
             TahunAkademik::TERM_PENDEK => 0,
         };
+    }
+
+    private function generateCompatibleMeetings(
+        TahunAkademik $period,
+        int $meetingCount,
+        MeetingGeneratorService $generator
+    ): array {
+        $result = ['created' => 0, 'skipped' => 0, 'schedules' => 0];
+        $schedules = JadwalMingguan::query()
+            ->forAcademicPeriod($period)
+            ->whereHas('penawaranMataKuliah', fn ($query) => $query->where('wajib_dijadwalkan', true))
+            ->with(['penawaranMataKuliah.masterMataKuliah'])
+            ->orderBy('id')
+            ->get();
+
+        foreach ($schedules as $schedule) {
+            $generated = $generator->generate(
+                $schedule,
+                $period->starts_at->toDateString(),
+                $period->ends_at->toDateString(),
+                $meetingCount
+            );
+            $result['created'] += $generated['created'];
+            $result['skipped'] += $generated['skipped'];
+            $result['schedules']++;
+        }
+
+        return $result;
     }
 }

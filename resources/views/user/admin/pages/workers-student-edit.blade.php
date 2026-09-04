@@ -32,24 +32,16 @@ Halaman untuk mengedit data pengguna {{ $student->mhs_name }}
                     </div>
                 </div>
                 <div class="card-body">
-                    <form action="{{ route('mahasiswa.home-profile-save-image') }}" method="POST" enctype="multipart/form-data">
-                        @csrf
-                        @method('PATCH')
-
-                        <img src="{{ asset('storage/images/' . $student->mhs_image) }}" class="card-img-top" alt="">
-                        <hr>
-                        <div class="form-group">
-                            <label for="mhs_image">Upload Foto Profile</label>
-                            <div class="d-flex justify-content-between align-items-center">
-
-                                <input type="file" class="form-control" name="mhs_image" id="mhs_image">
-                                @error('mhs_image')
-                                <small class="text-danger">{{ $message }}</small>
-                                @enderror
-                                <button type="submit" class="btn btn-outline-primary" style="margin-left: 10px"><i class="fa-solid fa-paper-plane"></i></button>
-                            </div>
-                        </div>
-                    </form>
+                    <img src="{{ asset('storage/images/' . $student->mhs_image) }}" class="card-img-top" alt="Foto profil {{ $student->mhs_name }}">
+                    <hr>
+                    <div class="form-group">
+                        <label for="mhs_image">Upload Foto Profil</label>
+                        <input type="file" class="form-control @error('mhs_image') is-invalid @enderror" name="mhs_image" id="mhs_image" accept=".jpg,.jpeg,.png,.gif">
+                        @error('mhs_image')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                        <small class="text-muted">Foto akan disimpan saat tombol simpan di bagian atas ditekan.</small>
+                    </div>
                 </div>
             </div>
         </div>

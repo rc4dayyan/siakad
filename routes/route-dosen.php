@@ -20,6 +20,9 @@ Route::group(['prefix' => 'dosen', 'middleware' => ['dsn-access:Dosen Aktif'], '
     // PRIVATE FUNCTION => DATA AKADEMIK - JADWAL MENGAJAR
     Route::get('/data-akademik/jadwal', [App\Http\Controllers\Dosen\Akademik\JadwalAjarController::class, 'index'])->name('akademik.jadwal-index');
     Route::get('/data-akademik/jadwal/download-mingguan', [App\Http\Controllers\Dosen\Akademik\JadwalAjarController::class, 'downloadWeeklySchedule'])->name('akademik.jadwal-weekly-download');
+    Route::get('/data-akademik/jadwal/{scheduleCode}/pertemuan', [App\Http\Controllers\Dosen\Akademik\JadwalAjarController::class, 'meetings'])->name('akademik.jadwal-meetings');
+    Route::get('/data-akademik/jadwal/{scheduleCode}/pertemuan/{meetingCode}/presensi', [App\Http\Controllers\Dosen\Akademik\JadwalAjarController::class, 'meetingAttendance'])->name('akademik.jadwal-meeting-attendance');
+    Route::patch('/data-akademik/jadwal/{scheduleCode}/pertemuan/{meetingCode}/presensi', [App\Http\Controllers\Dosen\Akademik\JadwalAjarController::class, 'updateMeetingAttendance'])->name('akademik.jadwal-meeting-attendance-update');
     Route::get('/data-akademik/jadwal/{code}/absen', [App\Http\Controllers\Dosen\Akademik\JadwalAjarController::class, 'viewAbsen'])->name('akademik.jadwal-view-absen');
     Route::get('/data-akademik/jadwal/{code}/feedback', [App\Http\Controllers\Dosen\Akademik\JadwalAjarController::class, 'viewFeedBack'])->name('akademik.jadwal-view-feedback');
     Route::patch('/data-akademik/jadwal/absen/{code}/update', [App\Http\Controllers\Dosen\Akademik\JadwalAjarController::class, 'updateAbsen'])->name('akademik.jadwal-absen-update');

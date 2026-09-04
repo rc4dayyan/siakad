@@ -855,29 +855,27 @@ class WorkersController extends Controller
 
     public function updateStudent(Request $request, $code)
     {
-        $user = Mahasiswa::where('mhs_code', $code)->first();
+        $user = Mahasiswa::where('mhs_code', $code)->firstOrFail();
 
         $request->validate([
-            'mhs_image' => 'image|mimes:jpeg,png,jpg,gif,svg|max:8196',
+            'mhs_image' => 'image|mimes:jpeg,png,jpg,gif|max:8196',
             'mhs_name' => 'required|string|max:255',
-            'mhs_user' => 'string|max:255|unique:users,user,'.$user->id,
+            'mhs_nim' => 'required|string|max:255|unique:mahasiswas,mhs_nim,'.$user->id,
             'mhs_birthplace' => 'nullable|string|max:255', // New field
             'mhs_birthdate' => 'nullable|date', // New field
-            'mhs_gend' => 'nullable|string',
-            'mhs_phone' => 'required|numeric|unique:users,phone,'.$user->id,
-            'mhs_mail' => 'required|email|max:255|unique:users,email,'.$user->id,
-            'mhs_stat' => 'nullable|string',
-            'password' => 'nullable|string',
-            'password_confirm' => 'nullable|string|same:password',
+            'mhs_gend' => 'nullable|in:L,P',
+            'mhs_phone' => 'required|numeric|unique:mahasiswas,mhs_phone,'.$user->id,
+            'mhs_mail' => 'required|email|max:255|unique:mahasiswas,mhs_mail,'.$user->id,
+            'mhs_stat' => 'nullable|integer|between:0,3',
+            'password' => 'nullable|string|min:8',
+            'password_confirmed' => 'nullable|string|same:password',
         ]);
 
-        $user->class_id = $request->class_id;
         $user->mhs_name = $request->mhs_name;
         // $user->mhs_user = $request->mhs_user;
         $user->mhs_nim = $request->mhs_nim;
         $user->mhs_gend = $request->mhs_gend;
         $user->mhs_birthplace = $request->mhs_birthplace;
-        $user->mhs_birthdate = $request->mhs_birthdate;
         $user->mhs_birthdate = $request->mhs_birthdate;
         $user->mhs_reli = $request->mhs_reli;
         $user->mhs_phone = $request->mhs_phone;
@@ -895,13 +893,17 @@ class WorkersController extends Controller
         $user->mhs_addr_provinsi = $request->mhs_addr_provinsi;
         $user->mhs_stat = $request->mhs_stat;
 
-        $user->password = Hash::make($request->password);
+        if ($request->filled('password')) {
+            $user->password = Hash::make($request->password);
+        }
+
         $user->save();
         if ($request->hasFile('mhs_image')) {
             $image = $request->file('mhs_image');
-            $name = 'profile-'.$user->mhs_code.'-'.uniqid().'.'.$image->getClientOriginalExtension();
-            $destinationPath = storage_path('app/public/images/profile/dosen');
+            $name = 'profile-'.$user->mhs_code.'-'.uniqid().'.png';
+            $destinationPath = storage_path('app/public/images/profile/mahasiswa');
             $destinationPaths = storage_path('app/public/images');
+            File::ensureDirectoryExists($destinationPath);
 
             // Compress image
             $manager = new ImageManager(new Driver);
@@ -913,7 +915,7 @@ class WorkersController extends Controller
             if ($user->mhs_image != 'default/default-profile.jpg') {
                 File::delete($destinationPaths.'/'.$user->mhs_image); // hapus gambar lama
             }
-            $user->mhs_image = 'profile/dosen/'.$name;
+            $user->mhs_image = 'profile/mahasiswa/'.$name;
             $user->save();
 
             Alert::success('Success', 'Data berhasil diupdate');

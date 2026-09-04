@@ -23,6 +23,7 @@ class AbsensiMahasiswa extends Model
             'H' => 'Hadir',
             'S' => 'Sakit',
             'I' => 'Izin',
+            'A' => 'Alpa',
         ];
 
         return isset($absentypes[$value]) ? $absentypes[$value] : 'Unknown';
@@ -30,7 +31,7 @@ class AbsensiMahasiswa extends Model
 
     public function getRawAbsenTypeAttribute()
     {
-        return $this->attributes['dsn_stat'];
+        return $this->attributes['absen_type'];
     }
 
     public function mahasiswa()

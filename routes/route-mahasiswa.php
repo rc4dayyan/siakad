@@ -15,12 +15,14 @@ Route::group(['prefix' => 'mahasiswa', 'middleware' => ['mhs-access:Mahasiswa Ak
     Route::get('/jadwal-kuliah', [App\Http\Controllers\Mahasiswa\HomeController::class, 'jadkulIndex'])->name('home-jadkul-index');
     Route::get('/jadwal-kuliah/cetak', [App\Http\Controllers\Mahasiswa\HomeController::class, 'jadkulPrint'])->name('home-jadkul-print');
     Route::get('/jadwal-kuliah/cetak-mingguan', [App\Http\Controllers\Mahasiswa\HomeController::class, 'jadkulWeeklyPrint'])->name('home-jadkul-weekly-print');
+    Route::get('/jadwal-kuliah/{scheduleCode}/pertemuan', [App\Http\Controllers\Mahasiswa\HomeController::class, 'jadkulMeetings'])->name('home-jadkul-meetings');
     Route::get('/tagihan/view/{code}', [App\Http\Controllers\Mahasiswa\HomeController::class, 'tagihanView'])->name('home-tagihan-view');
     Route::post('/tagihan/view/{code}/payment', [App\Http\Controllers\Mahasiswa\HomeController::class, 'tagihanPayment'])->name('home-tagihan-payment');
     Route::get('/tagihan/pembayaran/{payment}/bukti', [App\Http\Controllers\Mahasiswa\HomeController::class, 'paymentProof'])->name('home-tagihan-payment-proof');
     Route::get('/tagihan/view/{code}/payment/success', [App\Http\Controllers\Mahasiswa\HomeController::class, 'tagihanSuccess'])->name('home-tagihan-payment-success');
     Route::get('/jadwal-kuliah/{code}/absen', [App\Http\Controllers\Mahasiswa\HomeController::class, 'jadkulAbsen'])->name('home-jadkul-absen');
     Route::post('/jadwal-kuliah/store/absen', [App\Http\Controllers\Mahasiswa\HomeController::class, 'jadkulAbsenStore'])->name('home-jadkul-absen-store');
+    Route::get('/jadwal-kuliah/{code}/feedback', [App\Http\Controllers\Mahasiswa\HomeController::class, 'feedbackForm'])->name('jadkul.feedback-create');
     Route::post('/jadwal-kuliah/store/{code}/feedback', [App\Http\Controllers\Mahasiswa\HomeController::class, 'storeFBPerkuliahan'])->name('jadkul.feedback-store');
 
     // PRIVATE FUNCTION => PROFILE

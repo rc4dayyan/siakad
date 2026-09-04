@@ -14,6 +14,9 @@ use App\Models\studentTask;
 use App\Services\Academic\AcademicPeriodContext;
 use App\Services\Academic\StudentAcademicContext;
 use Auth;
+use Carbon\Carbon;
+use HTMLPurifier;
+use HTMLPurifier_Config;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Str;
@@ -40,8 +43,16 @@ class StudentTaskController extends Controller
         $user = Auth::guard('mahasiswa')->user();
         $data['stask'] = $this->taskForStudent($code, $user, $periodContext, $studentContext);
         $data['web'] = webSettings::where('id', 1)->first();
-        $score = studentScore::where('stask_id', $data['stask']->id)->where('student_id', Auth::guard('mahasiswa')->user()->id)->get();
-        if ($score->count() == 1) {
+        $deadline = Carbon::parse($data['stask']->exp_date.' '.$data['stask']->exp_time)->locale('id');
+        $purifierConfig = HTMLPurifier_Config::createDefault();
+        $data['deadline'] = $deadline;
+        $data['isOverdue'] = $deadline->isPast();
+        $data['safeTaskDescription'] = (new HTMLPurifier($purifierConfig))->purify($data['stask']->detail_task);
+        $hasSubmitted = studentScore::where('stask_id', $data['stask']->id)
+            ->where('student_id', $user->id)
+            ->exists();
+
+        if ($hasSubmitted) {
             Alert::error('Error', 'Kamu sudah mengumpulkan tugas ini.');
 
             return back();
@@ -58,7 +69,7 @@ class StudentTaskController extends Controller
         StudentAcademicContext $studentContext
     ) {
         $request->validate([
-            'desc' => 'required',
+            'desc' => 'required|string|max:10000',
             'file_1' => 'required|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,gif|max:20480',
             'file_2' => 'file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,gif|max:20480',
             'file_3' => 'file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,gif|max:20480',
@@ -69,6 +80,7 @@ class StudentTaskController extends Controller
             'file_8' => 'file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,gif|max:20480',
         ], [
             'desc.required' => 'Deskripsi Jawaban tugas harus diisi.',
+            'desc.max' => 'Deskripsi jawaban maksimal 10.000 karakter.',
             'file_1.required' => 'File 1 harus diunggah.',
             'file_1.mimes' => 'File 1 harus berupa file dokumen PDF, Word, Excel, atau gambar.',
             'file_1.max' => 'File 1 tidak boleh lebih dari 20 MB.',
@@ -137,6 +149,7 @@ class StudentTaskController extends Controller
             ->when($classId, fn ($query) => $query->whereHas('jadkul', fn ($schedule) => $schedule->where('kelas_id', $classId)))
             ->when(! $classId, fn ($query) => $query->whereRaw('1 = 0'))
             ->where('code', $code)
+            ->with(['jadkul.matkul', 'jadkul.kelas', 'dosen'])
             ->firstOrFail();
     }
 }

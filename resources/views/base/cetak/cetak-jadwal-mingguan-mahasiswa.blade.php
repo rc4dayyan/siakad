@@ -47,6 +47,11 @@
         td strong { display: block; color: var(--navy); font-size: 9px; line-height: 1.3; }
         td small { display: block; margin-top: 3px; color: var(--muted); font-size: 7.5px; line-height: 1.3; }
         .day { display: inline-block; min-width: 58px; margin-bottom: 4px; padding: 4px 7px; border-radius: 5px; color: #0b5f51; background: var(--green-soft); font-size: 7px; font-weight: 800; text-align: center; text-transform: uppercase; }
+        .day-group { margin-top: 13px; }
+        .day-group:first-of-type { margin-top: 0; }
+        .day-group__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 8px 11px; border-left: 4px solid var(--green); border-radius: 6px; color: var(--navy); background: var(--green-soft); break-after: avoid; page-break-after: avoid; }
+        .day-group__header h3 { margin: 0; font-size: 11px; text-transform: uppercase; }
+        .day-group__header span { color: #49665f; font-size: 7px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
         .empty { padding: 32px; color: var(--muted); text-align: center; }
         .note { margin-top: 12px; padding: 9px 11px; border-radius: 7px; color: var(--muted); background: #f4f8f7; font-size: 8px; line-height: 1.4; }
         .footer { display: flex; justify-content: space-between; margin-top: 13px; padding-top: 7px; border-top: 1px solid var(--line); color: #84928d; font-size: 7px; }
@@ -75,23 +80,32 @@
             <div class="identity__item"><small>Kelas · Jumlah Jadwal</small><strong>{{ $academicClass?->name ?? '—' }} · {{ number_format($schedules->count()) }} jadwal</strong></div>
         </section>
 
-        <table>
-            <thead><tr><th class="number">No.</th><th class="time">Hari &amp; Waktu</th><th class="course">Mata Kuliah</th><th class="lecturer">Nama Dosen</th><th>Kelas &amp; Lokasi</th><th class="credits">SKS</th></tr></thead>
-            <tbody>
-                @forelse ($schedules as $schedule)
-                    <tr>
-                        <td class="number">{{ $loop->iteration }}</td>
-                        <td class="time"><span class="day">{{ $schedule->hari_label }}</span><strong>{{ substr($schedule->mulai, 0, 5) }}–{{ substr($schedule->selesai, 0, 5) }} WIB</strong></td>
-                        <td class="course"><strong>{{ $schedule->penawaranMataKuliah?->masterMataKuliah?->name ?? 'Mata kuliah tidak tersedia' }}</strong><small>{{ $schedule->penawaranMataKuliah?->masterMataKuliah?->code ?? $schedule->penawaranMataKuliah?->code ?? $schedule->code }}</small></td>
-                        <td class="lecturer"><strong>{{ $schedule->dosen?->dsn_name ?? 'Belum ditentukan' }}</strong></td>
-                        <td><strong>{{ $schedule->kelas?->name ?? 'Tanpa kelas' }}</strong><small>{{ $schedule->ruang?->name ?? 'Tanpa ruangan' }}{{ $schedule->ruang?->gedung?->name ? ' · '.$schedule->ruang->gedung->name : '' }}</small></td>
-                        <td class="credits"><strong>{{ $schedule->penawaranMataKuliah?->sks ?? 0 }}</strong></td>
-                    </tr>
-                @empty
-                    <tr><td colspan="6" class="empty">Belum ada jadwal mingguan dari KRS yang telah disetujui.</td></tr>
-                @endforelse
-            </tbody>
-        </table>
+        @php $scheduleGroups = $schedules->groupBy('hari'); @endphp
+        @forelse ($scheduleGroups as $day => $daySchedules)
+            <section class="day-group">
+                <header class="day-group__header">
+                    <h3>{{ $daySchedules->first()->hari_label }}</h3>
+                    <span>{{ $daySchedules->count() }} mata kuliah</span>
+                </header>
+                <table>
+                    <thead><tr><th class="number">No.</th><th class="time">Waktu</th><th class="course">Mata Kuliah</th><th class="lecturer">Nama Dosen</th><th>Kelas &amp; Lokasi</th><th class="credits">SKS</th></tr></thead>
+                    <tbody>
+                        @foreach ($daySchedules as $schedule)
+                            <tr>
+                                <td class="number">{{ $loop->iteration }}</td>
+                                <td class="time"><strong>{{ substr($schedule->mulai, 0, 5) }}–{{ substr($schedule->selesai, 0, 5) }} WIB</strong></td>
+                                <td class="course"><strong>{{ $schedule->penawaranMataKuliah?->masterMataKuliah?->name ?? 'Mata kuliah tidak tersedia' }}</strong><small>{{ $schedule->penawaranMataKuliah?->masterMataKuliah?->code ?? $schedule->penawaranMataKuliah?->code ?? $schedule->code }}</small></td>
+                                <td class="lecturer"><strong>{{ $schedule->dosen?->dsn_name ?? 'Belum ditentukan' }}</strong></td>
+                                <td><strong>{{ $schedule->kelas?->name ?? 'Tanpa kelas' }}</strong><small>{{ $schedule->ruang?->name ?? 'Tanpa ruangan' }}{{ $schedule->ruang?->gedung?->name ? ' · '.$schedule->ruang->gedung->name : '' }}</small></td>
+                                <td class="credits"><strong>{{ $schedule->penawaranMataKuliah?->sks ?? 0 }}</strong></td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </section>
+        @empty
+            <div class="empty">Belum ada jadwal mingguan dari KRS yang telah disetujui.</div>
+        @endforelse
 
         <div class="note"><strong>Keterangan:</strong> Jadwal mingguan ini merupakan pola rutin. Tanggal pertemuan, perubahan jadwal, dan hari libur tetap mengikuti informasi terbaru pada SIAKAD.</div>
         <footer class="footer"><span>{{ strip_tags($web?->school_name ?? config('app.name')) }} · Sistem Informasi Akademik</span><span>Dicetak {{ $printedAt->locale('id')->translatedFormat('d F Y, H:i') }} WIB</span></footer>

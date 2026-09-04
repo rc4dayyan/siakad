@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\AbsensiMahasiswa;
 use App\Models\Dosen;
+use App\Models\FeedBack\FBPerkuliahan;
 use App\Models\JadwalKuliah;
 use App\Models\JadwalMingguan;
 use App\Models\KalenderAkademik;
@@ -53,6 +55,7 @@ class KrsWorkflowTest extends TestCase
             '2024_04_30_032644_create_mata_kuliahs_table.php',
             '2024_04_30_055648_create_jadwal_kuliahs_table.php',
             '2024_04_30_102751_create_absensi_mahasiswas_table.php',
+            '2024_06_09_053130_create_f_b_perkuliahans_table.php',
             '2024_05_30_004205_create_notifications_table.php',
             '2024_06_16_033935_create_hasil_studis_table.php',
             '2024_06_26_050556_create_web_settings_table.php',
@@ -80,6 +83,7 @@ class KrsWorkflowTest extends TestCase
         (require database_path('migrations/2026_08_18_000001_normalize_grades_by_course_offering.php'))->up();
         (require database_path('migrations/2026_09_03_000001_add_sks_to_jadwal_mingguans_table.php'))->up();
         (require database_path('migrations/2026_09_03_000002_add_schedule_requirement_to_course_offerings.php'))->up();
+        (require database_path('migrations/2026_09_04_000001_add_structured_answers_to_feedback_perkuliahans.php'))->up();
     }
 
     public function test_migration_prevents_duplicate_course_offering_combination(): void
@@ -347,19 +351,45 @@ class KrsWorkflowTest extends TestCase
             'ruang_id' => $secondRoom, 'pert_id' => 2, 'meth_id' => 1, 'days_id' => 2, 'bsks' => 3,
             'date' => '2026-08-18', 'start' => '10:00', 'ended' => '12:00', 'code' => 'JAD-FILTER-B',
         ]);
-
+        $weeklyAttributes = [
+            'penawaran_mata_kuliah_id' => $offering->id,
+            'kelas_id' => $data['classId'],
+            'dosen_id' => $data['advisor']->id,
+            'ruang_id' => $firstRoom,
+            'hari' => 1,
+            'mulai' => '08:00',
+            'selesai' => '10:00',
+            'sks' => 3,
+        ];
+        $weeklySchedule = JadwalMingguan::create([
+            ...$weeklyAttributes,
+            'code' => 'WEEKLY-FILTER-A',
+            'fingerprint' => JadwalMingguan::fingerprint($weeklyAttributes),
+        ]);
+        $secondWeeklyAttributes = [
+            ...$weeklyAttributes,
+            'ruang_id' => $secondRoom,
+            'hari' => 2,
+            'mulai' => '10:00',
+            'selesai' => '12:00',
+        ];
+        JadwalMingguan::create([
+            ...$secondWeeklyAttributes,
+            'code' => 'WEEKLY-FILTER-B',
+            'fingerprint' => JadwalMingguan::fingerprint($secondWeeklyAttributes),
+        ]);
         $lecturerRequest = Request::create('/dosen/data-akademik/jadwal', 'GET', [
-            'q' => 'Pengantar Studi', 'ruang_id' => $firstRoom, 'meth_id' => 0, 'days_id' => 1,
+            'q' => 'Pengantar Studi', 'ruang_id' => $firstRoom, 'days_id' => 1,
         ]);
         $this->actingAs($data['advisor'], 'dosen');
         $lecturerView = app(\App\Http\Controllers\Dosen\Akademik\JadwalAjarController::class)
             ->index($lecturerRequest, app(AcademicPeriodContext::class));
 
-        $this->assertSame([$matching->id], $lecturerView->getData()['jadkul']->modelKeys());
+        $this->assertSame([$weeklySchedule->id], $lecturerView->getData()['jadkul']->modelKeys());
         $this->assertTrue($lecturerView->getData()['filterRooms']->contains('id', $firstRoom));
 
         $studentRequest = Request::create('/mahasiswa/jadwal-kuliah', 'GET', [
-            'q' => 'JAD-FILTER-A', 'ruang_id' => $firstRoom, 'date_to' => '2026-08-17',
+            'q' => 'WEEKLY-FILTER-A', 'ruang_id' => $firstRoom, 'days_id' => 1,
         ]);
         $this->actingAs($data['student'], 'mahasiswa');
         $studentView = app(\App\Http\Controllers\Mahasiswa\HomeController::class)->jadkulIndex(
@@ -368,7 +398,7 @@ class KrsWorkflowTest extends TestCase
             app(\App\Services\Academic\StudentAcademicContext::class)
         );
 
-        $this->assertSame([$matching->id], $studentView->getData()['jadkul']->modelKeys());
+        $this->assertSame([$weeklySchedule->id], $studentView->getData()['jadkul']->modelKeys());
         $this->assertSame($data['advisor']->id, $studentView->getData()['filterLecturers']->sole()->id);
 
         $printRequest = Request::create('/mahasiswa/jadwal-kuliah/cetak', 'GET', [
@@ -386,6 +416,70 @@ class KrsWorkflowTest extends TestCase
         $this->assertStringContainsString($data['student']->mhs_name, $printHtml);
         $this->assertStringContainsString('Ruang FILTER-A', $printHtml);
         $this->assertStringNotContainsString('Ruang FILTER-B', $printHtml);
+    }
+
+    public function test_student_can_submit_complete_lecturer_evaluation_once(): void
+    {
+        $data = $this->academicData();
+        DB::table('tahun_akademiks')->where('id', $data['periodId'])->update([
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+        $offering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $service = app(KrsService::class);
+        $krs = $service->add($service->forRegistration($data['registration']), $offering);
+        $service->submit($krs);
+        $service->decide($krs->fresh(), $data['advisor'], Krs::STATUS_APPROVED, null);
+        $courseId = DB::table('mata_kuliahs')->insertGetId([
+            'kuri_id' => $data['curriculumId'], 'taka_id' => $data['periodId'], 'pstudi_id' => $data['programId'],
+            'dosen_1' => $data['advisor']->id, 'name' => 'Pengantar Studi Islam', 'code' => 'PAI-EVALUASI',
+            'bsks' => 3, 'desc' => '-', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $schedule = JadwalKuliah::create([
+            'penawaran_mata_kuliah_id' => $offering->id,
+            'makul_id' => $courseId, 'kelas_id' => $data['classId'], 'dosen_id' => $data['advisor']->id,
+            'ruang_id' => $this->room(40, 'EVALUASI'), 'pert_id' => 1, 'meth_id' => 0, 'days_id' => 1,
+            'bsks' => 3, 'date' => '2026-08-17', 'start' => '08:00', 'ended' => '10:00',
+            'code' => 'JAD-EVALUASI',
+        ]);
+        $ratings = collect(config('lecturer_evaluation.sections'))
+            ->flatMap(fn (array $section) => array_fill_keys(array_keys($section['questions']), 4))
+            ->all();
+        $narratives = collect(config('lecturer_evaluation.narratives'))
+            ->mapWithKeys(fn (string $question, string $key) => [$key => 'Jawaban untuk '.$key])
+            ->all();
+
+        $this->actingAs($data['student'], 'mahasiswa');
+        $controller = app(\App\Http\Controllers\Mahasiswa\HomeController::class);
+        $form = $controller->feedbackForm(
+            $schedule->code,
+            app(AcademicPeriodContext::class),
+            app(\App\Services\Academic\StudentAcademicContext::class)
+        );
+        $this->assertSame('mahasiswa.pages.mhs-jadkul-feedback', $form->name());
+        $this->assertCount(39, collect($form->getData()['evaluation']['sections'])->flatMap(fn (array $section) => $section['questions']));
+
+        $response = $controller->storeFBPerkuliahan(
+            Request::create('/mahasiswa/jadwal-kuliah/store/'.$schedule->code.'/feedback', 'POST', compact('ratings', 'narratives')),
+            $schedule->code,
+            app(AcademicPeriodContext::class),
+            app(\App\Services\Academic\StudentAcademicContext::class)
+        );
+
+        $this->assertSame(route('mahasiswa.home-jadkul-index'), $response->getTargetUrl());
+        $feedback = FBPerkuliahan::sole();
+        $this->assertSame('4.00', $feedback->fb_average_score);
+        $this->assertSame('Sangat Puas', $feedback->fb_score);
+        $this->assertCount(39, $feedback->fb_answers['ratings']);
+        $this->assertCount(5, $feedback->fb_answers['narratives']);
+
+        $controller->storeFBPerkuliahan(
+            Request::create('/mahasiswa/jadwal-kuliah/store/'.$schedule->code.'/feedback', 'POST', compact('ratings', 'narratives')),
+            $schedule->code,
+            app(AcademicPeriodContext::class),
+            app(\App\Services\Academic\StudentAcademicContext::class)
+        );
+        $this->assertSame(1, FBPerkuliahan::count());
     }
 
     public function test_student_can_print_only_approved_weekly_schedules_from_their_krs(): void
@@ -415,6 +509,17 @@ class KrsWorkflowTest extends TestCase
             ...$scheduleAttributes,
             'code' => 'JMG-STUDENT-WEEKLY',
             'fingerprint' => JadwalMingguan::fingerprint($scheduleAttributes),
+        ]);
+        $tuesdayAttributes = [
+            ...$scheduleAttributes,
+            'hari' => 2,
+            'mulai' => '13:00',
+            'selesai' => '14:40',
+        ];
+        $tuesdaySchedule = JadwalMingguan::create([
+            ...$tuesdayAttributes,
+            'code' => 'JMG-STUDENT-TUESDAY',
+            'fingerprint' => JadwalMingguan::fingerprint($tuesdayAttributes),
         ]);
 
         $otherMaster = MasterMataKuliah::create([
@@ -446,7 +551,7 @@ class KrsWorkflowTest extends TestCase
         ]);
 
         $this->actingAs($data['student'], 'mahasiswa');
-        $request = Request::create('/mahasiswa/jadwal-kuliah/cetak-mingguan', 'GET', ['hari' => 1]);
+        $request = Request::create('/mahasiswa/jadwal-kuliah/cetak-mingguan');
         $view = app(\App\Http\Controllers\Mahasiswa\HomeController::class)->jadkulWeeklyPrint(
             $request,
             app(AcademicPeriodContext::class),
@@ -454,8 +559,10 @@ class KrsWorkflowTest extends TestCase
         );
         $html = $view->render();
 
-        $this->assertSame([$schedule->id], $view->getData()['schedules']->modelKeys());
+        $this->assertSame([$schedule->id, $tuesdaySchedule->id], $view->getData()['schedules']->modelKeys());
         $this->assertStringContainsString('Jadwal Kuliah Mingguan', $html);
+        $this->assertStringContainsString('<h3>Senin</h3>', $html);
+        $this->assertStringContainsString('<h3>Selasa</h3>', $html);
         $this->assertStringContainsString('Pengantar Studi Islam', $html);
         $this->assertStringContainsString('Dosen Wali', $html);
         $this->assertStringContainsString('Ruang STUDENT-WEEKLY', $html);
@@ -769,6 +876,62 @@ class KrsWorkflowTest extends TestCase
         $this->assertTrue($sundayView->getData()['schedules']->isEmpty());
     }
 
+    public function test_weekly_schedule_list_is_paginated_and_keeps_filters(): void
+    {
+        $data = $this->academicData();
+        $offering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $roomId = $this->room(40, 'PAGINATION');
+
+        foreach (range(0, 29) as $number) {
+            $attributes = [
+                'penawaran_mata_kuliah_id' => $offering->id,
+                'kelas_id' => $data['classId'],
+                'dosen_id' => $data['advisor']->id,
+                'ruang_id' => $roomId,
+                'hari' => 1,
+                'mulai' => sprintf('08:%02d', $number),
+                'selesai' => sprintf('09:%02d', $number),
+            ];
+            JadwalMingguan::create([
+                ...$attributes,
+                'code' => 'JMG-PAGE-'.str_pad((string) $number, 2, '0', STR_PAD_LEFT),
+                'fingerprint' => JadwalMingguan::fingerprint($attributes),
+            ]);
+        }
+
+        $administrator = $this->webAdministrator('SCHEDULEPAGE');
+        $this->actingAs($administrator);
+        session([AcademicPeriodContext::SESSION_KEY => $data['periodId']]);
+        $firstRequest = Request::create('/web-admin/master/jadwal-mingguan', 'GET', [
+            'q' => 'JMG-PAGE',
+        ]);
+        $firstRequest->setUserResolver(fn () => $administrator);
+        \Illuminate\Pagination\Paginator::currentPageResolver(fn () => 1);
+        $firstPage = app(\App\Http\Controllers\Admin\JadwalMingguanController::class)
+            ->index($firstRequest, app(AcademicPeriodContext::class));
+        $firstSchedules = $firstPage->getData()['schedules'];
+
+        $this->assertSame(25, $firstSchedules->count());
+        $this->assertSame(30, $firstSchedules->total());
+        $this->assertSame(1, $firstSchedules->currentPage());
+        $this->assertSame('JMG-PAGE', $firstPage->getData()['filters']['q']);
+
+        $secondRequest = Request::create('/web-admin/master/jadwal-mingguan', 'GET', [
+            'q' => 'JMG-PAGE',
+            'page' => 2,
+        ]);
+        $secondRequest->setUserResolver(fn () => $administrator);
+        \Illuminate\Pagination\Paginator::currentPageResolver(fn () => 2);
+        $secondPage = app(\App\Http\Controllers\Admin\JadwalMingguanController::class)
+            ->index($secondRequest, app(AcademicPeriodContext::class));
+        $secondSchedules = $secondPage->getData()['schedules'];
+
+        $this->assertSame(5, $secondSchedules->count());
+        $this->assertSame(30, $secondSchedules->total());
+        $this->assertSame(26, $secondSchedules->firstItem());
+        \Illuminate\Pagination\Paginator::currentPageResolver(fn () => 1);
+    }
+
     public function test_meeting_generator_skips_holiday_and_is_idempotent(): void
     {
         $data = $this->academicData();
@@ -825,6 +988,129 @@ class KrsWorkflowTest extends TestCase
         ]);
         $this->expectException(ValidationException::class);
         app(AttendanceEligibilityService::class)->eligibleKrsItem($meeting, $outsider);
+    }
+
+    public function test_lecturer_can_manage_attendance_only_for_an_owned_weekly_meeting(): void
+    {
+        $data = $this->academicData();
+        DB::table('tahun_akademiks')->where('id', $data['periodId'])->update([
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+        $offering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $krsService = app(KrsService::class);
+        $krs = $krsService->add($krsService->forRegistration($data['registration']), $offering);
+        $krsService->submit($krs);
+        $krsService->decide($krs->fresh(), $data['advisor'], Krs::STATUS_APPROVED, null);
+        $attributes = [
+            'penawaran_mata_kuliah_id' => $offering->id,
+            'kelas_id' => $data['classId'],
+            'dosen_id' => $data['advisor']->id,
+            'ruang_id' => $this->room(40, 'PRESENSI-DOSEN'),
+            'hari' => 1,
+            'mulai' => '08:00',
+            'selesai' => '09:40',
+            'sks' => 2,
+        ];
+        $schedule = JadwalMingguan::create([
+            ...$attributes,
+            'code' => 'JMG-PRESENSI-DOSEN',
+            'fingerprint' => JadwalMingguan::fingerprint($attributes),
+        ]);
+        app(MeetingGeneratorService::class)->generate($schedule, '2026-08-01', '2026-08-31', 1);
+        $meeting = $schedule->pertemuans()->firstOrFail();
+        $otherLecturer = $this->lecturer('1002', 'Dosen Lain');
+        $payload = [
+            'presences' => [
+                $data['student']->id => ['status' => 'H', 'description' => 'Hadir tepat waktu'],
+            ],
+        ];
+        DB::table('web_settings')->insert([
+            'id' => 1,
+            'school_apps' => 'SIAKAD',
+            'school_name' => 'Kampus Test',
+            'school_head' => 'Ketua Test',
+            'school_link' => 'https://example.test',
+            'school_desc' => 'Kampus pengujian',
+            'school_email' => 'kampus@example.test',
+            'school_phone' => '0800000000',
+            'social_fb' => '-',
+            'social_ig' => '-',
+            'social_in' => '-',
+            'social_tw' => '-',
+        ]);
+
+        $this->actingAs($data['advisor'], 'dosen');
+        \Illuminate\Support\Facades\Auth::shouldUse('web');
+        $meetingListResponse = $this->get(route('dosen.akademik.jadwal-meetings', $schedule->code));
+        $meetingListResponse
+            ->assertOk()
+            ->assertSee('Presensi')
+            ->assertSee('Evaluasi')
+            ->assertSee(route('dosen.akademik.jadwal-view-feedback', $meeting->code), false);
+
+        $evaluationRatings = collect(config('lecturer_evaluation.sections'))
+            ->flatMap(fn (array $section) => array_fill_keys(array_keys($section['questions']), 4))
+            ->all();
+        $evaluationNarratives = collect(config('lecturer_evaluation.narratives'))
+            ->mapWithKeys(fn (string $question, string $key) => [$key => 'Masukan '.$key])
+            ->all();
+        FBPerkuliahan::create([
+            'fb_users_code' => $data['student']->mhs_code,
+            'fb_jakul_code' => $meeting->code,
+            'fb_code' => 'FEEDBACK-DOSEN-TEST',
+            'fb_score' => 'Sangat Puas',
+            'fb_reason' => 'Masukan pengujian',
+            'fb_answers' => ['ratings' => $evaluationRatings, 'narratives' => $evaluationNarratives],
+            'fb_average_score' => 4,
+        ]);
+        $this->get(route('dosen.akademik.jadwal-view-feedback', $meeting->code))
+            ->assertOk()
+            ->assertSee('Rata-rata kinerja dosen')
+            ->assertSee('Kompetensi Pedagogik')
+            ->assertSee('Detail Indikator Penilaian')
+            ->assertSee('Responden anonim #1')
+            ->assertDontSee($data['student']->mhs_name);
+
+        $this->actingAs($data['student'], 'mahasiswa');
+        $studentMeetingsView = app(\App\Http\Controllers\Mahasiswa\HomeController::class)->jadkulMeetings(
+            $schedule->code,
+            app(AcademicPeriodContext::class),
+            app(\App\Services\Academic\StudentAcademicContext::class)
+        );
+        $this->assertSame('mahasiswa.pages.mhs-jadkul-pertemuan', $studentMeetingsView->name());
+        $this->assertSame($schedule->id, $studentMeetingsView->getData()['schedule']->id);
+        $this->assertCount(1, $studentMeetingsView->getData()['schedule']->pertemuans);
+
+        $unauthorizedResponse = $this->actingAs($otherLecturer, 'dosen')
+            ->patch(route('dosen.akademik.jadwal-meeting-attendance-update', [$schedule->code, $meeting->code]), $payload);
+        $unauthorizedResponse->assertRedirect(route('error.notfound'));
+        $this->actingAs($data['advisor'], 'dosen')
+            ->patch(route('dosen.akademik.jadwal-meeting-attendance-update', [$schedule->code, $meeting->code]), $payload)
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('absensi_mahasiswas', [
+            'pertemuan_kuliah_id' => $meeting->id,
+            'krs_item_id' => $krs->items()->sole()->id,
+            'author_id' => $data['student']->id,
+            'jadkul_code' => $meeting->code,
+            'absen_type' => 'H',
+            'absen_desc' => 'Hadir tepat waktu',
+        ]);
+        $this->assertSame(PertemuanKuliah::STATUS_COMPLETED, $meeting->fresh()->status);
+
+        $payload['presences'][$data['student']->id] = ['status' => 'I', 'description' => 'Izin'];
+        $this->actingAs($data['advisor'], 'dosen')
+            ->patch(route('dosen.akademik.jadwal-meeting-attendance-update', [$schedule->code, $meeting->code]), $payload)
+            ->assertSessionHasNoErrors();
+        $this->assertSame(1, AbsensiMahasiswa::where('pertemuan_kuliah_id', $meeting->id)->count());
+        $this->assertDatabaseHas('absensi_mahasiswas', [
+            'pertemuan_kuliah_id' => $meeting->id,
+            'author_id' => $data['student']->id,
+            'absen_type' => 'I',
+            'absen_desc' => 'Izin',
+        ]);
     }
 
     public function test_krs_list_filters_rows_and_exports_reference_template_columns(): void

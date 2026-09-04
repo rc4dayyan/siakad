@@ -66,7 +66,7 @@
             <a href="{{ route($prefix.'workers.student-index') }}"><i class="fas fa-user-graduate"></i><span>Data Mahasiswa</span></a>
             <a href="{{ route($prefix.'workers.lecture-index') }}"><i class="fas fa-chalkboard-teacher"></i><span>Data Dosen</span></a>
             <a href="{{ route($prefix.'master.kelas-index') }}"><i class="fas fa-building-user"></i><span>Data Kelas</span></a>
-            <a href="{{ route($prefix.'master.jadkul-index') }}"><i class="fas fa-calendar-days"></i><span>Jadwal Kuliah</span></a>
+            <a href="{{ route($prefix.'master.jadwal-mingguan-index') }}"><i class="fas fa-calendar-days"></i><span>Jadwal Kuliah</span></a>
             <a href="{{ route($prefix.'krs-management.index') }}"><i class="fas fa-file-signature"></i><span>Kelola KRS</span></a>
             <a href="{{ route($prefix.'billing-period.index') }}"><i class="fas fa-file-invoice-dollar"></i><span>Tagihan Periode</span></a>
         </div></div>
