@@ -29,6 +29,10 @@ Route::group(['prefix' => 'dosen', 'middleware' => ['dsn-access:Dosen Aktif'], '
 
     // PRIVATE FUNCTION => MATA KULIAH PER KELAS DAN NILAI AKHIR
     Route::get('/data-akademik/mata-kuliah', [App\Http\Controllers\Dosen\Akademik\MataKuliahController::class, 'index'])->name('akademik.matkul-index');
+    Route::get('/data-akademik/mata-kuliah/{penawaran}/materi', [App\Http\Controllers\Dosen\Akademik\MataKuliahController::class, 'materials'])->name('akademik.matkul-materi');
+    Route::post('/data-akademik/mata-kuliah/{penawaran}/materi', [App\Http\Controllers\Dosen\Akademik\MataKuliahController::class, 'storeMaterial'])->name('akademik.matkul-materi-store');
+    Route::get('/data-akademik/mata-kuliah/{penawaran}/materi/{materi}/download', [App\Http\Controllers\Dosen\Akademik\MataKuliahController::class, 'downloadMaterial'])->name('akademik.matkul-materi-download');
+    Route::delete('/data-akademik/mata-kuliah/{penawaran}/materi/{materi}', [App\Http\Controllers\Dosen\Akademik\MataKuliahController::class, 'destroyMaterial'])->name('akademik.matkul-materi-destroy');
     Route::get('/data-akademik/mata-kuliah/{penawaran}/nilai', [App\Http\Controllers\Dosen\Akademik\MataKuliahController::class, 'grades'])->name('akademik.matkul-nilai');
     Route::post('/data-akademik/mata-kuliah/{penawaran}/nilai', [App\Http\Controllers\Dosen\Akademik\MataKuliahController::class, 'storeGrades'])->name('akademik.matkul-nilai-store');
     Route::get('/data-akademik/mata-kuliah/{penawaran}/nilai/export', [App\Http\Controllers\Dosen\Akademik\MataKuliahController::class, 'exportGrades'])->name('akademik.matkul-nilai-export');

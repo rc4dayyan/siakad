@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Dosen\Akademik;
 use App\Http\Controllers\Controller;
 use App\Models\Krs;
 use App\Models\Mahasiswa;
+use App\Models\MateriAjar;
 use App\Models\NilaiMahasiswa;
 use App\Models\PenawaranMataKuliah;
 use App\Models\TahunAkademik;
@@ -14,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -33,6 +35,7 @@ class MataKuliahController extends Controller
                     fn ($krs) => $krs->whereIn('status', [Krs::STATUS_APPROVED, Krs::STATUS_LOCKED])
                 ),
                 'nilais as nilai_terisi_count' => fn ($query) => $query->whereNotNull('nilai'),
+                'materiAjars as materi_count',
             ])
             ->orderBy('code')
             ->get();
@@ -41,6 +44,109 @@ class MataKuliahController extends Controller
             'period' => $period,
             'offerings' => $offerings,
         ]);
+    }
+
+    public function materials(PenawaranMataKuliah $penawaran, AcademicPeriodContext $context): View
+    {
+        $period = $context->published();
+        $this->ensureOwned($penawaran, $period);
+        $penawaran->load(['masterMataKuliah', 'taka', 'kelas', 'pstudi']);
+
+        return view('dosen.pages.materi-ajar-index', [
+            'penawaran' => $penawaran,
+            'period' => $period,
+            'materials' => $penawaran->materiAjars()->with('dosen')->latest()->get(),
+            'canManage' => $period->isWritable(),
+        ]);
+    }
+
+    public function storeMaterial(
+        Request $request,
+        PenawaranMataKuliah $penawaran,
+        AcademicPeriodContext $context
+    ): RedirectResponse {
+        $period = $this->writablePeriod($context);
+        $this->ensureOwned($penawaran, $period);
+        $validated = $request->validate([
+            '_form' => ['required', 'in:create-materi'],
+            'judul' => ['required', 'string', 'max:255'],
+            'deskripsi' => ['nullable', 'string', 'max:10000', 'required_without:file'],
+            'file' => [
+                'nullable',
+                'file',
+                'required_without:deskripsi',
+                'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt,jpg,jpeg,png,zip',
+                'max:20480',
+            ],
+        ], [
+            'judul.required' => 'Judul materi wajib diisi.',
+            'judul.max' => 'Judul materi maksimal 255 karakter.',
+            'deskripsi.required_without' => 'Isi deskripsi atau unggah sebuah file materi.',
+            'deskripsi.max' => 'Deskripsi materi maksimal 10.000 karakter.',
+            'file.required_without' => 'Unggah file atau isi deskripsi materi.',
+            'file.mimes' => 'File harus berupa PDF, Word, Excel, PowerPoint, teks, gambar, atau ZIP.',
+            'file.max' => 'Ukuran file materi maksimal 20 MB.',
+        ]);
+        $file = $request->file('file');
+        $path = $file?->store('materi-ajar/'.$penawaran->id, 'local');
+
+        try {
+            $material = MateriAjar::create([
+                'penawaran_mata_kuliah_id' => $penawaran->id,
+                'dosen_id' => auth('dosen')->id(),
+                'judul' => $validated['judul'],
+                'deskripsi' => $validated['deskripsi'] ?? null,
+                'file_path' => $path,
+                'file_name' => $file ? $this->safeOriginalName($file->getClientOriginalName()) : null,
+                'mime_type' => $file?->getMimeType(),
+                'file_size' => $file?->getSize(),
+            ]);
+        } catch (\Throwable $exception) {
+            if ($path) {
+                Storage::disk('local')->delete($path);
+            }
+
+            throw $exception;
+        }
+
+        return redirect()->route('dosen.akademik.matkul-materi', $penawaran)
+            ->with('success', "Materi {$material->judul} berhasil ditambahkan.");
+    }
+
+    public function downloadMaterial(
+        PenawaranMataKuliah $penawaran,
+        MateriAjar $materi,
+        AcademicPeriodContext $context
+    ) {
+        $this->ensureOwned($penawaran, $context->published());
+        $this->ensureMaterialBelongsToOffering($materi, $penawaran);
+        abort_unless($materi->file_path && Storage::disk('local')->exists($materi->file_path), 404);
+
+        return Storage::disk('local')->download(
+            $materi->file_path,
+            $materi->file_name,
+            ['Content-Type' => $materi->mime_type ?: 'application/octet-stream']
+        );
+    }
+
+    public function destroyMaterial(
+        PenawaranMataKuliah $penawaran,
+        MateriAjar $materi,
+        AcademicPeriodContext $context
+    ): RedirectResponse {
+        $period = $this->writablePeriod($context);
+        $this->ensureOwned($penawaran, $period);
+        $this->ensureMaterialBelongsToOffering($materi, $penawaran);
+        $path = $materi->file_path;
+        $title = $materi->judul;
+        $materi->delete();
+
+        if ($path) {
+            Storage::disk('local')->delete($path);
+        }
+
+        return redirect()->route('dosen.akademik.matkul-materi', $penawaran)
+            ->with('success', "Materi {$title} berhasil dihapus.");
     }
 
     public function grades(PenawaranMataKuliah $penawaran, AcademicPeriodContext $context): View
@@ -208,6 +314,18 @@ class MataKuliahController extends Controller
             $period && $this->ownedOfferings(auth('dosen')->id(), $period)->whereKey($penawaran->id)->exists(),
             404
         );
+    }
+
+    private function ensureMaterialBelongsToOffering(MateriAjar $material, PenawaranMataKuliah $offering): void
+    {
+        abort_unless((int) $material->penawaran_mata_kuliah_id === (int) $offering->id, 404);
+    }
+
+    private function safeOriginalName(string $name): string
+    {
+        $safeName = trim((string) preg_replace('/[^\pL\pN._ -]+/u', '-', basename($name)), '. -');
+
+        return Str::limit($safeName ?: 'materi', 255, '');
     }
 
     private function writablePeriod(AcademicPeriodContext $context): TahunAkademik

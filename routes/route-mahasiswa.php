@@ -47,8 +47,13 @@ Route::group(['prefix' => 'mahasiswa', 'middleware' => ['mhs-access:Mahasiswa Ak
 
     // PRIVATE FUNCTION => NILAI KULIAH
     Route::get('/nilai-kuliah', [App\Http\Controllers\Mahasiswa\Pages\StudentNilaiController::class, 'index'])->name('akademik.nilai-index');
+    Route::get('/nilai-kuliah/transkrip/cetak', [App\Http\Controllers\Mahasiswa\Pages\StudentNilaiController::class, 'printTranscript'])->name('akademik.nilai-transkrip-print');
     Route::get('/nilai-kuliah/{code}/view', [App\Http\Controllers\Mahasiswa\Pages\StudentNilaiController::class, 'view'])->name('akademik.nilai-view');
     Route::post('/nilai-kuliah/{code}/store', [App\Http\Controllers\Mahasiswa\Pages\StudentNilaiController::class, 'store'])->name('akademik.nilai-store');
+
+    // PRIVATE FUNCTION => MATERI AJAR
+    Route::get('/materi-ajar', [App\Http\Controllers\Mahasiswa\Pages\MateriAjarController::class, 'index'])->name('akademik.materi-index');
+    Route::get('/materi-ajar/{materi}/download', [App\Http\Controllers\Mahasiswa\Pages\MateriAjarController::class, 'download'])->name('akademik.materi-download');
 
     // PRIVATE FUNCTION => KARTU RENCANA STUDI
     Route::get('/krs', [App\Http\Controllers\Mahasiswa\KrsController::class, 'index'])->name('akademik.krs-index');

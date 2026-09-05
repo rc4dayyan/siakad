@@ -10,10 +10,12 @@ use App\Models\NilaiMahasiswa;
 use App\Models\TahunAkademik;
 use App\Services\Academic\AcademicPeriodContext;
 use App\Services\Academic\StudentAcademicContext;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Mockery;
 use Tests\TestCase;
 
 class NilaiAcademicPeriodTest extends TestCase
@@ -107,6 +109,69 @@ class NilaiAcademicPeriodTest extends TestCase
             'mata_kuliah_id' => $ungradedCourseId,
             'mahasiswa_id' => $this->student->id,
         ]);
+    }
+
+    public function test_student_can_download_own_transcript_as_landscape_pdf(): void
+    {
+        DB::table('program_studis')->insert([
+            'id' => 1,
+            'name' => 'Pendidikan Agama Islam',
+            'level' => 'S-1',
+            'head_id' => $this->lecturerId,
+        ]);
+        DB::table('registrasi_mahasiswas')->insert([
+            [
+                'mahasiswa_id' => $this->student->id,
+                'taka_id' => $this->closedPeriod->id,
+                'semester_mahasiswa' => 1,
+                'kelas_id' => $this->oldClassId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'mahasiswa_id' => $this->student->id,
+                'taka_id' => $this->activePeriod->id,
+                'semester_mahasiswa' => 2,
+                'kelas_id' => $this->activeClassId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+        NilaiMahasiswa::create([
+            'mahasiswa_id' => $this->student->id,
+            'taka_id' => $this->activePeriod->id,
+            'mata_kuliah_id' => $this->activeCourseId,
+            'kelas_id' => $this->activeClassId,
+            'dosen_id' => $this->lecturerId,
+            'nilai' => 'A',
+        ]);
+        $pdf = Mockery::mock(\Barryvdh\DomPDF\PDF::class);
+
+        Pdf::shouldReceive('loadView')
+            ->once()
+            ->withArgs(function (string $view, array $data): bool {
+                $this->assertSame('base.cetak.cetak-transkrip-mahasiswa', $view);
+                $this->assertSame('Pendidikan Agama Islam', $data['program']->name);
+                $this->assertSame([1, 2], $data['semesters']->pluck('number')->all());
+                $this->assertSame(4, $data['totalCredits']);
+                $this->assertEqualsWithDelta(3.5, $data['ipk'], 0.001);
+
+                return true;
+            })
+            ->andReturn($pdf);
+        $pdf->shouldReceive('setPaper')->once()->with('a4', 'landscape')->andReturnSelf();
+        $pdf->shouldReceive('download')
+            ->once()
+            ->with('Transkrip-Nilai-Sementara-MHS-001.pdf')
+            ->andReturn(response('pdf'));
+
+        $this->actingAs($this->student, 'mahasiswa');
+        $response = app(StudentNilaiController::class)->printTranscript(
+            app(AcademicPeriodContext::class),
+            app(StudentAcademicContext::class)
+        );
+
+        $this->assertSame('pdf', $response->getContent());
     }
 
     public function test_student_grade_page_uses_only_approved_krs_courses_when_available(): void
@@ -222,6 +287,12 @@ class NilaiAcademicPeriodTest extends TestCase
         (require database_path('migrations/2024_04_26_060533_create_tahun_akademiks_table.php'))->up();
         (require database_path('migrations/2026_07_17_000003_extend_tahun_akademiks_for_period_lifecycle.php'))->up();
         Schema::create('web_settings', fn (Blueprint $table) => $table->id());
+        Schema::create('program_studis', function (Blueprint $table): void {
+            $table->id();
+            $table->string('name');
+            $table->string('level')->nullable();
+            $table->unsignedBigInteger('head_id')->nullable();
+        });
         Schema::create('kelas', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('taka_id');
@@ -259,6 +330,7 @@ class NilaiAcademicPeriodTest extends TestCase
             $table->unsignedBigInteger('dosen_1');
             $table->unsignedBigInteger('dosen_2')->nullable();
             $table->unsignedBigInteger('dosen_3')->nullable();
+            $table->unsignedTinyInteger('bsks')->nullable();
             $table->string('name');
             $table->string('code')->unique();
         });
@@ -326,6 +398,7 @@ class NilaiAcademicPeriodTest extends TestCase
             'pstudi_id' => 1,
             'kelas_id' => $classId,
             'dosen_1' => $this->lecturerId,
+            'bsks' => 2,
             'name' => $code,
             'code' => $code,
         ]);

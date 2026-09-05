@@ -23,6 +23,12 @@
         <span>Tugas Kuliah</span>
     </a>
 </li>
+<li class="sidebar-item {{ Route::is('mahasiswa.akademik.materi-*') ? 'active' : '' }}">
+    <a href="{{ route('mahasiswa.akademik.materi-index') }}" class="sidebar-link">
+        <i class="fa-solid fa-book-open"></i>
+        <span>Materi Ajar</span>
+    </a>
+</li>
 <li class="sidebar-item {{ Route::is('mahasiswa.home-tagihan-*') ? 'active' : '' }}">
     <a href="{{ route('mahasiswa.home-tagihan-index') }}" class="sidebar-link">
         <i class="fa-solid fa-file-invoice"></i>

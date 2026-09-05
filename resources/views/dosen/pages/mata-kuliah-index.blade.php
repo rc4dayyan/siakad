@@ -134,9 +134,14 @@
                                     <div class="grade-progress"><span style="width: {{ $percentage }}%"></span></div>
                                 </td>
                                 <td class="text-center">
-                                    <a href="{{ route('dosen.akademik.matkul-nilai', $item) }}" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-graduation-cap me-1"></i> Kelola Nilai
-                                    </a>
+                                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                                        <a href="{{ route('dosen.akademik.matkul-materi', $item) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-book-open me-1"></i> Materi ({{ $item->materi_count }})
+                                        </a>
+                                        <a href="{{ route('dosen.akademik.matkul-nilai', $item) }}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-graduation-cap me-1"></i> Kelola Nilai
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                         @empty

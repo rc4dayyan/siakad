@@ -25,6 +25,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth as FacadesAuth;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
+use PDF;
 use Str;
 
 class StudentNilaiController extends Controller
@@ -51,6 +52,91 @@ class StudentNilaiController extends Controller
             ->get();
 
         return view('mahasiswa.pages.nilai-index', $data);
+    }
+
+    public function printTranscript(
+        AcademicPeriodContext $context,
+        StudentAcademicContext $studentContext
+    ) {
+        $student = FacadesAuth::guard('mahasiswa')->user();
+        $registrations = $student->registrasiAkademik()
+            ->with(['taka', 'kelas.pstudi.head'])
+            ->orderBy('semester_mahasiswa')
+            ->get();
+        $program = $registrations
+            ->first(fn ($registration) => $registration->kelas?->pstudi)?->kelas?->pstudi;
+
+        if (! $program) {
+            $student->loadMissing('kelas.pstudi.head');
+            $program = $student->kelas?->pstudi;
+        }
+
+        $semesterByPeriod = $registrations
+            ->filter(fn ($registration) => $registration->taka_id && $registration->semester_mahasiswa)
+            ->mapWithKeys(fn ($registration) => [
+                (int) $registration->taka_id => (int) $registration->semester_mahasiswa,
+            ]);
+        $courseRows = $this->courseRows($student, $context->published(), true, $studentContext);
+        $fallbackSemesters = $courseRows->pluck('periode_id')
+            ->unique()
+            ->sort()
+            ->values()
+            ->mapWithKeys(fn ($periodId, $index) => [(int) $periodId => $index + 1]);
+        $rows = $courseRows
+            ->map(function (array $row) use ($semesterByPeriod, $fallbackSemesters): array {
+                $periodId = (int) $row['periode_id'];
+                $row['semester'] = $semesterByPeriod->get($periodId, $fallbackSemesters->get($periodId, 1));
+                $row['nilai_indeks'] = $this->gradeIndex($row['nilai']);
+                $row['angka_kredit'] = $row['nilai_indeks'] === null || $row['sks'] === null
+                    ? null
+                    : (float) $row['sks'] * $row['nilai_indeks'];
+
+                return $row;
+            });
+        $semesters = $rows
+            ->groupBy('semester')
+            ->map(function (Collection $courses, int $semester): array {
+                $graded = $courses->filter(fn (array $course) => $course['angka_kredit'] !== null);
+                $gradedCredits = (int) $graded->sum('sks');
+
+                return [
+                    'number' => $semester,
+                    'courses' => $courses->values(),
+                    'credits' => (int) $courses->sum('sks'),
+                    'ips' => $gradedCredits > 0 ? (float) $graded->sum('angka_kredit') / $gradedCredits : null,
+                ];
+            })
+            ->sortKeys()
+            ->values();
+        $gradedRows = $rows->filter(fn (array $row) => $row['angka_kredit'] !== null);
+        $gradedCredits = (int) $gradedRows->sum('sks');
+        $ipk = $gradedCredits > 0 ? (float) $gradedRows->sum('angka_kredit') / $gradedCredits : null;
+        $safeNim = trim((string) preg_replace('/[^A-Za-z0-9_-]+/', '-', $student->mhs_nim), '-');
+
+        return PDF::loadView('base.cetak.cetak-transkrip-mahasiswa', [
+            'student' => $student,
+            'program' => $program,
+            'semesters' => $semesters,
+            'totalCredits' => (int) $rows->sum('sks'),
+            'ipk' => $ipk,
+            'hasIncompleteGrade' => $rows->contains(fn (array $row) => $row['nilai_indeks'] === null),
+            'web' => webSettings::query()->first(),
+            'printedAt' => now(),
+        ])
+            ->setPaper('a4', 'landscape')
+            ->download('Transkrip-Nilai-Sementara-'.($safeNim ?: 'mahasiswa').'.pdf');
+    }
+
+    private function gradeIndex(?string $grade): ?float
+    {
+        return match (strtoupper(trim((string) $grade))) {
+            'A' => 4.0,
+            'B' => 3.0,
+            'C' => 2.0,
+            'D' => 1.0,
+            'E' => 0.0,
+            default => null,
+        };
     }
 
     private function courseRows(

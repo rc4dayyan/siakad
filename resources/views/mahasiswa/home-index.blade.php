@@ -87,6 +87,8 @@
                 <a href="{{ route('mahasiswa.akademik.krs-index') }}"><i class="fas fa-file-signature"></i><span>Kartu Rencana Studi</span></a>
                 <a href="{{ route('mahasiswa.home-jadkul-index') }}"><i class="fas fa-calendar-week"></i><span>Jadwal Kuliah</span></a>
                 <a href="{{ route('mahasiswa.akademik.nilai-index') }}"><i class="fas fa-chart-column"></i><span>Nilai Kuliah</span></a>
+                <a href="{{ route('mahasiswa.akademik.materi-index') }}"><i class="fas fa-book-open"></i><span>Materi Ajar</span></a>
+                <a href="{{ route('mahasiswa.akademik.nilai-transkrip-print') }}" target="_blank"><i class="fas fa-file-pdf"></i><span>Cetak Transkrip</span></a>
                 <a href="{{ route('mahasiswa.home-tagihan-index') }}"><i class="fas fa-receipt"></i><span>Tagihan</span></a>
             </div></div>
         </div>

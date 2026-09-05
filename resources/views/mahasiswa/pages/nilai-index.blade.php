@@ -20,6 +20,9 @@ Daftar mata kuliah per kelas dan nilai berdasarkan KRS yang telah disetujui
             <h5 class="card-title d-flex justify-content-between align-items-center">
                 <span>@yield('menu') <small class="text-muted">— {{ $isTranscript ? 'Transkrip seluruh periode' : ($period?->name ?? 'Tidak ada periode aktif') }}</small></span>
                 <div class="">
+                    <a href="{{ route('mahasiswa.akademik.nilai-transkrip-print') }}" class="btn btn-danger" target="_blank">
+                        <i class="fas fa-file-pdf me-1"></i> Cetak Transkrip
+                    </a>
                     @if ($isTranscript)
                         <a href="{{ route('mahasiswa.akademik.nilai-index') }}" class="btn btn-outline-primary">Periode Aktif</a>
                     @else

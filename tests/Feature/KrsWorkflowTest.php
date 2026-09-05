@@ -12,6 +12,7 @@ use App\Models\Krs;
 use App\Models\KrsItem;
 use App\Models\Mahasiswa;
 use App\Models\MasterMataKuliah;
+use App\Models\MateriAjar;
 use App\Models\NilaiMahasiswa;
 use App\Models\PenawaranMataKuliah;
 use App\Models\PertemuanKuliah;
@@ -28,6 +29,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 use Rap2hpoutre\FastExcel\FastExcel;
@@ -84,6 +86,7 @@ class KrsWorkflowTest extends TestCase
         (require database_path('migrations/2026_09_03_000001_add_sks_to_jadwal_mingguans_table.php'))->up();
         (require database_path('migrations/2026_09_03_000002_add_schedule_requirement_to_course_offerings.php'))->up();
         (require database_path('migrations/2026_09_04_000001_add_structured_answers_to_feedback_perkuliahans.php'))->up();
+        (require database_path('migrations/2026_09_05_000001_create_materi_ajars_table.php'))->up();
     }
 
     public function test_migration_prevents_duplicate_course_offering_combination(): void
@@ -318,6 +321,82 @@ class KrsWorkflowTest extends TestCase
             'penawaran_mata_kuliah_id' => $offering->id,
             'nilai' => 'A',
         ]);
+    }
+
+    public function test_lecturer_shares_private_course_material_only_with_approved_participants(): void
+    {
+        Storage::fake('local');
+        $data = $this->academicData();
+        DB::table('tahun_akademiks')->where('id', $data['periodId'])->update([
+            'is_published' => true,
+            'published_at' => now(),
+        ]);
+        $offering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $service = app(KrsService::class);
+        $krs = $service->add($service->forRegistration($data['registration']), $offering);
+        $service->submit($krs);
+        $service->decide($krs->fresh(), $data['advisor'], Krs::STATUS_APPROVED, null);
+
+        $this->actingAs($data['advisor'], 'dosen')
+            ->post(route('dosen.akademik.matkul-materi-store', $offering), [
+                '_form' => 'create-materi',
+                'judul' => 'Modul Pertemuan Pertama',
+                'deskripsi' => 'Baca modul sebelum perkuliahan.',
+                'file' => UploadedFile::fake()->create('modul-pai.pdf', 100, 'application/pdf'),
+            ])
+            ->assertRedirect(route('dosen.akademik.matkul-materi', $offering))
+            ->assertSessionHasNoErrors();
+
+        $material = MateriAjar::query()->firstOrFail();
+        $this->assertSame($data['advisor']->id, $material->dosen_id);
+        $this->assertSame($offering->id, $material->penawaran_mata_kuliah_id);
+        Storage::disk('local')->assertExists($material->file_path);
+
+        $this->actingAs($data['student'], 'mahasiswa');
+        $studentView = app(\App\Http\Controllers\Mahasiswa\Pages\MateriAjarController::class)
+            ->index(app(AcademicPeriodContext::class));
+        $this->assertSame('mahasiswa.pages.materi-ajar-index', $studentView->name());
+        $this->assertSame('Modul Pertemuan Pertama', $studentView->getData()['offerings']->first()->materiAjars->first()->judul);
+        $this->get(route('mahasiswa.akademik.materi-download', $material))
+            ->assertOk()
+            ->assertDownload('modul-pai.pdf');
+
+        $outsider = Mahasiswa::create([
+            'mhs_stat' => 1,
+            'mhs_nim' => '26999',
+            'mhs_name' => 'Mahasiswa Luar',
+            'mhs_code' => 'MHS999',
+            'mhs_user' => 'mhs999',
+            'password' => 'secret',
+            'mhs_mail' => 'mhs999@example.test',
+            'mhs_phone' => '0899999999',
+        ]);
+        $this->actingAs($outsider, 'mahasiswa');
+        try {
+            app(\App\Http\Controllers\Mahasiswa\Pages\MateriAjarController::class)
+                ->download($material, app(AcademicPeriodContext::class));
+            $this->fail('Mahasiswa di luar peserta KRS seharusnya tidak dapat mengunduh materi.');
+        } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException) {
+            $this->assertTrue(true);
+        }
+
+        $otherLecturer = $this->lecturer('2003', 'Dosen Tidak Ditugaskan');
+        $this->actingAs($otherLecturer, 'dosen');
+        try {
+            app(\App\Http\Controllers\Dosen\Akademik\MataKuliahController::class)->storeMaterial(
+                Request::create('/dosen/data-akademik/mata-kuliah/materi', 'POST', [
+                    '_form' => 'create-materi',
+                    'judul' => 'Materi Tidak Sah',
+                    'deskripsi' => 'Tidak boleh tersimpan.',
+                ]),
+                $offering,
+                app(AcademicPeriodContext::class)
+            );
+            $this->fail('Dosen yang tidak ditugaskan seharusnya tidak dapat menambah materi.');
+        } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException) {
+            $this->assertTrue(true);
+        }
+        $this->assertSame(1, MateriAjar::count());
     }
 
     public function test_lecturer_and_student_schedule_filters_share_their_authorized_schedules(): void

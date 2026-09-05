@@ -92,6 +92,11 @@ class PenawaranMataKuliah extends Model
         return $this->hasMany(NilaiMahasiswa::class);
     }
 
+    public function materiAjars()
+    {
+        return $this->hasMany(MateriAjar::class);
+    }
+
     public function pesertaDisetujui()
     {
         return Mahasiswa::query()->whereHas('registrasiAkademik.krs.items', fn (Builder $query) => $query
