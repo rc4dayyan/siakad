@@ -11,6 +11,12 @@
                     <span>Persiapan Akademik Baru</span>
                 </a>
             </li>
+            <li class="sidebar-item {{ Route::is('web-admin.nilai-import.*') ? 'active' : '' }}">
+                <a href="{{ route('web-admin.nilai-import.index') }}" class="sidebar-link">
+                    <i class="fa-solid fa-file-import"></i>
+                    <span>Import Nilai</span>
+                </a>
+            </li>
         @endif
         @if ((int) Auth::user()->raw_type === 4)
             <li class="sidebar-item {{ Route::is('admin.krs-management.*') ? 'active' : '' }}">

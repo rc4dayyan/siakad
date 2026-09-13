@@ -144,7 +144,7 @@ Input, impor, dan ekspor nilai mahasiswa dalam satu halaman
     }
 
     .grade-page .grade-table-wrap {
-        overflow: hidden;
+        overflow-x: auto;
         border: 1px solid #dce9e4;
         border-radius: 12px;
     }
@@ -182,6 +182,11 @@ Input, impor, dan ekspor nilai mahasiswa dalam satu halaman
     .grade-page .grade-select {
         min-width: 135px;
         font-weight: 700;
+    }
+
+    .grade-page .grade-number {
+        min-width: 110px;
+        max-width: 145px;
     }
 
     .grade-page .grade-status {
@@ -256,6 +261,8 @@ Input, impor, dan ekspor nilai mahasiswa dalam satu halaman
     $participantCount = $mahasiswas->count();
     $gradedCount = $mahasiswas->filter(
         fn ($student) => filled($existingNilais[$student->id]->nilai ?? null)
+            && filled($existingNilais[$student->id]->nilai_indeks ?? null)
+            && filled($existingNilais[$student->id]->nilai_angka ?? null)
     )->count();
     $gradedPercentage = $participantCount > 0 ? round(($gradedCount / $participantCount) * 100) : 0;
 @endphp
@@ -336,9 +343,9 @@ Input, impor, dan ekspor nilai mahasiswa dalam satu halaman
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
-                    <span class="small fw-semibold text-muted">Progres pengisian nilai</span>
+                    <span class="small fw-semibold text-muted">Progres kelengkapan tiga nilai</span>
                     <span class="small fw-bold text-success">
-                        <span id="gradedCount">{{ $gradedCount }}</span>/{{ $participantCount }} terisi
+                        <span id="gradedCount">{{ $gradedCount }}</span>/{{ $participantCount }} lengkap
                     </span>
                 </div>
                 <div class="grade-progress" role="progressbar" aria-label="Progres pengisian nilai"
@@ -361,10 +368,11 @@ Input, impor, dan ekspor nilai mahasiswa dalam satu halaman
 
             @if ($errors->has('nilai') || $errors->has('nilai.*'))
                 <div class="alert alert-danger">
-                    Periksa kembali nilai mahasiswa. Hanya nilai A, B, C, D, E, atau kosong yang diperbolehkan.
+                    Periksa kolom yang ditandai. Nilai huruf A–E, indeks 0–4, dan angka 0–100; masing-masing boleh kosong.
                 </div>
             @endif
 
+            <p class="small text-muted">Isi nilai angka (0–100) untuk mengisi huruf dan indeks otomatis. Jika angka kosong, huruf dan indeks dapat diisi manual. Saat disimpan, angka menjadi acuan konversi. A ≥86, B ≥71, C ≥56, D ≥41, E &lt;41; contoh 85,5 → B (3).</p>
             <form id="gradeForm" method="POST" action="{{ $gradeStoreUrl }}">
                 @csrf
                 <input type="hidden" name="_form" value="manual-nilai">
@@ -377,7 +385,9 @@ Input, impor, dan ekspor nilai mahasiswa dalam satu halaman
                                 <th style="width: 170px">NIM</th>
                                 <th>Nama Mahasiswa</th>
                                 <th style="width: 145px">Status</th>
-                                <th style="width: 180px">Nilai Akhir</th>
+                                <th style="width: 145px">Nilai Angka <small>(0–100)</small></th>
+                                <th style="width: 155px">Nilai Huruf</th>
+                                <th style="width: 145px">Nilai Indeks <small>(0–4)</small></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -385,6 +395,10 @@ Input, impor, dan ekspor nilai mahasiswa dalam satu halaman
                                 @php
                                     $existingGrade = $existingNilais[$student->id]->nilai ?? null;
                                     $selectedGrade = old("nilai.{$student->id}.nilai", $existingGrade);
+                                    $selectedIndex = old("nilai.{$student->id}.nilai_indeks", $existingNilais[$student->id]->nilai_indeks ?? null);
+                                    $selectedNumber = old("nilai.{$student->id}.nilai_angka", $existingNilais[$student->id]->nilai_angka ?? null);
+                                    $complete = filled($selectedGrade) && filled($selectedIndex) && filled($selectedNumber);
+                                    $partial = filled($selectedGrade) || filled($selectedIndex) || filled($selectedNumber);
                                 @endphp
                                 <tr data-grade-row data-search="{{ strtolower($student->mhs_nim.' '.$student->mhs_name) }}">
                                     <td class="text-muted">{{ $index + 1 }}</td>
@@ -396,26 +410,53 @@ Input, impor, dan ekspor nilai mahasiswa dalam satu halaman
                                         <input type="hidden" name="nilai[{{ $student->id }}][mahasiswa_id]" value="{{ $student->id }}">
                                     </td>
                                     <td>
-                                        <span class="grade-status {{ filled($selectedGrade) ? 'is-graded' : '' }}" data-grade-status>
+                                        <span class="grade-status {{ $complete ? 'is-graded' : '' }}" data-grade-status>
                                             <i class="fas fa-circle"></i>
-                                            <span>{{ filled($selectedGrade) ? 'Sudah dinilai' : 'Belum dinilai' }}</span>
+                                            <span>{{ $complete ? 'Lengkap' : ($partial ? 'Belum lengkap' : 'Belum dinilai') }}</span>
                                         </span>
                                     </td>
+                                    @foreach (['nilai_angka' => ['Nilai angka', $selectedNumber, 100]] as $field => [$label, $value, $maximum])
+                                        <td>
+                                            <input type="number" name="nilai[{{ $student->id }}][{{ $field }}]"
+                                                value="{{ $value }}" min="0" max="{{ $maximum }}" step="0.01"
+                                                class="form-control grade-number @error("nilai.{$student->id}.{$field}") is-invalid @enderror"
+                                                data-grade-number @disabled(! $canManageNilai)
+                                                aria-label="{{ $label }} {{ $student->mhs_name }}" placeholder="Kosong">
+                                            @error("nilai.{$student->id}.{$field}")
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </td>
+                                    @endforeach
                                     <td>
                                         <select name="nilai[{{ $student->id }}][nilai]"
                                             class="form-select grade-select @error("nilai.{$student->id}.nilai") is-invalid @enderror"
                                             data-grade-select @disabled(! $canManageNilai)
-                                            aria-label="Nilai {{ $student->mhs_name }}">
+                                            aria-label="Nilai huruf {{ $student->mhs_name }}">
                                             <option value="">Belum dinilai</option>
                                             @foreach (['A', 'B', 'C', 'D', 'E'] as $grade)
                                                 <option value="{{ $grade }}" @selected($selectedGrade === $grade)>{{ $grade }}</option>
                                             @endforeach
                                         </select>
+                                        @error("nilai.{$student->id}.nilai")
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
                                     </td>
+                                    @foreach (['nilai_indeks' => ['Nilai indeks', $selectedIndex, 4]] as $field => [$label, $value, $maximum])
+                                        <td>
+                                            <input type="number" name="nilai[{{ $student->id }}][{{ $field }}]"
+                                                value="{{ $value }}" min="0" max="{{ $maximum }}" step="0.01"
+                                                class="form-control grade-number @error("nilai.{$student->id}.{$field}") is-invalid @enderror"
+                                                data-grade-number @disabled(! $canManageNilai)
+                                                aria-label="{{ $label }} {{ $student->mhs_name }}" placeholder="Kosong">
+                                            @error("nilai.{$student->id}.{$field}")
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </td>
+                                    @endforeach
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="py-5 text-center">
+                                    <td colspan="7" class="py-5 text-center">
                                         <i class="fas fa-user-graduate fa-2x text-muted mb-3"></i>
                                         <p class="mb-1 fw-semibold">Belum ada peserta mata kuliah</p>
                                         <small class="text-muted">Pastikan mahasiswa sudah terdaftar pada kelas atau KRS yang disetujui.</small>
@@ -442,7 +483,7 @@ Input, impor, dan ekspor nilai mahasiswa dalam satu halaman
 </section>
 
 <div class="modal fade" id="importNilaiModal" tabindex="-1" aria-labelledby="importNilaiModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <form method="POST" action="{{ $gradeImportUrl }}"
             enctype="multipart/form-data" class="modal-content">
             @csrf
@@ -458,10 +499,12 @@ Input, impor, dan ekspor nilai mahasiswa dalam satu halaman
             <div class="modal-body">
                 <div class="alert alert-info py-2">
                     <i class="fas fa-circle-info me-1"></i>
-                    Unduh file melalui tombol <strong>Ekspor</strong>, ubah kolom <strong>Nilai</strong>, lalu unggah kembali.
-                    Nilai yang diperbolehkan: A, B, C, D, E, atau kosong.
+                    Unduh template OpenFeeder melalui tombol <strong>Ekspor</strong>, isi kolom <strong>Nilai Angka</strong>, lalu unggah kembali. Huruf dan indeks otomatis dihitung dari angka. Jika angka kosong, nilai huruf dan indeks pada file digunakan.
+                    Huruf A–E, indeks 0–4, angka 0–100, atau kosong. Periode, mata kuliah, kelas, dan prodi harus sesuai halaman ini. File lama dengan kolom Nilai tetap dapat diimpor.
                 </div>
 
+                <p class="small text-muted">Import ulang memperbarui nilai peserta yang tercantum di file. Seluruh import dibatalkan jika ada baris tidak valid.</p>
+                <a href="{{ $gradeExportUrl }}" class="btn btn-outline-success mb-3"><i class="fas fa-file-excel me-1"></i> Unduh Template dan Nilai Saat Ini</a>
                 <div class="import-dropzone">
                     <i class="fas fa-file-excel fa-2x text-success mb-3"></i>
                     <label for="grade_import" class="form-label d-block">Pilih file XLSX atau CSV</label>
@@ -493,11 +536,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const gradeCount = document.getElementById('gradedCount');
     const progressBar = document.getElementById('gradeProgressBar');
     const totalStudents = rows.length;
+    const scale = @json(\App\Services\Academic\GradeConversionService::SCALE);
+    const canManage = @json($canManageNilai);
 
     const updateProgress = function () {
-        const completed = document.querySelectorAll('[data-grade-select]').length
-            ? Array.from(document.querySelectorAll('[data-grade-select]')).filter((select) => select.value).length
-            : 0;
+        const completed = rows.filter((row) =>
+            Array.from(row.querySelectorAll('[data-grade-select], [data-grade-number]')).every((input) => input.value !== '')
+        ).length;
         const percentage = totalStudents > 0 ? Math.round((completed / totalStudents) * 100) : 0;
 
         if (gradeCount) {
@@ -510,16 +555,43 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    document.querySelectorAll('[data-grade-select]').forEach(function (select) {
-        select.addEventListener('change', function () {
-            const status = select.closest('tr').querySelector('[data-grade-status]');
-            const isGraded = Boolean(select.value);
-
-            status.classList.toggle('is-graded', isGraded);
-            status.querySelector('span').textContent = isGraded ? 'Sudah dinilai' : 'Belum dinilai';
+    rows.forEach(function (row) {
+        const inputs = Array.from(row.querySelectorAll('[data-grade-select], [data-grade-number]'));
+        const refreshStatus = function () {
+            const complete = inputs.every((input) => input.value !== '');
+            const partial = inputs.some((input) => input.value !== '');
+            const status = row.querySelector('[data-grade-status]');
+            status.classList.toggle('is-graded', complete);
+            status.querySelector('span').textContent = complete ? 'Lengkap' : (partial ? 'Belum lengkap' : 'Belum dinilai');
             updateProgress();
+        };
+        const scoreInput = row.querySelector('[name$="[nilai_angka]"]');
+        const letterInput = row.querySelector('[data-grade-select]');
+        const indexInput = row.querySelector('[name$="[nilai_indeks]"]');
+        const updateEditable = function () {
+            letterInput.disabled = !canManage || scoreInput.value !== '';
+            indexInput.readOnly = scoreInput.value !== '';
+        };
+        scoreInput.addEventListener('input', function () {
+            if (!canManage) return;
+            if (scoreInput.value === '') {
+                letterInput.value = '';
+                indexInput.value = '';
+            } else if (scoreInput.validity.valid) {
+                const score = Number(scoreInput.value);
+                const category = scale.find((item) => score >= item.minimum);
+                if (category) {
+                    letterInput.value = category.huruf;
+                    indexInput.value = category.indeks;
+                }
+            }
+            updateEditable();
+            refreshStatus();
         });
+        updateEditable();
+        inputs.forEach((input) => input.addEventListener('input', refreshStatus));
     });
+    updateProgress();
 
     if (searchInput) {
         searchInput.addEventListener('input', function () {

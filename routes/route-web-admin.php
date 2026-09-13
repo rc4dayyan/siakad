@@ -14,6 +14,9 @@ Route::group(['prefix' => 'web-admin', 'middleware' => ['user-access:Web Adminis
 
         // ADMIN AUTHORITY
 
+        Route::get('/import-nilai', [App\Http\Controllers\Admin\NilaiImportController::class, 'index'])->name('nilai-import.index');
+        Route::post('/import-nilai', [App\Http\Controllers\Admin\NilaiImportController::class, 'store'])->name('nilai-import.store');
+
         // PERSIAPAN AKADEMIK BARU
         Route::get('/persiapan-akademik-baru', [App\Http\Controllers\Admin\AcademicPreparationController::class, 'index'])->name('academic-preparation.index');
         Route::post('/persiapan-akademik-baru/tahun-akademik', [App\Http\Controllers\Admin\AcademicPreparationController::class, 'storeAcademicYear'])->name('academic-preparation.academic-year.store');

@@ -17,8 +17,15 @@ class NilaiMahasiswa extends Model
         'kelas_id',
         'dosen_id',
         'nilai',
+        'nilai_indeks',
+        'nilai_angka',
         'keterangan',
     ];
+
+    protected function casts(): array
+    {
+        return ['nilai_indeks' => 'decimal:2', 'nilai_angka' => 'decimal:2'];
+    }
 
     public function scopeForAcademicPeriod(Builder $query, PeriodeAkademik|int|null $period): Builder
     {

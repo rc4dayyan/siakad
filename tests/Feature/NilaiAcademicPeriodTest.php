@@ -105,6 +105,7 @@ class NilaiAcademicPeriodTest extends TestCase
         $this->assertTrue($activeView->getData()['nilai']->contains(fn (array $row) => $row['kode_mata_kuliah'] === 'MK-BELUM-DINILAI' && $row['nilai'] === null
         ));
         $this->assertCount(3, $transcriptView->getData()['nilai']);
+        $this->assertSame('mahasiswa.pages.transkrip-index', $transcriptView->name());
         $this->assertDatabaseMissing('nilai_mahasiswas', [
             'mata_kuliah_id' => $ungradedCourseId,
             'mahasiswa_id' => $this->student->id,
@@ -145,15 +146,39 @@ class NilaiAcademicPeriodTest extends TestCase
             'dosen_id' => $this->lecturerId,
             'nilai' => 'A',
         ]);
+        $outsider = $this->student('MHS-OUTSIDER', $this->activeClassId);
+        $outsiderClass = $this->kelas('KELAS-PRIVATE', $this->closedPeriod);
+        $outsiderCourse = $this->course('MK-PRIVATE', $this->closedPeriod, $outsiderClass);
+        NilaiMahasiswa::create([
+            'mahasiswa_id' => $outsider->id, 'taka_id' => $this->closedPeriod->id,
+            'mata_kuliah_id' => $outsiderCourse, 'kelas_id' => $outsiderClass,
+            'dosen_id' => $this->lecturerId, 'nilai' => 'E',
+        ]);
+        $this->actingAs($this->student, 'mahasiswa');
+        $preview = app(StudentNilaiController::class)->index(
+            Request::create('/nilai-kuliah', 'GET', ['transkrip' => 1, 'mahasiswa_id' => $outsider->id]),
+            app(AcademicPeriodContext::class), app(StudentAcademicContext::class)
+        );
+        $previewData = $preview->getData();
+        $this->assertSame('mahasiswa.pages.transkrip-index', $preview->name());
+        $previewHtml = view('base.cetak.transkrip-content', $previewData)->render();
+        foreach (['TRANSKRIP NILAI SEMENTARA', 'SEMESTER 1', 'SEMESTER 2', 'Total SKS', 'IPK', '3,50', 'MK-AKTIF', 'MK-LAMA'] as $text) {
+            $this->assertStringContainsString($text, $previewHtml);
+        }
+        $this->assertStringNotContainsString('MK-PRIVATE', $previewHtml);
+        $this->assertStringNotContainsString('MHS-OUTSIDER', $previewHtml);
         $pdf = Mockery::mock(\Barryvdh\DomPDF\PDF::class);
 
         Pdf::shouldReceive('loadView')
             ->once()
-            ->withArgs(function (string $view, array $data): bool {
+            ->withArgs(function (string $view, array $data) use ($previewData): bool {
                 $this->assertSame('base.cetak.cetak-transkrip-mahasiswa', $view);
                 $this->assertSame('Pendidikan Agama Islam', $data['program']->name);
                 $this->assertSame([1, 2], $data['semesters']->pluck('number')->all());
                 $this->assertSame(4, $data['totalCredits']);
+                $this->assertEquals($previewData['semesters']->toArray(), $data['semesters']->toArray());
+                $this->assertSame($previewData['totalCredits'], $data['totalCredits']);
+                $this->assertSame($previewData['ipk'], $data['ipk']);
                 $this->assertEqualsWithDelta(3.5, $data['ipk'], 0.001);
 
                 return true;
@@ -267,6 +292,26 @@ class NilaiAcademicPeriodTest extends TestCase
             'smt_id' => 2,
             'code' => 'KHS-2',
         ]);
+    }
+
+    public function test_transcript_shared_layout_displays_semesters_after_the_first_pair(): void
+    {
+        $semesters = collect(range(1, 5))->map(fn ($number) => [
+            'number' => $number, 'courses' => collect(), 'credits' => 0, 'ips' => null,
+        ]);
+        $html = view('base.cetak.transkrip-content', [
+            'student' => $this->student, 'program' => null, 'semesters' => $semesters,
+            'totalCredits' => 0, 'ipk' => null, 'hasIncompleteGrade' => true, 'printedAt' => now(),
+        ])->render();
+        foreach (range(1, 5) as $number) {
+            $this->assertStringContainsString("SEMESTER {$number}", $html);
+        }
+        $this->assertStringContainsString('Nilai belum keluar/mata kuliah belum dinilai.', $html);
+        $emptyHtml = view('base.cetak.transkrip-content', [
+            'student' => $this->student, 'program' => null, 'semesters' => collect(),
+            'totalCredits' => 0, 'ipk' => null, 'hasIncompleteGrade' => false, 'printedAt' => now(),
+        ])->render();
+        $this->assertStringContainsString('Belum ada mata kuliah yang tercatat pada transkrip.', $emptyHtml);
     }
 
     private function createBaseTables(): void

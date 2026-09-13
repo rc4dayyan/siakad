@@ -10,6 +10,8 @@ use App\Models\NilaiMahasiswa;
 use App\Models\PenawaranMataKuliah;
 use App\Models\TahunAkademik;
 use App\Services\Academic\AcademicPeriodContext;
+use App\Services\Academic\GradeConversionService;
+use App\Services\Imports\OfferingGradeFileService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -184,11 +186,18 @@ class MataKuliahController extends Controller
             'nilai' => ['required', 'array'],
             'nilai.*.mahasiswa_id' => ['required', 'integer', Rule::in($allowedStudentIds)],
             'nilai.*.nilai' => ['nullable', 'in:A,B,C,D,E'],
+            'nilai.*.nilai_indeks' => ['nullable', 'numeric', 'between:0,4'],
+            'nilai.*.nilai_angka' => ['nullable', 'numeric', 'between:0,100'],
         ], [
+            'nilai.*.nilai.in' => 'Nilai huruf harus A, B, C, D, E, atau kosong.',
+            'nilai.*.nilai_indeks.numeric' => 'Nilai indeks harus berupa angka.',
+            'nilai.*.nilai_indeks.between' => 'Nilai indeks harus antara 0 dan 4.',
+            'nilai.*.nilai_angka.numeric' => 'Nilai angka harus berupa angka.',
+            'nilai.*.nilai_angka.between' => 'Nilai angka harus antara 0 dan 100.',
             'nilai.*.mahasiswa_id.in' => 'Mahasiswa harus tercatat pada KRS yang disetujui untuk mata kuliah ini.',
         ]);
 
-        DB::transaction(fn () => $this->persistGrades($validated['nilai'], $period, $penawaran));
+        DB::transaction(fn () => $this->persistGrades(GradeConversionService::apply($validated['nilai']), $period, $penawaran));
 
         return redirect()->route('dosen.akademik.matkul-nilai', $penawaran)
             ->with('success', 'Nilai mahasiswa berhasil disimpan.');
@@ -198,20 +207,16 @@ class MataKuliahController extends Controller
     {
         $period = $context->published();
         $this->ensureOwned($penawaran, $period);
-        $penawaran->load(['masterMataKuliah', 'kelas']);
+        $penawaran->load(['masterMataKuliah', 'kelas', 'pstudi', 'legacyMataKuliah']);
         $grades = NilaiMahasiswa::query()
             ->forAcademicPeriod($period)
             ->where('penawaran_mata_kuliah_id', $penawaran->id)
-            ->pluck('nilai', 'mahasiswa_id');
+            ->get()->keyBy('mahasiswa_id');
         $participants = $this->participants($penawaran)->orderBy('mhs_nim')->get();
 
         return (new FastExcel($participants))->download(
             'nilai-'.$penawaran->code.'-'.$penawaran->kelas->code.'-'.$period->code.'.xlsx',
-            fn (Mahasiswa $student) => [
-                'NIM' => (string) $student->mhs_nim,
-                'Nama Mahasiswa' => $student->mhs_name,
-                'Nilai' => $grades->get($student->id),
-            ]
+            fn (Mahasiswa $student) => OfferingGradeFileService::exportRow($student, $grades->get($student->id), $penawaran, $period)
         );
     }
 
@@ -248,6 +253,8 @@ class MataKuliahController extends Controller
             throw ValidationException::withMessages(['import' => 'File import tidak berisi data nilai.']);
         }
 
+        $rows = OfferingGradeFileService::normalize($rows, $penawaran, $period);
+
         $missingHeaders = array_diff(['NIM', 'Nama Mahasiswa', 'Nilai'], array_keys($rows->first()));
         if ($missingHeaders !== []) {
             throw ValidationException::withMessages([
@@ -266,6 +273,17 @@ class MataKuliahController extends Controller
             $rowNumber = $index + 2;
             $nim = trim((string) ($row['NIM'] ?? ''));
             $grade = strtoupper(trim((string) ($row['Nilai'] ?? '')));
+            $numericGrades = [];
+            foreach (['Nilai Indeks' => ['nilai_indeks', 4], 'Nilai Angka' => ['nilai_angka', 100]] as $column => [$field, $maximum]) {
+                if (! array_key_exists($column, $row)) {
+                    continue;
+                }
+                $value = str_replace(',', '.', trim((string) ($row[$column] ?? '')));
+                if ($value !== '' && (! is_numeric($value) || ! is_finite((float) $value) || (float) $value < 0 || (float) $value > $maximum)) {
+                    $errors[] = "Baris {$rowNumber}: {$column} harus antara 0 dan {$maximum}, atau kosong.";
+                }
+                $numericGrades[$field] = $value === '' ? null : round((float) $value, 2);
+            }
 
             if ($nim === '') {
                 $errors[] = "Baris {$rowNumber}: NIM wajib diisi.";
@@ -279,6 +297,7 @@ class MataKuliahController extends Controller
                 $prepared[] = [
                     'mahasiswa_id' => $participants->get($nim)->id,
                     'nilai' => $grade !== '' ? $grade : null,
+                    ...$numericGrades,
                 ];
             }
 
@@ -291,7 +310,7 @@ class MataKuliahController extends Controller
             ]);
         }
 
-        DB::transaction(fn () => $this->persistGrades($prepared, $period, $penawaran));
+        DB::transaction(fn () => $this->persistGrades(GradeConversionService::apply($prepared), $period, $penawaran));
 
         return redirect()->route('dosen.akademik.matkul-nilai', $penawaran)
             ->with('success', count($prepared).' nilai mahasiswa berhasil diimpor.');
@@ -363,6 +382,7 @@ class MataKuliahController extends Controller
                     'kelas_id' => $penawaran->kelas_id,
                     'dosen_id' => auth('dosen')->id(),
                     'nilai' => $grade['nilai'] ?? null,
+                    ...array_intersect_key($grade, array_flip(['nilai_indeks', 'nilai_angka'])),
                 ]
             );
         }

@@ -685,7 +685,7 @@ class KrsWorkflowTest extends TestCase
         }
 
         $this->assertCount(1, $rows);
-        $this->assertSame('B', $rows->first()['Nilai']);
+        $this->assertSame('B', $rows->first()['Nilai Huruf']);
 
         DB::table('tahun_akademiks')->where('id', $data['periodId'])->update([
             'status' => 'closed',
@@ -1395,6 +1395,158 @@ class KrsWorkflowTest extends TestCase
         ])->render();
         $this->assertStringContainsString('Ruang Kerja Akademik', $html);
         $this->assertStringContainsString('1 jadwal mingguan', $html);
+    }
+
+    public function test_openfeeder_grade_import_stores_all_grade_forms_and_rejects_invalid_rows(): void
+    {
+        (require database_path('migrations/2026_09_13_000001_add_numeric_grades_to_nilai_mahasiswas.php'))->up();
+        $data = $this->academicData();
+        $data['master']->update(['code' => 'PAI.01']);
+        DB::table('kelas')->where('id', $data['classId'])->update(['name' => 'PAI I A']);
+        $offering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $krsService = app(KrsService::class);
+        $krs = $krsService->add($krsService->forRegistration($data['registration']), $offering);
+        $krsService->submit($krs);
+        $krsService->decide($krs->fresh(), $data['advisor'], Krs::STATUS_APPROVED, null);
+        $administrator = $this->webAdministrator('OPENFEEDERGRADE');
+        $row = [
+            'NIM' => $data['student']->mhs_nim, 'Nama Mahasiswa' => $data['student']->mhs_name,
+            'Kode Mata Kuliah' => 'PAI.01', 'Nama Mata Kuliah' => $data['master']->name,
+            'Semester' => '20261', 'Nama Kelas' => 'A', 'Nilai Huruf' => 'B',
+            'Nilai Indeks' => 3, 'Nilai Angka' => 80, 'Kode Prodi' => '86208',
+        ];
+        $path = sys_get_temp_dir().'/openfeeder-grades-'.uniqid().'.xlsx';
+        try {
+            (new FastExcel(collect([$row])))->export($path);
+            $file = new UploadedFile($path, 'nilai.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true);
+            $this->actingAs($administrator)->post(route('web-admin.nilai-import.store'), ['periode' => '20261', 'import' => $file])
+                ->assertRedirect(route('web-admin.nilai-import.index'))->assertSessionHasNoErrors();
+        } finally {
+            @unlink($path);
+        }
+        $grade = NilaiMahasiswa::where('penawaran_mata_kuliah_id', $offering->id)->sole();
+        $this->assertSame('B', $grade->nilai);
+        $this->assertSame('3.00', $grade->nilai_indeks);
+        $this->assertSame('80.00', $grade->nilai_angka);
+        $service = app(\App\Services\Imports\NilaiOpenFeederImportService::class);
+        $period = \App\Models\TahunAkademik::findOrFail($data['periodId']);
+        foreach ([
+            [$row, [...$row, 'NIM' => 'UNKNOWN']],
+            [[...$row, 'Nilai Angka' => 101]],
+            [[...$row, 'Semester' => '20251']],
+            [$row, $row],
+        ] as $invalidRows) {
+            try {
+                $service->import(collect($invalidRows), $period);
+                $this->fail('Invalid grade import was accepted.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('import', $exception->errors());
+            }
+            $this->assertSame(1, NilaiMahasiswa::count());
+            $this->assertSame('80.00', $grade->fresh()->nilai_angka);
+        }
+        $service->import(collect([[...$row, 'Nilai Angka' => 90, 'Nilai Indeks' => 4, 'Nilai Huruf' => 'A']]), $period);
+        $this->assertSame(1, NilaiMahasiswa::count());
+        $this->assertSame('90.00', $grade->fresh()->nilai_angka);
+        $krs->update(['status' => Krs::STATUS_DRAFT]);
+        try {
+            $service->import(collect([$row]), $period);
+            $this->fail('Unapproved KRS was accepted.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('import', $exception->errors());
+        }
+        $period->update(['status' => 'closed']);
+        try {
+            $service->import(collect([$row]), $period);
+            $this->fail('Closed period was accepted.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('import', $exception->errors());
+        }
+        $administrator->update(['type' => 4]);
+        $this->actingAs($administrator)->get(route('web-admin.nilai-import.index'))->assertRedirect(route('error.access'));
+    }
+
+    public function test_grade_page_edits_and_round_trips_all_three_values(): void
+    {
+        (require database_path('migrations/2026_09_13_000001_add_numeric_grades_to_nilai_mahasiswas.php'))->up();
+        $data = $this->academicData();
+        $offering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $service = app(KrsService::class);
+        $krs = $service->add($service->forRegistration($data['registration']), $offering);
+        $service->submit($krs);
+        $service->decide($krs->fresh(), $data['advisor'], Krs::STATUS_APPROVED, null);
+        $this->actingAs($this->webAdministrator('THREEGRADEADMIN'));
+        $this->withSession([AcademicPeriodContext::SESSION_KEY => $data['periodId']]);
+        $studentId = $data['student']->id;
+        $url = route('web-admin.master.penawaran-grades-store', $offering);
+        $payload = ['mahasiswa_id' => $studentId, 'nilai' => 'B', 'nilai_indeks' => '3.00', 'nilai_angka' => '82.50'];
+        $this->post($url, ['_form' => 'manual-nilai', 'nilai' => [$studentId => $payload]])
+            ->assertSessionHasNoErrors()->assertRedirect(route('web-admin.master.penawaran-grades', $offering));
+        $grade = NilaiMahasiswa::where('penawaran_mata_kuliah_id', $offering->id)->sole();
+        $this->assertSame('3.00', $grade->nilai_indeks);
+        $this->assertSame('82.50', $grade->nilai_angka);
+        $view = app(\App\Http\Controllers\Admin\PenawaranMataKuliahController::class)
+            ->grades($offering, app(AcademicPeriodContext::class));
+        $template = str_replace("@extends('base.base-dash-index')", '', file_get_contents(resource_path('views/user/admin/master/admin-matkul-nilai.blade.php')));
+        $html = \Illuminate\Support\Facades\Blade::render($template."@yield('content')", $view->getData());
+        foreach (['Nilai Huruf', 'Nilai Indeks', 'Nilai Angka', 'value="3.00"', 'value="82.50"'] as $text) {
+            $this->assertStringContainsString($text, $html);
+        }
+        $this->post($url, ['nilai' => [$studentId => [...$payload, 'nilai_indeks' => 5, 'nilai_angka' => -1]]])
+            ->assertSessionHasErrors(["nilai.{$studentId}.nilai_indeks", "nilai.{$studentId}.nilai_angka"]);
+        $this->assertSame('82.50', $grade->fresh()->nilai_angka);
+        $export = $this->get(route('web-admin.master.penawaran-grades-export', $offering))->assertOk();
+        $path = sys_get_temp_dir().'/three-grade-export-'.uniqid().'.xlsx';
+        try {
+            file_put_contents($path, $export->streamedContent());
+            $row = (new FastExcel)->import($path)->first();
+            $this->assertSame([
+                'NIM', 'Nama Mahasiswa', 'Kode Mata Kuliah', 'Nama Mata Kuliah', 'Semester',
+                'Nama Kelas', 'Nilai Huruf', 'Nilai Indeks', 'Nilai Angka', 'Kode Prodi', 'Nama Prodi',
+            ], array_keys($row));
+            $this->assertSame('20261', (string) $row['Semester']);
+            $this->assertSame('86208', (string) $row['Kode Prodi']);
+
+            $this->assertEquals(3.00, $row['Nilai Indeks']);
+            $this->assertEquals(82.5, $row['Nilai Angka']);
+            $grade->update(['nilai_indeks' => 0, 'nilai_angka' => 0]);
+            $file = new UploadedFile($path, 'nilai.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true);
+            $this->post(route('web-admin.master.penawaran-grades-import', $offering), ['_form' => 'import-nilai', 'import' => $file])
+                ->assertSessionHasNoErrors();
+            $this->assertSame('3.00', $grade->fresh()->nilai_indeks);
+            $this->assertSame('82.50', $grade->fresh()->nilai_angka);
+            $numericOnly = [...$row, 'Nilai Huruf' => '', 'Nilai Indeks' => '', 'Nilai Angka' => 90];
+            (new FastExcel(collect([$numericOnly])))->export($path);
+            $this->post(route('web-admin.master.penawaran-grades-import', $offering), [
+                '_form' => 'import-nilai',
+                'import' => new UploadedFile($path, 'nilai.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true),
+            ])->assertSessionHasNoErrors();
+            $this->assertSame('A', $grade->fresh()->nilai);
+            $this->assertSame('4.00', $grade->fresh()->nilai_indeks);
+            foreach (['Semester' => '20251', 'Kode Mata Kuliah' => 'OTHER', 'Nama Kelas' => 'OTHER', 'Kode Prodi' => '88204'] as $column => $value) {
+                (new FastExcel(collect([[...$numericOnly, $column => $value]])))->export($path);
+                $this->post(route('web-admin.master.penawaran-grades-import', $offering), [
+                    '_form' => 'import-nilai',
+                    'import' => new UploadedFile($path, 'nilai.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true),
+                ])->assertSessionHasErrors('import');
+                $this->assertSame('90.00', $grade->fresh()->nilai_angka);
+            }
+
+        } finally {
+            @unlink($path);
+        }
+        $this->post($url, ['nilai' => [$studentId => ['mahasiswa_id' => $studentId, 'nilai_angka' => 90]]])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('A', $grade->fresh()->nilai);
+        $this->assertSame('4.00', $grade->fresh()->nilai_indeks);
+        $this->post($url, ['nilai' => [$studentId => [...$payload, 'nilai' => 'A', 'nilai_indeks' => 4, 'nilai_angka' => 0]]])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('E', $grade->fresh()->nilai);
+        $this->assertSame('0.00', $grade->fresh()->nilai_indeks);
+        $this->post($url, ['nilai' => [$studentId => [...$payload, 'nilai_indeks' => '', 'nilai_angka' => '']]])
+            ->assertSessionHasNoErrors();
+        $this->assertNull($grade->fresh()->nilai_indeks);
+        $this->assertNull($grade->fresh()->nilai_angka);
     }
 
     private function academicData(): array

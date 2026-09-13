@@ -51,6 +51,10 @@ class StudentNilaiController extends Controller
             ->orderBy('taka_id')
             ->get();
 
+        if ($isTranscript) {
+            return view('mahasiswa.pages.transkrip-index', array_merge($data, $this->transcriptData($user, $context, $studentContext)));
+        }
+
         return view('mahasiswa.pages.nilai-index', $data);
     }
 
@@ -59,6 +63,18 @@ class StudentNilaiController extends Controller
         StudentAcademicContext $studentContext
     ) {
         $student = FacadesAuth::guard('mahasiswa')->user();
+        $safeNim = trim((string) preg_replace('/[^A-Za-z0-9_-]+/', '-', $student->mhs_nim), '-');
+
+        return PDF::loadView('base.cetak.cetak-transkrip-mahasiswa', $this->transcriptData($student, $context, $studentContext))
+            ->setPaper('a4', 'landscape')
+            ->download('Transkrip-Nilai-Sementara-'.($safeNim ?: 'mahasiswa').'.pdf');
+    }
+
+    private function transcriptData(
+        Mahasiswa $student,
+        AcademicPeriodContext $context,
+        StudentAcademicContext $studentContext
+    ): array {
         $registrations = $student->registrasiAkademik()
             ->with(['taka', 'kelas.pstudi.head'])
             ->orderBy('semester_mahasiswa')
@@ -111,9 +127,8 @@ class StudentNilaiController extends Controller
         $gradedRows = $rows->filter(fn (array $row) => $row['angka_kredit'] !== null);
         $gradedCredits = (int) $gradedRows->sum('sks');
         $ipk = $gradedCredits > 0 ? (float) $gradedRows->sum('angka_kredit') / $gradedCredits : null;
-        $safeNim = trim((string) preg_replace('/[^A-Za-z0-9_-]+/', '-', $student->mhs_nim), '-');
 
-        return PDF::loadView('base.cetak.cetak-transkrip-mahasiswa', [
+        return [
             'student' => $student,
             'program' => $program,
             'semesters' => $semesters,
@@ -122,9 +137,7 @@ class StudentNilaiController extends Controller
             'hasIncompleteGrade' => $rows->contains(fn (array $row) => $row['nilai_indeks'] === null),
             'web' => webSettings::query()->first(),
             'printedAt' => now(),
-        ])
-            ->setPaper('a4', 'landscape')
-            ->download('Transkrip-Nilai-Sementara-'.($safeNim ?: 'mahasiswa').'.pdf');
+        ];
     }
 
     private function gradeIndex(?string $grade): ?float
