@@ -52,7 +52,8 @@ class AcademicScheduleGeneratorService
             $this->reject('Belum ada penawaran mata kuliah pada periode yang dipilih.');
         }
 
-        $dailyMinutes = $this->minutes($dayEndsAt) - $this->minutes($dayStartsAt);
+        $windows = AcademicScheduleBreak::teachingWindows($this->minutes($dayStartsAt), $this->minutes($dayEndsAt));
+        $dailyMinutes = collect($windows)->map(fn (array $window): int => $window[1] - $window[0])->max() ?? 0;
         $maximumCreditsPerSession = intdiv($dailyMinutes, $minutesPerCredit);
         if ($maximumCreditsPerSession < 1) {
             $this->reject("Rentang jam harian minimal harus memuat 1 SKS ({$minutesPerCredit} menit).");
@@ -94,6 +95,7 @@ class AcademicScheduleGeneratorService
                         $dayStartsAt,
                         $dayEndsAt,
                         $duration,
+                        $minutesPerCredit,
                         $gapMinutes,
                         $occupancy
                     );
@@ -136,6 +138,7 @@ class AcademicScheduleGeneratorService
         string $dayStartsAt,
         string $dayEndsAt,
         int $duration,
+        int $minutesPerCredit,
         int $gapMinutes,
         array $occupancy
     ): ?array {
@@ -143,32 +146,35 @@ class AcademicScheduleGeneratorService
         $endBoundary = $this->minutes($dayEndsAt);
 
         foreach ($days as $day) {
-            for ($start = $startBoundary; $start + $duration <= $endBoundary; $start += 10) {
-                $end = $start + $duration;
-                $conflictStart = max($startBoundary, $start - $gapMinutes);
-                $conflictEnd = min($endBoundary, $end + $gapMinutes);
+            // Restart the shared credit grid at 16:30 after the fixed break.
+            foreach (AcademicScheduleBreak::teachingWindows($startBoundary, $endBoundary) as [$windowStart, $windowEnd]) {
+                for ($start = $windowStart; $start + $duration <= $windowEnd; $start += $minutesPerCredit) {
+                    $end = $start + $duration;
+                    $conflictStart = max($startBoundary, $start - $gapMinutes);
+                    $conflictEnd = min($endBoundary, $end + $gapMinutes);
 
-                if ($this->isBusy($occupancy['kelas'][(int) $day][$offering->kelas_id] ?? [], $conflictStart, $conflictEnd)
-                    || $this->isBusy($occupancy['dosen'][(int) $day][$offering->dosen_utama_id] ?? [], $conflictStart, $conflictEnd)) {
-                    continue;
-                }
-
-                foreach ($rooms as $room) {
-                    if ($this->isBusy($occupancy['ruang'][(int) $day][$room->id] ?? [], $conflictStart, $conflictEnd)) {
+                    if ($this->isBusy($occupancy['kelas'][(int) $day][$offering->kelas_id] ?? [], $conflictStart, $conflictEnd)
+                        || $this->isBusy($occupancy['dosen'][(int) $day][$offering->dosen_utama_id] ?? [], $conflictStart, $conflictEnd)) {
                         continue;
                     }
 
-                    $attributes = [
-                        'penawaran_mata_kuliah_id' => $offering->id,
-                        'kelas_id' => $offering->kelas_id,
-                        'dosen_id' => $offering->dosen_utama_id,
-                        'ruang_id' => $room->id,
-                        'hari' => (int) $day,
-                        'mulai' => $this->time($start),
-                        'selesai' => $this->time($end),
-                    ];
+                    foreach ($rooms as $room) {
+                        if ($this->isBusy($occupancy['ruang'][(int) $day][$room->id] ?? [], $conflictStart, $conflictEnd)) {
+                            continue;
+                        }
 
-                    return $attributes;
+                        $attributes = [
+                            'penawaran_mata_kuliah_id' => $offering->id,
+                            'kelas_id' => $offering->kelas_id,
+                            'dosen_id' => $offering->dosen_utama_id,
+                            'ruang_id' => $room->id,
+                            'hari' => (int) $day,
+                            'mulai' => $this->time($start),
+                            'selesai' => $this->time($end),
+                        ];
+
+                        return $attributes;
+                    }
                 }
             }
         }

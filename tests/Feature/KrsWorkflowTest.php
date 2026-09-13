@@ -19,6 +19,7 @@ use App\Models\PertemuanKuliah;
 use App\Models\RegistrasiMahasiswa;
 use App\Models\User;
 use App\Services\Academic\AcademicPeriodContext;
+use App\Services\Academic\AcademicScheduleGeneratorService;
 use App\Services\Academic\AttendanceEligibilityService;
 use App\Services\Academic\KrsService;
 use App\Services\Academic\MeetingGeneratorService;
@@ -862,7 +863,108 @@ class KrsWorkflowTest extends TestCase
         app(ScheduleConflictService::class)->validate($offering, [...$attributes, 'ruang_id' => $smallRoom, 'hari' => 2]);
     }
 
-    public function test_printed_weekly_timetable_contains_professional_schedule_details(): void
+    public function test_schedule_generator_aligns_mixed_credit_durations_and_respects_gaps(): void
+    {
+        $data = $this->academicData();
+        $this->room(40, 'GRID');
+        foreach ([1, 2, 3] as $credits) {
+            $master = MasterMataKuliah::create([
+                'program_studi' => 'PAI', 'semester' => $credits, 'name' => 'Kuliah '.$credits, 'sks' => $credits,
+            ]);
+            PenawaranMataKuliah::create([
+                ...$this->offeringAttributes($data), 'master_mata_kuliah_id' => $master->id, 'sks' => $credits,
+            ]);
+        }
+        $period = \App\Models\TahunAkademik::findOrFail($data['periodId']);
+        $generator = app(AcademicScheduleGeneratorService::class);
+        $this->assertSame(['created' => 3, 'skipped' => 0], $generator->generate(
+            $period, [1], '08:00', '15:00', 45, 10, true
+        ));
+        $this->assertDatabaseCount('jadwal_mingguans', 0);
+        $generator->generate($period, [1], '08:00', '15:00', 45, 10);
+        $schedules = JadwalMingguan::orderBy('mulai')->get();
+        $this->assertSame(['08:00', '11:00', '13:15'], $schedules->map(fn ($schedule) => substr($schedule->mulai, 0, 5))->all());
+        $this->assertSame(['10:15', '12:30', '14:00'], $schedules->map(fn ($schedule) => substr($schedule->selesai, 0, 5))->all());
+        foreach ($schedules as $schedule) {
+            $start = explode(':', $schedule->mulai);
+            $end = explode(':', $schedule->selesai);
+            $startMinutes = (int) $start[0] * 60 + (int) $start[1];
+            $endMinutes = (int) $end[0] * 60 + (int) $end[1];
+            $this->assertSame(0, ($startMinutes - 480) % 45);
+            $this->assertSame($schedule->sks * 45, $endMinutes - $startMinutes);
+        }
+        $this->assertSame(['created' => 0, 'skipped' => 3], $generator->generate(
+            $period, [1], '08:00', '15:00', 45, 10
+        ));
+    }
+
+    public function test_generator_and_printout_use_only_the_fixed_afternoon_break(): void
+    {
+        $data = $this->academicData();
+        $this->room(40, 'BREAK');
+        foreach ([1, 2] as $credits) {
+            $master = MasterMataKuliah::create([
+                'program_studi' => 'PAI', 'semester' => 1, 'name' => 'Kuliah '.$credits, 'sks' => $credits,
+            ]);
+            PenawaranMataKuliah::create([
+                ...$this->offeringAttributes($data), 'master_mata_kuliah_id' => $master->id, 'sks' => $credits,
+            ]);
+        }
+        $period = \App\Models\TahunAkademik::findOrFail($data['periodId']);
+        $generator = app(AcademicScheduleGeneratorService::class);
+        try {
+            $generator->generate($period, [4], '16:10', '16:30', 50, 0);
+            $this->fail('Teaching must not be scheduled during the fixed break.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('schedule', $exception->errors());
+            $this->assertDatabaseCount('jadwal_mingguans', 0);
+        }
+        $generator->generate($period, [4], '14:30', '18:00', 50, 10);
+        $schedules = JadwalMingguan::orderBy('mulai')->get();
+        $this->assertSame(['14:30', '16:30'], $schedules->map(fn ($schedule) => substr($schedule->mulai, 0, 5))->all());
+        $this->assertSame(['16:10', '17:20'], $schedules->map(fn ($schedule) => substr($schedule->selesai, 0, 5))->all());
+        $administrator = $this->webAdministrator('BREAKPRINT');
+        $request = Request::create('/web-admin/master/jadwal-mingguan/cetak', 'GET', [
+            'taka_id' => $period->id, 'pstudi_id' => $data['programId'],
+        ]);
+        $request->setUserResolver(fn () => $administrator);
+        $view = app(\App\Http\Controllers\Admin\JadwalMingguanController::class)
+            ->printTimetable($request, app(AcademicPeriodContext::class));
+        $rows = collect($view->getData()['days']->first()['rows']);
+        $breaks = $rows->where('type', 'break')->values();
+        $this->assertCount(1, $breaks);
+        $this->assertSame('16:10', $breaks[0]['start']);
+        $this->assertSame('16:30', $breaks[0]['end']);
+        $html = $view->render();
+        $this->assertSame(1, substr_count($html, '>ISTIRAHAT</td>'));
+        $this->assertStringContainsString('16.10 – 16.30', $html);
+    }
+
+    public function test_schedule_generator_rolls_back_when_no_aligned_slot_fits(): void
+    {
+        $data = $this->academicData();
+        $this->room(40, 'GRIDFULL');
+        foreach ([1, 2] as $credits) {
+            $master = MasterMataKuliah::create([
+                'program_studi' => 'PAI', 'semester' => $credits, 'name' => 'Kuliah '.$credits, 'sks' => $credits,
+            ]);
+            PenawaranMataKuliah::create([
+                ...$this->offeringAttributes($data), 'master_mata_kuliah_id' => $master->id, 'sks' => $credits,
+            ]);
+        }
+        $period = \App\Models\TahunAkademik::findOrFail($data['periodId']);
+        try {
+            // The former 10-minute search could fit 09:50–10:40; the next
+            // aligned start is 10:30, which exceeds the operating window.
+            app(AcademicScheduleGeneratorService::class)->generate($period, [1], '08:00', '10:40', 50, 10);
+            $this->fail('Generation must reject a session outside the shared grid.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('schedule', $exception->errors());
+            $this->assertDatabaseCount('jadwal_mingguans', 0);
+        }
+    }
+
+    public function test_printed_weekly_timetable_matches_semester_matrix_layout(): void
     {
         $data = $this->academicData();
         $offering = PenawaranMataKuliah::create($this->offeringAttributes($data));
@@ -878,13 +980,15 @@ class KrsWorkflowTest extends TestCase
         ];
         JadwalMingguan::create([
             ...$attributes,
+            'sks' => 2,
             'code' => 'JMG-PRINT',
             'fingerprint' => JadwalMingguan::fingerprint($attributes),
         ]);
         $administrator = $this->webAdministrator('TIMETABLEPRINT');
         $this->actingAs($administrator);
-        session([AcademicPeriodContext::SESSION_KEY => $data['periodId']]);
+        session()->forget(AcademicPeriodContext::SESSION_KEY);
         $request = Request::create('/web-admin/master/jadwal-mingguan/cetak', 'GET', [
+            'taka_id' => $data['periodId'],
             'pstudi_id' => $data['programId'],
         ]);
         $request->setUserResolver(fn () => $administrator);
@@ -894,18 +998,93 @@ class KrsWorkflowTest extends TestCase
         $html = $view->render();
 
         $this->assertStringContainsString('Pengantar Studi Islam', $html);
-        $this->assertStringContainsString('PAI 1A', $html);
-        $this->assertStringContainsString('Ruang PRINT', $html);
-        $this->assertStringContainsString('3 SKS', $html);
-        $this->assertStringContainsString('Nama Dosen', $html);
-        $this->assertStringNotContainsString('Kode Dosen', $html);
-        $this->assertStringContainsString('Dosen Wali', $html);
+        $this->assertStringContainsString('Semester I', $html);
+        $this->assertStringContainsString('<th>KD</th>', $html);
+        $this->assertStringContainsString($data['advisor']->dsn_code, $html);
+        $this->assertStringContainsString('08.00 – 08.50', $html);
+        $this->assertStringContainsString('2026/2027 Ganjil', $html);
+        $this->assertStringContainsString('class="letterhead"', $html);
+        $this->assertStringContainsString('class="print-note"', $html);
+        $this->assertStringContainsString('class="document-footer"', $html);
+        $this->assertStringContainsString('size: A4 landscape', $html);
+        $this->assertStringNotContainsString('Nama Dosen', $html);
+        $this->assertStringContainsString('summary__item', $html);
         $this->assertSame([
             'schedules' => 1,
             'classes' => 1,
             'lecturers' => 1,
             'rooms' => 1,
         ], $view->getData()['summary']);
+
+        $laterAttributes = [...$attributes, 'mulai' => '10:00', 'selesai' => '11:40'];
+        JadwalMingguan::create([
+            ...$laterAttributes,
+            'sks' => 2,
+            'code' => 'JMG-PRINT-LATER',
+            'fingerprint' => JadwalMingguan::fingerprint($laterAttributes),
+        ]);
+        $html = app(\App\Http\Controllers\Admin\JadwalMingguanController::class)
+            ->printTimetable($request, app(AcademicPeriodContext::class))->render();
+        $this->assertStringContainsString('09.40 – 10.00', $html);
+        $this->assertStringNotContainsString('class="break">ISTIRAHAT</td>', $html);
+        $this->assertStringContainsString('rowspan="5"', $html);
+
+        $advancedMaster = MasterMataKuliah::create([
+            'program_studi' => 'PAI', 'semester' => 3, 'name' => 'Pedagogik', 'sks' => 3,
+        ]);
+        $advancedOffering = PenawaranMataKuliah::create([
+            ...$this->offeringAttributes($data), 'master_mata_kuliah_id' => $advancedMaster->id,
+        ]);
+        $overlappingAttributes = [
+            ...$attributes, 'penawaran_mata_kuliah_id' => $advancedOffering->id, 'selesai' => '10:30',
+        ];
+        JadwalMingguan::create([
+            ...$overlappingAttributes,
+            'sks' => 3,
+            'code' => 'JMG-PRINT-OVERLAP',
+            'fingerprint' => JadwalMingguan::fingerprint($overlappingAttributes),
+        ]);
+        $view = app(\App\Http\Controllers\Admin\JadwalMingguanController::class)
+            ->printTimetable($request, app(AcademicPeriodContext::class));
+        $rows = $view->getData()['days']->first()['rows'];
+        $this->assertCount(6, $rows);
+        $this->assertCount(1, $rows[0]['cells']->get(1));
+        $this->assertCount(1, $rows[0]['cells']->get(3));
+        $this->assertSame(4, $rows[0]['spans'][3]);
+        $this->assertSame(2, $rows[0]['spans'][1]);
+        $this->assertSame('08:50', $rows[0]['end']);
+        $this->assertSame('09:40', $rows[1]['end']);
+        $this->assertTrue($rows[1]['skip'][3]);
+        $this->assertTrue($rows[2]['skip'][3]);
+        $this->assertSame('schedule', $rows[1]['type']);
+        $html = $view->render();
+        $this->assertSame(1, substr_count($html, '>Pedagogik</div>'));
+        $this->assertStringNotContainsString('class="break">ISTIRAHAT</td>', $html);
+    }
+
+    public function test_printed_weekly_timetable_rejects_unavailable_period(): void
+    {
+        $data = $this->academicData();
+        DB::table('tahun_akademiks')->where('id', $data['periodId'])->update([
+            'status' => 'archived',
+            'is_active' => false,
+        ]);
+        $user = $this->webAdministrator('PRINTDENIED');
+        $user->type = 2;
+        $request = Request::create('/web-admin/master/jadwal-mingguan/cetak', 'GET', [
+            'taka_id' => $data['periodId'],
+            'pstudi_id' => $data['programId'],
+        ]);
+        $request->setUserResolver(fn () => $user);
+
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        try {
+            app(\App\Http\Controllers\Admin\JadwalMingguanController::class)
+                ->printTimetable($request, app(AcademicPeriodContext::class));
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+            throw $exception;
+        }
     }
 
     public function test_weekly_schedule_list_combines_academic_resource_and_day_filters(): void

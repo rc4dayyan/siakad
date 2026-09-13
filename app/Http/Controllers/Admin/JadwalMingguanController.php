@@ -12,7 +12,9 @@ use App\Models\PertemuanKuliah;
 use App\Models\ProgramStudi;
 use App\Models\Ruang;
 use App\Models\Settings\webSettings;
+use App\Models\TahunAkademik;
 use App\Services\Academic\AcademicPeriodContext;
+use App\Services\Academic\AcademicScheduleBreak;
 use App\Services\Academic\MeetingGeneratorService;
 use App\Services\Academic\ScheduleConflictService;
 use App\Services\Academic\ScheduleNotificationService;
@@ -49,10 +51,15 @@ class JadwalMingguanController extends Controller
 
     public function printTimetable(Request $request, AcademicPeriodContext $context): View
     {
-        $period = $context->requireCurrent($request->user());
         $validated = $request->validate([
+            'taka_id' => ['nullable', 'integer', 'exists:tahun_akademiks,id'],
             'pstudi_id' => ['nullable', 'integer', 'exists:program_studis,id'],
         ]);
+        $period = isset($validated['taka_id'])
+            ? TahunAkademik::findOrFail($validated['taka_id'])
+            : $context->requireCurrent($request->user());
+        abort_unless($context->isAvailableTo($period, $request->user()), 403);
+
         $program = isset($validated['pstudi_id'])
             ? ProgramStudi::findOrFail($validated['pstudi_id'])
             : ProgramStudi::query()->orderBy('name')->first();
@@ -76,33 +83,80 @@ class JadwalMingguanController extends Controller
             ->sort()
             ->values();
 
-        $days = $schedules->groupBy('hari')->map(function ($daySchedules, $day) use ($semesters): array {
-            $slots = $daySchedules
-                ->groupBy(fn (JadwalMingguan $schedule) => substr($schedule->mulai, 0, 5).'|'.substr($schedule->selesai, 0, 5))
-                ->sortKeys()
-                ->values();
+        // Generated sessions retain their SKS, allowing the printout to recover
+        // the configured minutes per credit without changing stored schedules.
+        $creditDurations = $schedules->map(function (JadwalMingguan $schedule): ?int {
+            $credits = $schedule->sks ?? $schedule->penawaranMataKuliah?->sks;
+            $start = explode(':', $schedule->mulai);
+            $end = explode(':', $schedule->selesai);
+            $duration = ((int) $end[0] * 60 + (int) $end[1]) - ((int) $start[0] * 60 + (int) $start[1]);
+            if (! $credits || $duration <= 0 || $duration % $credits !== 0) {
+                return null;
+            }
+            $minutes = intdiv($duration, $credits);
+
+            return $minutes >= 30 && $minutes <= 60 ? $minutes : null;
+        })->filter();
+        $minutesPerCredit = $creditDurations->mode()[0] ?? 50;
+
+        $days = $schedules->groupBy('hari')->map(function ($daySchedules, $day) use ($semesters, $minutesPerCredit): array {
+            // Add one boundary per credit; retain actual start/end times for
+            // breaks and sessions that do not align with other semesters.
+            $boundaries = $daySchedules->flatMap(function (JadwalMingguan $schedule) use ($minutesPerCredit): array {
+                $start = explode(':', $schedule->mulai);
+                $end = explode(':', $schedule->selesai);
+                $startMinutes = (int) $start[0] * 60 + (int) $start[1];
+                $endMinutes = (int) $end[0] * 60 + (int) $end[1];
+                $times = [];
+                for ($minute = $startMinutes; $minute < $endMinutes; $minute += $minutesPerCredit) {
+                    $times[] = sprintf('%02d:%02d', intdiv($minute, 60), $minute % 60);
+                }
+                $times[] = substr($schedule->selesai, 0, 5);
+
+                return $times;
+            })->unique()->sort()->values();
+            $firstTime = $boundaries->first();
+            $lastTime = $boundaries->last();
+            if ($firstTime < AcademicScheduleBreak::END && $lastTime > AcademicScheduleBreak::START) {
+                $boundaries = $boundaries->filter(fn (string $time): bool => $time <= AcademicScheduleBreak::START || $time >= AcademicScheduleBreak::END
+                )->merge([
+                    max($firstTime, AcademicScheduleBreak::START),
+                    min($lastTime, AcademicScheduleBreak::END),
+                ])->unique()->sort()->values();
+            }
             $rows = [];
 
-            foreach ($slots as $index => $slotSchedules) {
-                $first = $slotSchedules->first();
+            for ($index = 0; $index < $boundaries->count() - 1; $index++) {
+                $start = $boundaries[$index];
+                $end = $boundaries[$index + 1];
+                $active = $daySchedules->filter(fn (JadwalMingguan $schedule) => substr($schedule->mulai, 0, 5) < $end && substr($schedule->selesai, 0, 5) > $start
+                );
                 $rows[] = [
-                    'type' => 'schedule',
-                    'start' => substr($first->mulai, 0, 5),
-                    'end' => substr($first->selesai, 0, 5),
+                    'type' => $active->isEmpty() && $start >= AcademicScheduleBreak::START && $end <= AcademicScheduleBreak::END ? 'break' : 'schedule',
+                    'start' => $start,
+                    'end' => $end,
                     'cells' => $semesters->mapWithKeys(fn (int $semester) => [
-                        $semester => $slotSchedules->filter(
+                        $semester => $active->filter(
                             fn (JadwalMingguan $schedule) => (int) $schedule->penawaranMataKuliah?->masterMataKuliah?->semester === $semester
                         )->values(),
                     ]),
+                    'spans' => [],
+                    'skip' => [],
                 ];
+            }
 
-                $next = $slots->get($index + 1)?->first();
-                if ($next && substr($next->mulai, 0, 5) > substr($first->selesai, 0, 5)) {
-                    $rows[] = [
-                        'type' => 'break',
-                        'start' => substr($first->selesai, 0, 5),
-                        'end' => substr($next->mulai, 0, 5),
-                    ];
+            // Merge consecutive cells with the same schedules, including empty cells.
+            foreach ($semesters as $semester) {
+                for ($index = 0; $index < count($rows); $index += $span) {
+                    $span = 1;
+                    $ids = $rows[$index]['cells']->get($semester)->modelKeys();
+                    while (isset($rows[$index + $span])
+                        && $rows[$index + $span]['type'] === $rows[$index]['type']
+                        && $rows[$index + $span]['cells']->get($semester)->modelKeys() === $ids) {
+                        $rows[$index + $span]['skip'][$semester] = true;
+                        $span++;
+                    }
+                    $rows[$index]['spans'][$semester] = $span;
                 }
             }
 

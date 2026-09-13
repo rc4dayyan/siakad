@@ -31,29 +31,24 @@
         .summary__item small, .summary__item strong { display: block; }
         .summary__item small { margin-bottom: 4px; color: var(--muted); font-size: 7px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
         .summary__item strong { overflow: hidden; color: var(--navy); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-        .schedule-table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; border: 1px solid #9fb1ac; border-radius: 7px; overflow: hidden; }
-        .schedule-table th, .schedule-table td { border-right: 1px solid #afbfba; border-bottom: 1px solid #afbfba; padding: 6px 5px; text-align: center; vertical-align: middle; }
-        .schedule-table tr > :last-child { border-right: 0; }
-        .schedule-table tbody tr:last-child > td { border-bottom: 0; }
+        .schedule-table { color: #000; width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .schedule-table th, .schedule-table td { height: 36px; border: 1px solid #222; padding: 6px 8px; text-align: center; vertical-align: middle; overflow-wrap: anywhere; }
+        .schedule-table th { font-size: 12px; font-weight: 800; text-transform: uppercase; }
         .schedule-table thead { display: table-header-group; }
-        .schedule-table thead th { color: #fff; background: var(--navy); font-size: 7px; letter-spacing: .04em; text-transform: uppercase; }
-        .schedule-table tbody tr { break-inside: avoid; page-break-inside: avoid; }
-        .schedule-table tbody tr:nth-child(even) td { background: #f7faf9; }
-        .schedule-table .number { width: 30px; font-weight: 700; }
-        .schedule-table .day { width: 58px; color: var(--navy); background: var(--green-soft) !important; font-weight: 800; letter-spacing: .04em; }
-        .schedule-table .time { width: 67px; font-weight: 700; white-space: nowrap; }
-        .schedule-table .lecturer-name { width: 92px; font-size: 7px; font-weight: 700; line-height: 1.25; }
-        .course-item + .course-item { margin-top: 5px; padding-top: 5px; border-top: 1px dashed #c3cecb; }
-        .course-item strong { display: block; color: var(--navy); font-size: 8px; line-height: 1.25; }
-        .course-item span { display: block; margin-top: 2px; color: var(--muted); font-size: 6.8px; line-height: 1.2; }
-        .break { color: #786128; background: #fbf5e7 !important; font-weight: 800; letter-spacing: .25em; }
-        .empty { padding: 30px !important; color: var(--muted); }
+        .schedule-table tbody { break-inside: avoid; page-break-inside: avoid; }
+        .schedule-table tr { break-inside: avoid; page-break-inside: avoid; }
+        .number { width: 5%; }
+        .day { width: 6.5%; }
+        .time { width: 12%; white-space: nowrap; }
+        .lecturer-code { width: 4.5%; }
+        .schedule-table .course { text-align: left; }
+        .course-item + .course-item { margin-top: 5px; padding-top: 5px; border-top: 1px dotted #777; }
+        .break-row .time, .break-row .break { font-size: 13px; font-weight: 800; font-style: italic; }
+        .empty { height: 70px !important; }
+        .is-dense .schedule-table th, .is-dense .schedule-table td { padding: 5px 3px; font-size: 9px; }
         .print-note { margin-top: 14px; padding: 10px 12px; border-radius: 8px; color: var(--muted); background: #f4f8f7; line-height: 1.45; }
         .print-note strong { color: var(--navy); }
         .document-footer { display: flex; justify-content: space-between; margin-top: 14px; padding-top: 7px; border-top: 1px solid var(--line); color: #84928d; font-size: 7px; }
-        .is-dense .schedule-table th, .is-dense .schedule-table td { padding: 4px 3px; }
-        .is-dense .course-item strong { font-size: 7px; }
-        .is-dense .course-item span { font-size: 6px; }
         @media print {
             body { background: #fff; }
             .print-toolbar { display: none; }
@@ -100,65 +95,61 @@
         </section>
 
         <table class="schedule-table">
+            <colgroup>
+                <col class="number"><col class="day"><col class="time">
+                @foreach ($semesters as $semester)
+                    <col><col class="lecturer-code">
+                @endforeach
+            </colgroup>
             <thead>
                 <tr>
-                    <th class="number" rowspan="2">No.</th>
-                    <th class="day" rowspan="2">Hari</th>
-                    <th class="time" rowspan="2">Waktu</th>
+                    <th>No</th>
+                    <th>Hari</th>
+                    <th>Waktu</th>
                     @foreach ($semesters as $semester)
-                        <th colspan="2">Semester {{ [1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI', 7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII', 13 => 'XIII', 14 => 'XIV'][$semester] ?? $semester }}</th>
-                    @endforeach
-                </tr>
-                <tr>
-                    @foreach ($semesters as $semester)
-                        <th>Mata Kuliah</th>
-                        <th class="lecturer-name">Nama Dosen</th>
+                        <th>Semester {{ [1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI', 7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII', 13 => 'XIII', 14 => 'XIV'][$semester] ?? $semester }}</th>
+                        <th>KD</th>
                     @endforeach
                 </tr>
             </thead>
-            <tbody>
-                @forelse ($days as $dayIndex => $day)
+            @forelse ($days as $dayIndex => $day)
+                <tbody>
                     @foreach ($day['rows'] as $rowIndex => $row)
-                        <tr>
+                        <tr class="{{ $row['type'] === 'break' ? 'break-row' : '' }}">
                             @if ($rowIndex === 0)
-                                <td rowspan="{{ count($day['rows']) }}" class="number">{{ $dayIndex + 1 }}</td>
-                                <td rowspan="{{ count($day['rows']) }}" class="day">{{ $day['label'] }}</td>
+                                <td rowspan="{{ count($day['rows']) }}">{{ $dayIndex + 1 }}</td>
+                                <td rowspan="{{ count($day['rows']) }}">{{ $day['label'] }}</td>
                             @endif
-                            <td class="time">{{ str_replace(':', '.', $row['start']) }}–{{ str_replace(':', '.', $row['end']) }}</td>
-                            @if ($row['type'] === 'break')
-                                <td colspan="{{ max(1, $semesters->count() * 2) }}" class="break">ISTIRAHAT</td>
-                            @else
-                                @foreach ($semesters as $semester)
+                            <td class="time">{{ str_replace(':', '.', $row['start']) }} – {{ str_replace(':', '.', $row['end']) }}</td>
+                            @foreach ($semesters as $semester)
+                                @if ($row['skip'][$semester] ?? false)
+                                    @continue
+                                @endif
+                                @if ($row['type'] === 'break')
+                                    <td rowspan="{{ $row['spans'][$semester] }}" class="break">ISTIRAHAT</td>
+                                    <td rowspan="{{ $row['spans'][$semester] }}">-</td>
+                                @else
                                     @php($cellSchedules = $row['cells']->get($semester, collect()))
-                                    <td>
+                                    <td rowspan="{{ $row['spans'][$semester] }}" class="course">
                                         @foreach ($cellSchedules as $schedule)
-                                            <div class="course-item">
-                                                <strong>{{ $schedule->penawaranMataKuliah?->masterMataKuliah?->name ?? 'Mata Kuliah Legacy' }}</strong>
-                                                <span>
-                                                    {{ $schedule->penawaranMataKuliah?->masterMataKuliah?->code ?? $schedule->penawaranMataKuliah?->code ?? 'Tanpa kode' }} ·
-                                                    {{ $schedule->kelas?->name ?? 'Tanpa kelas' }} ·
-                                                    {{ $schedule->ruang?->name ?? 'Ruang belum ditentukan' }}
-                                                    @if ($schedule->ruang?->gedung?->name) ({{ $schedule->ruang->gedung->name }}) @endif ·
-                                                    {{ $schedule->sks ?? $schedule->penawaranMataKuliah?->sks ?? 0 }} SKS
-                                                </span>
-                                            </div>
+                                            <div class="course-item">{{ $schedule->penawaranMataKuliah?->masterMataKuliah?->name ?? 'Mata Kuliah Legacy' }}</div>
                                         @endforeach
                                     </td>
-                                    <td class="lecturer-name">
+                                    <td rowspan="{{ $row['spans'][$semester] }}">
                                         @forelse ($cellSchedules as $schedule)
-                                            @if (! $loop->first)<br><br>@endif{{ $schedule->dosen?->dsn_name ?? 'Dosen belum ditentukan' }}
+                                            <div class="course-item">{{ $schedule->dosen?->dsn_code ?: '-' }}</div>
                                         @empty
-                                            —
+                                            -
                                         @endforelse
                                     </td>
-                                @endforeach
-                            @endif
+                                @endif
+                            @endforeach
                         </tr>
                     @endforeach
-                @empty
-                    <tr><td colspan="{{ 3 + ($semesters->count() * 2) }}" class="empty">Belum ada jadwal mingguan untuk program studi dan periode ini.</td></tr>
-                @endforelse
-            </tbody>
+                </tbody>
+            @empty
+                <tbody><tr><td colspan="{{ 3 + ($semesters->count() * 2) }}" class="empty">Belum ada jadwal mingguan untuk program studi dan periode ini.</td></tr></tbody>
+            @endforelse
         </table>
 
         <aside class="print-note">

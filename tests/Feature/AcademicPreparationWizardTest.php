@@ -494,7 +494,7 @@ class AcademicPreparationWizardTest extends TestCase
             'taka_id' => $period->id,
             'days' => [1],
             'day_starts_at' => '08:00',
-            'day_ends_at' => '12:00',
+            'day_ends_at' => '12:30',
             'minutes_per_credit' => 50,
             'gap_minutes' => 10,
             'meeting_count' => 16,
@@ -533,8 +533,8 @@ class AcademicPreparationWizardTest extends TestCase
             'kelas_id' => $classId,
             'dosen_id' => $lecturerId,
             'hari' => 1,
-            'mulai' => '09:50',
-            'selesai' => '11:30',
+            'mulai' => '10:30',
+            'selesai' => '12:10',
         ]);
         $this->assertDatabaseCount('pertemuan_kuliahs', 32);
         $this->assertDatabaseCount('jadwal_kuliahs', 32);
