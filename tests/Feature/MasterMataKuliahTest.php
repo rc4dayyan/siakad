@@ -101,6 +101,7 @@ class MasterMataKuliahTest extends TestCase
 
         (require database_path('migrations/2026_07_17_000001_create_master_mata_kuliahs_table.php'))->up();
         (require database_path('migrations/2026_08_17_000001_add_code_to_master_mata_kuliahs_table.php'))->up();
+        (require database_path('migrations/2026_09_13_000001_allow_distinct_master_course_codes_with_same_name.php'))->up();
         (require database_path('migrations/2026_07_17_000002_add_mid_to_mata_kuliahs_table.php'))->up();
     }
 
@@ -108,10 +109,10 @@ class MasterMataKuliahTest extends TestCase
     {
         $this->seed(MasterMataKuliahSeeder::class);
 
-        $this->assertDatabaseCount('master_mata_kuliahs', 186);
+        $this->assertDatabaseCount('master_mata_kuliahs', 191);
         $this->assertSame(62, MasterMataKuliah::where('program_studi', '86208')->count());
         $this->assertSame(62, MasterMataKuliah::where('program_studi', '86233')->count());
-        $this->assertSame(62, MasterMataKuliah::where('program_studi', '88204')->count());
+        $this->assertSame(67, MasterMataKuliah::where('program_studi', '88204')->count());
         $this->assertDatabaseHas('master_mata_kuliahs', [
             'program_studi' => '88204',
             'code' => 'PGBA01',
@@ -119,6 +120,33 @@ class MasterMataKuliahTest extends TestCase
             'sks' => 2,
             'semester' => 1,
         ]);
+    }
+
+    public function test_seeder_includes_additional_pba_codes_without_duplicates_or_replacing_existing_codes(): void
+    {
+        $this->seed(MasterMataKuliahSeeder::class);
+        $this->seed(MasterMataKuliahSeeder::class);
+
+        $this->assertDatabaseCount('master_mata_kuliahs', 191);
+
+        foreach ([
+            ['PGBA011', 'Filsafat Umum', 2],
+            ['PGBA018', 'Nahwu I', 2],
+            ['PGBA033', "Maharah Al Istima'", 4],
+            ['PGBA049', 'Lughah Al Jaraid Walmajalah', 6],
+            ['PGBA053', "Qiro'ah Al Kutub", 6],
+        ] as [$code, $name, $semester]) {
+            $this->assertDatabaseHas('master_mata_kuliahs', [
+                'program_studi' => '88204',
+                'code' => $code,
+                'name' => $name,
+                'sks' => 2,
+                'semester' => $semester,
+            ]);
+        }
+
+        $this->assertDatabaseHas('master_mata_kuliahs', ['code' => 'PGBA33', 'name' => 'Keterampilan Bahasa']);
+        $this->assertDatabaseHas('master_mata_kuliahs', ['code' => 'PGBA53', 'name' => 'Keterampilan Komputer']);
     }
 
     public function test_import_accepts_reference_headers_and_roman_semesters(): void
