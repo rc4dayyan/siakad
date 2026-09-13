@@ -535,7 +535,7 @@
                                 @endif
                             </strong>
                             <small class="d-block mt-1">
-                                Estimasi memakai {{ number_format($scheduleSummary['total_credits']) }} SKS, hari dan jam operasional, durasi per SKS, serta jeda yang dipilih.
+                                Estimasi memakai tiga slot kuliah per hari. Istirahat ditetapkan pukul 16.10–16.30.
                                 @if ($scheduleSummary['largest_capacity'] > 0)
                                     Kelas belum terjadwal terbesar memerlukan kapasitas {{ number_format($scheduleSummary['largest_capacity']) }}; tersedia {{ number_format($scheduleSummary['adequate_rooms']) }} ruang yang mampu menampungnya.
                                 @endif
@@ -593,7 +593,7 @@
                                     <label class="form-label d-block">Hari Kuliah</label>
                                     @foreach ([1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis', 5 => "Jum'at", 6 => 'Sabtu'] as $dayValue => $dayLabel)
                                         <div class="form-check form-check-inline">
-                                            <input type="checkbox" name="days[]" id="schedule-day-{{ $dayValue }}" class="form-check-input" value="{{ $dayValue }}" @checked(in_array($dayValue, array_map('intval', (array) old('days', [1, 2, 3, 4, 5, 6])), true))>
+                                            <input type="checkbox" name="days[]" id="schedule-day-{{ $dayValue }}" class="form-check-input" value="{{ $dayValue }}" @checked(in_array($dayValue, array_map('intval', (array) old('days', [4, 5, 6])), true))>
                                             <label for="schedule-day-{{ $dayValue }}" class="form-check-label">{{ $dayLabel }}</label>
                                         </div>
                                     @endforeach
@@ -601,19 +601,20 @@
                                 </div>
                                 <div class="col-md-3">
                                     <label for="schedule-day-start" class="form-label">Jam Operasional Mulai</label>
-                                    <input type="time" name="day_starts_at" id="schedule-day-start" class="form-control" value="{{ old('day_starts_at', '08:00') }}" required>
+                                    <input type="time" name="day_starts_at" id="schedule-day-start" class="form-control" value="13:00" readonly required>
                                 </div>
                                 <div class="col-md-3">
                                     <label for="schedule-day-end" class="form-label">Jam Operasional Selesai</label>
-                                    <input type="time" name="day_ends_at" id="schedule-day-end" class="form-control" value="{{ old('day_ends_at', '17:00') }}" required>
+                                    <input type="time" name="day_ends_at" id="schedule-day-end" class="form-control" value="18:10" readonly required>
                                 </div>
                                 <div class="col-md-3">
-                                    <label for="schedule-credit-minutes" class="form-label">Menit per SKS</label>
-                                    <input type="number" name="minutes_per_credit" id="schedule-credit-minutes" class="form-control" value="{{ old('minutes_per_credit', 50) }}" min="30" max="60" required>
+                                    <label for="schedule-session-minutes" class="form-label">Slot Jam Kuliah</label>
+                                    <input type="text" id="schedule-session-minutes" class="form-control" value="13.00–14.40 / 14.40–16.10 / 16.30–18.10" readonly>
+                                    <input type="hidden" name="minutes_per_credit" id="schedule-credit-minutes" value="50">
                                 </div>
                                 <div class="col-md-3">
                                     <label for="schedule-gap-minutes" class="form-label">Jeda Antarjadwal</label>
-                                    <input type="number" name="gap_minutes" id="schedule-gap-minutes" class="form-control" value="{{ old('gap_minutes', 10) }}" min="0" max="60" required>
+                                    <input type="number" name="gap_minutes" id="schedule-gap-minutes" class="form-control" value="0" readonly required>
                                 </div>
                                 <div class="col-md-3">
                                     <label for="schedule-meeting-count" class="form-label">Jumlah Pertemuan</label>
@@ -705,7 +706,6 @@
                 const gapMinutes = document.getElementById('schedule-gap-minutes');
                 const days = [...document.querySelectorAll('input[name="days[]"]')];
                 const offeringCount = {{ (int) $scheduleSummary['required_offerings'] }};
-                const totalCredits = {{ (int) $scheduleSummary['total_credits'] }};
                 const availableRooms = {{ (int) $scheduleSummary['rooms'] }};
                 const clearExclusions = document.getElementById('clear-schedule-exclusions');
 
@@ -723,8 +723,7 @@
                 const updateRoomEstimate = function () {
                     const selectedDays = days.filter(day => day.checked).length;
                     const dailyMinutes = toMinutes(endsAt.value) - toMinutes(startsAt.value);
-                    const workload = (totalCredits * Number(minutesPerCredit.value || 0))
-                        + (offeringCount * Number(gapMinutes.value || 0));
+                    const workload = offeringCount;
 
                     if (selectedDays < 1 || dailyMinutes <= 0 || workload <= 0) {
                         requiredRooms.textContent = '—';
@@ -732,7 +731,7 @@
                         return;
                     }
 
-                    const estimate = Math.ceil(workload / (selectedDays * dailyMinutes));
+                    const estimate = Math.ceil(workload / (selectedDays * 3));
                     const shortage = Math.max(0, estimate - availableRooms);
                     requiredRooms.textContent = new Intl.NumberFormat('id-ID').format(estimate);
                     status.textContent = shortage > 0

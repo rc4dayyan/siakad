@@ -116,9 +116,8 @@ class AcademicPreparationController extends Controller
                 ->count('penawaran_mata_kuliah_id')
             : 0;
         $availableRoomCount = Ruang::query()->whereIn('type', [0, 1])->count();
-        $defaultWeeklyMinutesPerRoom = 6 * 9 * 60;
         $defaultRequiredRooms = $requiredOfferingCount > 0
-            ? (int) ceil((($totalOfferingCredits * 50) + ($requiredOfferingCount * 10)) / $defaultWeeklyMinutesPerRoom)
+            ? (int) ceil($requiredOfferingCount / (3 * 3))
             : 0;
         $scheduleSummary = [
             'offerings' => $offeringCount,

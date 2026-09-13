@@ -525,16 +525,16 @@ class AcademicPreparationWizardTest extends TestCase
             'kelas_id' => $classId,
             'dosen_id' => $lecturerId,
             'hari' => 1,
-            'mulai' => '08:00',
-            'selesai' => '09:40',
+            'mulai' => '13:00',
+            'selesai' => '14:40',
         ]);
         $this->assertDatabaseHas('jadwal_mingguans', [
             'penawaran_mata_kuliah_id' => $secondOfferingId,
             'kelas_id' => $classId,
             'dosen_id' => $lecturerId,
             'hari' => 1,
-            'mulai' => '10:30',
-            'selesai' => '12:10',
+            'mulai' => '14:40',
+            'selesai' => '16:10',
         ]);
         $this->assertDatabaseCount('pertemuan_kuliahs', 32);
         $this->assertDatabaseCount('jadwal_kuliahs', 32);
@@ -655,7 +655,7 @@ class AcademicPreparationWizardTest extends TestCase
         $this->assertDatabaseCount('tahun_akademik', 0);
     }
 
-    public function test_schedule_generator_splits_seven_credits_into_balanced_sessions(): void
+    public function test_schedule_generator_places_seven_credit_course_in_one_reference_slot(): void
     {
         $academicYear = TahunAkademikInduk::create([
             'name' => 'Tahun Akademik 2026/2027',
@@ -772,16 +772,15 @@ class AcademicPreparationWizardTest extends TestCase
             ->where('penawaran_mata_kuliah_id', $offeringId)
             ->orderBy('hari')
             ->get();
-        $this->assertCount(2, $schedules);
+        $this->assertCount(1, $schedules);
         $this->assertDatabaseHas('penawaran_mata_kuliahs', [
             'id' => $optionalOfferingId,
             'wajib_dijadwalkan' => false,
         ]);
         $this->assertDatabaseMissing('jadwal_mingguans', ['penawaran_mata_kuliah_id' => $optionalOfferingId]);
-        $this->assertSame([4, 3], $schedules->pluck('sks')->map(fn ($credits) => (int) $credits)->all());
-        $this->assertSame([5, 6], $schedules->pluck('hari')->map(fn ($day) => (int) $day)->all());
-        $this->assertSame(['13:00', '16:00'], [substr($schedules[0]->mulai, 0, 5), substr($schedules[0]->selesai, 0, 5)]);
-        $this->assertSame(['13:00', '15:15'], [substr($schedules[1]->mulai, 0, 5), substr($schedules[1]->selesai, 0, 5)]);
+        $this->assertSame([7], $schedules->pluck('sks')->map(fn ($credits) => (int) $credits)->all());
+        $this->assertSame([5], $schedules->pluck('hari')->map(fn ($day) => (int) $day)->all());
+        $this->assertSame(['13:00', '14:40'], [substr($schedules[0]->mulai, 0, 5), substr($schedules[0]->selesai, 0, 5)]);
     }
 
     private function staffUser(int $type, string $code): User

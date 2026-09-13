@@ -278,6 +278,7 @@ Untuk satu mahasiswa saja, pilih periode 2026 melalui pemilih periode, buka Edit
 
 #Reset data dan pakai data dummy
 php artisan db:seed --class=ResetDanSeedDataAkademikSeeder --force
+php artisan db:seed --class=KodeDosenBerurutanSeeder --force
 
 1. tambah tahun akademik
 2. tambah periode akademik

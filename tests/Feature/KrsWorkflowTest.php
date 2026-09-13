@@ -863,7 +863,7 @@ class KrsWorkflowTest extends TestCase
         app(ScheduleConflictService::class)->validate($offering, [...$attributes, 'ruang_id' => $smallRoom, 'hari' => 2]);
     }
 
-    public function test_schedule_generator_aligns_mixed_credit_durations_and_respects_gaps(): void
+    public function test_schedule_generator_uses_reference_slots_independent_of_credits_and_duration_inputs(): void
     {
         $data = $this->academicData();
         $this->room(40, 'GRID');
@@ -883,16 +883,9 @@ class KrsWorkflowTest extends TestCase
         $this->assertDatabaseCount('jadwal_mingguans', 0);
         $generator->generate($period, [1], '08:00', '15:00', 45, 10);
         $schedules = JadwalMingguan::orderBy('mulai')->get();
-        $this->assertSame(['08:00', '11:00', '13:15'], $schedules->map(fn ($schedule) => substr($schedule->mulai, 0, 5))->all());
-        $this->assertSame(['10:15', '12:30', '14:00'], $schedules->map(fn ($schedule) => substr($schedule->selesai, 0, 5))->all());
-        foreach ($schedules as $schedule) {
-            $start = explode(':', $schedule->mulai);
-            $end = explode(':', $schedule->selesai);
-            $startMinutes = (int) $start[0] * 60 + (int) $start[1];
-            $endMinutes = (int) $end[0] * 60 + (int) $end[1];
-            $this->assertSame(0, ($startMinutes - 480) % 45);
-            $this->assertSame($schedule->sks * 45, $endMinutes - $startMinutes);
-        }
+        $this->assertSame(['13:00', '14:40', '16:30'], $schedules->map(fn ($schedule) => substr($schedule->mulai, 0, 5))->all());
+        $this->assertSame(['14:40', '16:10', '18:10'], $schedules->map(fn ($schedule) => substr($schedule->selesai, 0, 5))->all());
+        $this->assertSame([1, 2, 3], $schedules->pluck('sks')->sort()->values()->all());
         $this->assertSame(['created' => 0, 'skipped' => 3], $generator->generate(
             $period, [1], '08:00', '15:00', 45, 10
         ));
@@ -912,17 +905,10 @@ class KrsWorkflowTest extends TestCase
         }
         $period = \App\Models\TahunAkademik::findOrFail($data['periodId']);
         $generator = app(AcademicScheduleGeneratorService::class);
-        try {
-            $generator->generate($period, [4], '16:10', '16:30', 50, 0);
-            $this->fail('Teaching must not be scheduled during the fixed break.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('schedule', $exception->errors());
-            $this->assertDatabaseCount('jadwal_mingguans', 0);
-        }
-        $generator->generate($period, [4], '14:30', '18:00', 50, 10);
+        $generator->generate($period, [4], '14:30', '18:30', 50, 10);
         $schedules = JadwalMingguan::orderBy('mulai')->get();
-        $this->assertSame(['14:30', '16:30'], $schedules->map(fn ($schedule) => substr($schedule->mulai, 0, 5))->all());
-        $this->assertSame(['16:10', '17:20'], $schedules->map(fn ($schedule) => substr($schedule->selesai, 0, 5))->all());
+        $this->assertSame(['13:00', '14:40'], $schedules->map(fn ($schedule) => substr($schedule->mulai, 0, 5))->all());
+        $this->assertSame(['14:40', '16:10'], $schedules->map(fn ($schedule) => substr($schedule->selesai, 0, 5))->all());
         $administrator = $this->webAdministrator('BREAKPRINT');
         $request = Request::create('/web-admin/master/jadwal-mingguan/cetak', 'GET', [
             'taka_id' => $period->id, 'pstudi_id' => $data['programId'],
@@ -931,6 +917,8 @@ class KrsWorkflowTest extends TestCase
         $view = app(\App\Http\Controllers\Admin\JadwalMingguanController::class)
             ->printTimetable($request, app(AcademicPeriodContext::class));
         $rows = collect($view->getData()['days']->first()['rows']);
+        $this->assertSame(['13:00', '14:40', '16:10', '16:30'], $rows->pluck('start')->all());
+        $this->assertSame(['14:40', '16:10', '16:30', '18:10'], $rows->pluck('end')->all());
         $breaks = $rows->where('type', 'break')->values();
         $this->assertCount(1, $breaks);
         $this->assertSame('16:10', $breaks[0]['start']);
@@ -940,11 +928,61 @@ class KrsWorkflowTest extends TestCase
         $this->assertStringContainsString('16.10 – 16.30', $html);
     }
 
+    public function test_schedule_generator_prioritizes_limited_options_and_uses_parallel_rooms(): void
+    {
+        $data = $this->academicData();
+        $firstRoom = $this->room(40, 'PLAN1');
+        $this->room(40, 'PLAN2');
+        $otherLecturer = $this->lecturer('PLAN2', 'Dosen Kedua');
+        $classAttributes = (array) DB::table('kelas')->where('id', $data['classId'])->first();
+        unset($classAttributes['id']);
+        $otherClass = DB::table('kelas')->insertGetId([
+            ...$classAttributes, 'name' => 'Kelas B', 'code' => 'PLAN-B',
+        ]);
+        $blockedClass = DB::table('kelas')->insertGetId([
+            ...$classAttributes, 'name' => 'Kelas C', 'code' => 'PLAN-C',
+        ]);
+        $blocked = [
+            'kelas_id' => $blockedClass, 'dosen_id' => $data['advisor']->id, 'ruang_id' => $firstRoom,
+            'hari' => 1, 'mulai' => '13:00', 'selesai' => '14:40',
+        ];
+        JadwalMingguan::create([
+            ...$blocked, 'code' => 'PLAN-EXISTING', 'fingerprint' => JadwalMingguan::fingerprint($blocked),
+        ]);
+        $afternoonBlocked = [...$blocked, 'dosen_id' => $otherLecturer->id, 'mulai' => '16:30', 'selesai' => '18:10'];
+        JadwalMingguan::create([
+            ...$afternoonBlocked, 'code' => 'PLAN-AFTERNOON', 'fingerprint' => JadwalMingguan::fingerprint($afternoonBlocked),
+        ]);
+        $limitedOffering = PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $otherMaster = MasterMataKuliah::create([
+            'program_studi' => 'PAI', 'semester' => 1, 'name' => 'Kuliah Lain', 'sks' => 3,
+        ]);
+        foreach ([$data['classId'], $otherClass] as $classId) {
+            PenawaranMataKuliah::create([
+                ...$this->offeringAttributes($data), 'master_mata_kuliah_id' => $otherMaster->id,
+                'kelas_id' => $classId, 'dosen_utama_id' => $otherLecturer->id,
+            ]);
+        }
+        $period = \App\Models\TahunAkademik::findOrFail($data['periodId']);
+        $this->assertSame(['created' => 3, 'skipped' => 0], app(AcademicScheduleGeneratorService::class)->generate(
+            $period, [1], '13:00', '16:10', 50, 0
+        ));
+        $limited = JadwalMingguan::where('penawaran_mata_kuliah_id', $limitedOffering->id)->firstOrFail();
+        $this->assertSame('14:40', substr($limited->mulai, 0, 5));
+        $this->assertSame('16:10', substr($limited->selesai, 0, 5));
+        $parallel = JadwalMingguan::whereNotNull('penawaran_mata_kuliah_id')->get()->groupBy('mulai');
+        $this->assertSame(2, $parallel->get($limited->mulai)->count());
+        $this->assertSame(2, $parallel->get($limited->mulai)->pluck('ruang_id')->unique()->count());
+        $this->assertSame('13:00', substr(JadwalMingguan::where('kelas_id', $data['classId'])
+            ->where('dosen_id', $otherLecturer->id)->firstOrFail()->mulai, 0, 5));
+        $this->assertSame('13:00', substr(JadwalMingguan::where('code', 'PLAN-EXISTING')->firstOrFail()->mulai, 0, 5));
+    }
+
     public function test_schedule_generator_rolls_back_when_no_aligned_slot_fits(): void
     {
         $data = $this->academicData();
         $this->room(40, 'GRIDFULL');
-        foreach ([1, 2] as $credits) {
+        foreach ([1, 2, 3, 4] as $credits) {
             $master = MasterMataKuliah::create([
                 'program_studi' => 'PAI', 'semester' => $credits, 'name' => 'Kuliah '.$credits, 'sks' => $credits,
             ]);
@@ -954,8 +992,7 @@ class KrsWorkflowTest extends TestCase
         }
         $period = \App\Models\TahunAkademik::findOrFail($data['periodId']);
         try {
-            // The former 10-minute search could fit 09:50–10:40; the next
-            // aligned start is 10:30, which exceeds the operating window.
+            // A class cannot fit four courses into three slots on one day.
             app(AcademicScheduleGeneratorService::class)->generate($period, [1], '08:00', '10:40', 50, 10);
             $this->fail('Generation must reject a session outside the shared grid.');
         } catch (ValidationException $exception) {

@@ -83,21 +83,8 @@ class JadwalMingguanController extends Controller
             ->sort()
             ->values();
 
-        // Generated sessions retain their SKS, allowing the printout to recover
-        // the configured minutes per credit without changing stored schedules.
-        $creditDurations = $schedules->map(function (JadwalMingguan $schedule): ?int {
-            $credits = $schedule->sks ?? $schedule->penawaranMataKuliah?->sks;
-            $start = explode(':', $schedule->mulai);
-            $end = explode(':', $schedule->selesai);
-            $duration = ((int) $end[0] * 60 + (int) $end[1]) - ((int) $start[0] * 60 + (int) $start[1]);
-            if (! $credits || $duration <= 0 || $duration % $credits !== 0) {
-                return null;
-            }
-            $minutes = intdiv($duration, $credits);
-
-            return $minutes >= 30 && $minutes <= 60 ? $minutes : null;
-        })->filter();
-        $minutesPerCredit = $creditDurations->mode()[0] ?? 50;
+        // Keep two 50-minute rows per generated 100-minute session.
+        $minutesPerCredit = 50;
 
         $days = $schedules->groupBy('hari')->map(function ($daySchedules, $day) use ($semesters, $minutesPerCredit): array {
             // Add one boundary per credit; retain actual start/end times for
@@ -115,6 +102,12 @@ class JadwalMingguanController extends Controller
 
                 return $times;
             })->unique()->sort()->values();
+            $usesFixedSlots = $daySchedules->every(fn (JadwalMingguan $schedule): bool => in_array([
+                substr($schedule->mulai, 0, 5), substr($schedule->selesai, 0, 5),
+            ], AcademicScheduleBreak::TEACHING_SLOTS, true));
+            if ($usesFixedSlots) {
+                $boundaries = collect(AcademicScheduleBreak::PRINT_BOUNDARIES);
+            }
             $firstTime = $boundaries->first();
             $lastTime = $boundaries->last();
             if ($firstTime < AcademicScheduleBreak::END && $lastTime > AcademicScheduleBreak::START) {

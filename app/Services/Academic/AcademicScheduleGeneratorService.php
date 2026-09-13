@@ -42,22 +42,24 @@ class AcademicScheduleGeneratorService
             ->get();
         $requiredOfferings = $offerings->where('wajib_dijadwalkan', true);
         $skipped = $requiredOfferings->where('jadwal_mingguans_count', '>', 0)->count();
+        $lecturerLoads = $requiredOfferings->countBy('dosen_utama_id');
+        $classLoads = $requiredOfferings->countBy('kelas_id');
         $unscheduled = $requiredOfferings
             ->where('jadwal_mingguans_count', 0)
-            ->sortByDesc(fn (PenawaranMataKuliah $offering): string => str_pad((string) $offering->sks, 2, '0', STR_PAD_LEFT)
-                .'|'.str_pad((string) $offering->kapasitas, 5, '0', STR_PAD_LEFT))
-            ->values();
+            ->sortBy([
+                fn (PenawaranMataKuliah $a, PenawaranMataKuliah $b): int => ($lecturerLoads[$b->dosen_utama_id] ?? 0) <=> ($lecturerLoads[$a->dosen_utama_id] ?? 0),
+                fn (PenawaranMataKuliah $a, PenawaranMataKuliah $b): int => ($classLoads[$b->kelas_id] ?? 0) <=> ($classLoads[$a->kelas_id] ?? 0),
+                fn (PenawaranMataKuliah $a, PenawaranMataKuliah $b): int => $b->kapasitas <=> $a->kapasitas,
+                fn (PenawaranMataKuliah $a, PenawaranMataKuliah $b): int => $a->id <=> $b->id,
+            ])->values();
 
         if ($offerings->isEmpty()) {
             $this->reject('Belum ada penawaran mata kuliah pada periode yang dipilih.');
         }
 
-        $windows = AcademicScheduleBreak::teachingWindows($this->minutes($dayStartsAt), $this->minutes($dayEndsAt));
-        $dailyMinutes = collect($windows)->map(fn (array $window): int => $window[1] - $window[0])->max() ?? 0;
-        $maximumCreditsPerSession = intdiv($dailyMinutes, $minutesPerCredit);
-        if ($maximumCreditsPerSession < 1) {
-            $this->reject("Rentang jam harian minimal harus memuat 1 SKS ({$minutesPerCredit} menit).");
-        }
+        // The reference timetable defines fixed slots, independent of SKS,
+        // operating-window inputs and additional gaps between sessions.
+        $gapMinutes = 0;
 
         $occupancy = $this->occupancy($period);
 
@@ -65,6 +67,7 @@ class AcademicScheduleGeneratorService
 
         try {
             $created = 0;
+            $candidates = [];
 
             foreach ($unscheduled as $offering) {
                 if (! $offering->kelas || ! $offering->dosenUtama) {
@@ -81,42 +84,35 @@ class AcademicScheduleGeneratorService
                     $this->reject("Tidak ada ruang dengan kapasitas minimal {$requiredCapacity} untuk {$offering->masterMataKuliah?->name} — {$offering->kelas->name}.");
                 }
 
-                $sessionCredits = $this->splitCredits(
-                    max(1, (int) $offering->sks),
-                    $maximumCreditsPerSession
+                $candidates[$offering->id] = $this->availableSchedules(
+                    $offering,
+                    $eligibleRooms,
+                    $days,
+                    $gapMinutes,
+                    $occupancy
                 );
-
-                foreach ($sessionCredits as $sessionIndex => $credits) {
-                    $duration = $credits * $minutesPerCredit;
-                    $schedule = $this->findAvailableSchedule(
-                        $offering,
-                        $eligibleRooms,
-                        $days,
-                        $dayStartsAt,
-                        $dayEndsAt,
-                        $duration,
-                        $minutesPerCredit,
-                        $gapMinutes,
-                        $occupancy
-                    );
-
-                    if (! $schedule) {
-                        $sessionLabel = count($sessionCredits) > 1
-                            ? ' sesi '.($sessionIndex + 1).' dari '.count($sessionCredits)." ({$credits} SKS)"
-                            : '';
-                        $this->reject("Slot jadwal tidak mencukupi untuk {$offering->masterMataKuliah?->name} — {$offering->kelas->name}{$sessionLabel}. Tambah hari atau rentang jam; tambah ruang hanya membantu jika bentroknya pada ruang.");
-                    }
-
-                    $this->conflicts->validate($offering, $schedule);
-                    JadwalMingguan::create([
-                        ...$schedule,
-                        'sks' => $credits,
-                        'code' => 'JMG-AUTO-'.Str::upper(Str::random(12)),
-                        'fingerprint' => JadwalMingguan::fingerprint($schedule),
-                    ]);
-                    $this->reserve($occupancy, $schedule);
-                    $created++;
+                if (! $candidates[$offering->id]) {
+                    $this->reject("Tidak ada slot jadwal tetap untuk {$offering->masterMataKuliah?->name} — {$offering->kelas->name} pada hari dan jam yang dipilih.");
                 }
+            }
+
+            $attempts = 0;
+            $plan = $this->planSchedules($candidates, $occupancy, $gapMinutes, $attempts);
+            if ($plan === null) {
+                $reason = $attempts >= 5000 ? 'Batas pencarian susunan jadwal tercapai.' : 'Tidak ditemukan susunan jadwal tanpa bentrok.';
+                $this->reject($reason.' Periksa jumlah mata kuliah per kelas dan dosen, hari kuliah, serta jeda antarjadwal. Tambah hari atau kurangi jeda jika memungkinkan.');
+            }
+            foreach ($unscheduled as $offering) {
+                $schedule = $plan[$offering->id];
+                $this->conflicts->validate($offering, $schedule);
+                JadwalMingguan::create([
+                    ...$schedule,
+                    'sks' => $offering->sks,
+                    'code' => 'JMG-AUTO-'.Str::upper(Str::random(12)),
+                    'fingerprint' => JadwalMingguan::fingerprint($schedule),
+                ]);
+                $this->reserve($occupancy, $schedule);
+                $created++;
             }
 
             $dryRun ? DB::rollBack() : DB::commit();
@@ -131,51 +127,99 @@ class AcademicScheduleGeneratorService
         }
     }
 
-    private function findAvailableSchedule(
+    private function availableSchedules(
         PenawaranMataKuliah $offering,
         $rooms,
         array $days,
-        string $dayStartsAt,
-        string $dayEndsAt,
-        int $duration,
-        int $minutesPerCredit,
         int $gapMinutes,
         array $occupancy
-    ): ?array {
-        $startBoundary = $this->minutes($dayStartsAt);
-        $endBoundary = $this->minutes($dayEndsAt);
+    ): array {
+        $schedules = [];
 
         foreach ($days as $day) {
-            // Restart the shared credit grid at 16:30 after the fixed break.
-            foreach (AcademicScheduleBreak::teachingWindows($startBoundary, $endBoundary) as [$windowStart, $windowEnd]) {
-                for ($start = $windowStart; $start + $duration <= $windowEnd; $start += $minutesPerCredit) {
-                    $end = $start + $duration;
-                    $conflictStart = max($startBoundary, $start - $gapMinutes);
-                    $conflictEnd = min($endBoundary, $end + $gapMinutes);
+            foreach (AcademicScheduleBreak::TEACHING_SLOTS as [$startTime, $endTime]) {
+                $start = $this->minutes($startTime);
+                $end = $this->minutes($endTime);
+                $conflictStart = $start;
+                $conflictEnd = $end;
 
-                    if ($this->isBusy($occupancy['kelas'][(int) $day][$offering->kelas_id] ?? [], $conflictStart, $conflictEnd)
-                        || $this->isBusy($occupancy['dosen'][(int) $day][$offering->dosen_utama_id] ?? [], $conflictStart, $conflictEnd)) {
-                        continue;
-                    }
+                if ($this->isBusy($occupancy['kelas'][(int) $day][$offering->kelas_id] ?? [], $conflictStart, $conflictEnd)
+                    || $this->isBusy($occupancy['dosen'][(int) $day][$offering->dosen_utama_id] ?? [], $conflictStart, $conflictEnd)) {
+                    continue;
+                }
 
-                    foreach ($rooms as $room) {
-                        if ($this->isBusy($occupancy['ruang'][(int) $day][$room->id] ?? [], $conflictStart, $conflictEnd)) {
-                            continue;
-                        }
+                $roomIds = $rooms->filter(fn ($room) => ! $this->isBusy(
+                    $occupancy['ruang'][(int) $day][$room->id] ?? [], $conflictStart, $conflictEnd
+                ))->pluck('id')->all();
+                if ($roomIds) {
+                    $schedules[] = [
+                        'penawaran_mata_kuliah_id' => $offering->id,
+                        'kelas_id' => $offering->kelas_id,
+                        'dosen_id' => $offering->dosen_utama_id,
+                        'ruang_id' => $roomIds[0],
+                        'room_choices' => $roomIds,
+                        'hari' => (int) $day,
+                        'mulai' => $this->time($start),
+                        'selesai' => $this->time($end),
+                    ];
+                }
+            }
+        }
 
-                        $attributes = [
-                            'penawaran_mata_kuliah_id' => $offering->id,
-                            'kelas_id' => $offering->kelas_id,
-                            'dosen_id' => $offering->dosen_utama_id,
-                            'ruang_id' => $room->id,
-                            'hari' => (int) $day,
-                            'mulai' => $this->time($start),
-                            'selesai' => $this->time($end),
-                        ];
+        return $schedules;
+    }
 
-                        return $attributes;
+    /** @return array<int, array>|null */
+    private function planSchedules(array $domains, array $occupancy, int $gapMinutes, int &$attempts): ?array
+    {
+        if (! $domains) {
+            return [];
+        }
+        if (++$attempts >= 5000) {
+            return null;
+        }
+        $selectedId = null;
+        $selectedOptions = [];
+        $filtered = [];
+        foreach ($domains as $offeringId => $options) {
+            $available = [];
+            foreach ($options as $option) {
+                $start = $this->minutes($option['mulai']) - $gapMinutes;
+                $end = $this->minutes($option['selesai']) + $gapMinutes;
+                foreach (['kelas' => 'kelas_id', 'dosen' => 'dosen_id'] as $resource => $key) {
+                    if ($this->isBusy($occupancy[$resource][$option['hari']][$option[$key]] ?? [], $start, $end)) {
+                        continue 2;
                     }
                 }
+                foreach ($option['room_choices'] as $roomId) {
+                    if (! $this->isBusy($occupancy['ruang'][$option['hari']][$roomId] ?? [], $start, $end)) {
+                        $option['ruang_id'] = $roomId;
+                        $available[] = $option;
+                        break;
+                    }
+                }
+            }
+            if (! $available) {
+                return null;
+            }
+            $filtered[$offeringId] = $available;
+            if ($selectedId === null || count($available) < count($selectedOptions)) {
+                $selectedId = $offeringId;
+                $selectedOptions = $available;
+            }
+        }
+        unset($filtered[$selectedId]);
+        foreach ($selectedOptions as $schedule) {
+            $nextOccupancy = $occupancy;
+            $this->reserve($nextOccupancy, $schedule);
+            $rest = $this->planSchedules($filtered, $nextOccupancy, $gapMinutes, $attempts);
+            if ($rest !== null) {
+                unset($schedule['room_choices']);
+
+                return [$selectedId => $schedule] + $rest;
+            }
+            if ($attempts >= 5000) {
+                break;
             }
         }
 
@@ -226,18 +270,6 @@ class AcademicScheduleGeneratorService
         }
 
         return false;
-    }
-
-    /** @return list<int> */
-    private function splitCredits(int $totalCredits, int $maximumCreditsPerSession): array
-    {
-        $sessionCount = (int) ceil($totalCredits / $maximumCreditsPerSession);
-        $baseCredits = intdiv($totalCredits, $sessionCount);
-        $remainder = $totalCredits % $sessionCount;
-
-        return collect(range(0, $sessionCount - 1))
-            ->map(fn (int $index): int => $baseCredits + ($index < $remainder ? 1 : 0))
-            ->all();
     }
 
     private function minutes(string $time): int
