@@ -8,7 +8,7 @@
         @page { size: A4 landscape; margin: 8mm; }
         :root { --navy: #0b2135; --green: #117a65; --green-soft: #e7f4f0; --ink: #19313f; --muted: #647681; --line: #cfdad7; --surface: #fff; }
         * { box-sizing: border-box; }
-        body { margin: 0; color: var(--ink); background: #e9efed; font-family: Arial, Helvetica, sans-serif; font-size: 9px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { margin: 0; color: var(--ink); background: #e9efed; font-family: Arial, Helvetica, sans-serif; font-size: 11px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .print-toolbar { position: sticky; z-index: 20; top: 0; display: flex; justify-content: flex-end; gap: 8px; padding: 12px max(18px, calc((100vw - 1120px) / 2)); border-bottom: 1px solid #d6dfdc; background: rgba(255, 255, 255, .96); box-shadow: 0 4px 16px rgba(11, 33, 53, .08); }
         .print-toolbar button { padding: 9px 14px; border: 1px solid #c9d5d1; border-radius: 8px; color: var(--ink); background: #fff; cursor: pointer; font-weight: 700; }
         .print-toolbar .primary { border-color: var(--green); color: #fff; background: var(--green); }
@@ -33,7 +33,7 @@
         .summary__item strong { overflow: hidden; color: var(--navy); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
         .schedule-table { color: #000; width: 100%; border-collapse: collapse; table-layout: fixed; }
         .schedule-table th, .schedule-table td { height: 36px; border: 1px solid #222; padding: 6px 8px; text-align: center; vertical-align: middle; overflow-wrap: anywhere; }
-        .schedule-table th { font-size: 12px; font-weight: 800; text-transform: uppercase; }
+        .schedule-table th { font-size: 13px; font-weight: 800; text-transform: uppercase; }
         .schedule-table thead { display: table-header-group; }
         .schedule-table tbody { break-inside: avoid; page-break-inside: avoid; }
         .schedule-table tr { break-inside: avoid; page-break-inside: avoid; }
@@ -43,9 +43,9 @@
         .lecturer-code { width: 4.5%; }
         .schedule-table .course { text-align: left; }
         .course-item + .course-item { margin-top: 5px; padding-top: 5px; border-top: 1px dotted #777; }
-        .break-row .time, .break-row .break { font-size: 13px; font-weight: 800; font-style: italic; }
+        .break-row .time, .break-row .break { font-weight: 800; font-style: italic; }
         .empty { height: 70px !important; }
-        .is-dense .schedule-table th, .is-dense .schedule-table td { padding: 5px 3px; font-size: 9px; }
+        .is-dense .schedule-table th, .is-dense .schedule-table td { padding: 5px 3px; font-size: 10px; }
         .print-note { margin-top: 14px; padding: 10px 12px; border-radius: 8px; color: var(--muted); background: #f4f8f7; line-height: 1.45; }
         .print-note strong { color: var(--navy); }
         .document-footer { display: flex; justify-content: space-between; margin-top: 14px; padding-top: 7px; border-top: 1px solid var(--line); color: #84928d; font-size: 7px; }
