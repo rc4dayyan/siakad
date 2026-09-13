@@ -65,6 +65,7 @@ class KrsOpenFeederImportService
             ->keyBy(fn (Mahasiswa $student) => (string) $student->mhs_nim);
         $newStudents = [];
         $prepared = [];
+        $studentsByClass = [];
 
         foreach ($rows as $index => $row) {
             $rowNumber = $index + 2;
@@ -134,7 +135,7 @@ class KrsOpenFeederImportService
                 $this->reject("Baris {$rowNumber}: kelas {$className} tidak ditemukan pada periode dan program studi yang dipilih.");
             }
 
-            if (! $student->exists) {
+            if (! $student->exists && ! isset($prepared[$nim])) {
                 $student->taka_id = $period->id;
                 $student->class_id = $class->id;
             }
@@ -146,20 +147,17 @@ class KrsOpenFeederImportService
             }
 
             $studentKey = $nim;
-            if (isset($prepared[$studentKey]) && (int) $prepared[$studentKey]['class']->id !== (int) $class->id) {
-                $this->reject("Baris {$rowNumber}: NIM {$nim} tercantum pada lebih dari satu kelas.");
+            if (collect($prepared[$studentKey]['offerings'] ?? [])->contains(
+                fn (PenawaranMataKuliah $item): bool => (int) $item->master_mata_kuliah_id === (int) $master->id
+            )) {
+                $this->reject("Baris {$rowNumber}: mata kuliah {$courseCode} untuk NIM {$nim} tercantum lebih dari sekali, termasuk pada kelas berbeda.");
             }
-
             $itemKey = (string) $offering->id;
-            if (isset($prepared[$studentKey]['offerings'][$itemKey])) {
-                $this->reject("Baris {$rowNumber}: mata kuliah {$courseCode} untuk NIM {$nim} tercantum lebih dari sekali.");
-            }
+            $studentsByClass[$class->id][$studentKey] = true;
 
             $prepared[$studentKey] ??= ['student' => $student, 'class' => $class, 'offerings' => []];
             $prepared[$studentKey]['offerings'][$itemKey] = $offering;
         }
-
-        $studentsByClass = collect($prepared)->groupBy(fn (array $item) => $item['class']->id);
 
         DB::beginTransaction();
 
@@ -171,9 +169,9 @@ class KrsOpenFeederImportService
             $itemsSkipped = 0;
             $classesResized = 0;
 
-            foreach ($studentsByClass as $classStudents) {
-                $class = $classStudents->first()['class'];
-                $requiredCapacity = $classStudents->count();
+            foreach ($studentsByClass as $classId => $classStudents) {
+                $class = $classes->firstWhere('id', $classId);
+                $requiredCapacity = count($classStudents);
                 $capacityAdjusted = false;
 
                 if (! $class->capacity || $class->capacity < $requiredCapacity) {
@@ -208,8 +206,8 @@ class KrsOpenFeederImportService
 
                 if ($registration->exists) {
                     if ((int) $registration->semester_mahasiswa !== $studentSemester
-                        || ((int) $registration->kelas_id !== 0 && (int) $registration->kelas_id !== (int) $studentData['class']->id)) {
-                        $this->reject("NIM {$studentData['student']->mhs_nim}: registrasi periode sudah menggunakan semester atau kelas yang berbeda.");
+                        || ($registration->kelas_id && (int) $registration->kelas?->pstudi_id !== (int) $program->id)) {
+                        $this->reject("NIM {$studentData['student']->mhs_nim}: registrasi periode sudah menggunakan semester atau program studi yang berbeda.");
                     }
 
                     $registrationUpdates = [];
@@ -247,6 +245,13 @@ class KrsOpenFeederImportService
                 $missingOfferings = collect($studentData['offerings'])->reject(
                     fn (PenawaranMataKuliah $offering) => in_array((int) $offering->id, $existingOfferingIds, true)
                 );
+                $existingMasterIds = $krs->items()->whereHas('penawaranMataKuliah')->with('penawaranMataKuliah')
+                    ->get()->pluck('penawaranMataKuliah.master_mata_kuliah_id')->map(fn ($id) => (int) $id);
+                foreach ($missingOfferings as $offering) {
+                    if ($existingMasterIds->contains((int) $offering->master_mata_kuliah_id)) {
+                        $this->reject("NIM {$studentData['student']->mhs_nim}: mata kuliah yang sama sudah ada di KRS pada kelas berbeda.");
+                    }
+                }
                 $itemsSkipped += count($studentData['offerings']) - $missingOfferings->count();
 
                 if ($missingOfferings->isNotEmpty() && ! $krs->isEditable()) {

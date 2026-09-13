@@ -863,6 +863,76 @@ class KrsWorkflowTest extends TestCase
         app(ScheduleConflictService::class)->validate($offering, [...$attributes, 'ruang_id' => $smallRoom, 'hari' => 2]);
     }
 
+    public function test_krs_import_allows_different_classes_per_course_and_preserves_primary_class(): void
+    {
+        [$data, $rows, $secondOffering, $otherClass] = $this->crossClassKrsImportData();
+        $rows = $rows->push([
+            ...$rows[1], 'NIM' => '26002', 'Nama' => 'Mahasiswa Baru',
+        ], [
+            ...$rows[0], 'NIM' => '26002', 'Nama' => 'Mahasiswa Baru',
+        ]);
+        $service = app(\App\Services\Imports\KrsOpenFeederImportService::class);
+        $period = \App\Models\TahunAkademik::findOrFail($data['periodId']);
+        $program = \App\Models\ProgramStudi::findOrFail($data['programId']);
+        $service->import($rows, $period, $program, 1, true);
+        $this->assertDatabaseCount('mahasiswas', 1);
+        $this->assertDatabaseCount('krs_items', 0);
+        $result = $service->import($rows, $period, $program, 1);
+        $this->assertSame(4, $result['items_created']);
+        $this->assertSame($data['classId'], $data['registration']->fresh()->kelas_id);
+        $this->assertSame($data['classId'], $data['student']->fresh()->class_id);
+        $newStudent = Mahasiswa::where('mhs_nim', '26002')->firstOrFail();
+        $this->assertSame($otherClass, (int) $newStudent->class_id);
+        $this->assertSame($otherClass, (int) RegistrasiMahasiswa::where('mahasiswa_id', $newStudent->id)->value('kelas_id'));
+        $this->assertSame(2, (int) DB::table('kelas')->where('id', $otherClass)->value('capacity'));
+        $this->assertSame(2, $secondOffering->fresh()->kapasitas);
+        $this->assertSame(2, KrsItem::where('penawaran_mata_kuliah_id', $secondOffering->id)->count());
+        $this->assertSame([6, 6], Krs::orderBy('id')->pluck('total_sks')->map(fn ($sks) => (int) $sks)->all());
+        $result = $service->import($rows->reverse()->values(), $period, $program, 1);
+        $this->assertSame(0, $result['items_created']);
+        $this->assertSame(4, $result['items_skipped']);
+        $this->assertSame($otherClass, (int) $newStudent->fresh()->class_id);
+        $this->assertDatabaseCount('krs_items', 4);
+    }
+
+    public function test_krs_import_rejects_same_course_in_two_classes(): void
+    {
+        [$data, $rows, , $otherClass] = $this->crossClassKrsImportData();
+        PenawaranMataKuliah::create([
+            ...$this->offeringAttributes($data), 'kelas_id' => $otherClass,
+        ]);
+        $duplicateRows = collect([$rows[0], [...$rows[0], 'Nama Kelas' => 'B']]);
+        try {
+            app(\App\Services\Imports\KrsOpenFeederImportService::class)->import(
+                $duplicateRows, \App\Models\TahunAkademik::findOrFail($data['periodId']),
+                \App\Models\ProgramStudi::findOrFail($data['programId']), 1
+            );
+            $this->fail('The same course cannot be imported in two classes.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('tercantum lebih dari sekali', $exception->errors()['import'][0]);
+            $this->assertDatabaseCount('krs_items', 0);
+        }
+    }
+
+    public function test_krs_import_rejects_course_already_taken_in_another_class(): void
+    {
+        [$data, $rows, , $otherClass] = $this->crossClassKrsImportData();
+        PenawaranMataKuliah::create([
+            ...$this->offeringAttributes($data), 'kelas_id' => $otherClass,
+        ]);
+        $service = app(\App\Services\Imports\KrsOpenFeederImportService::class);
+        $period = \App\Models\TahunAkademik::findOrFail($data['periodId']);
+        $program = \App\Models\ProgramStudi::findOrFail($data['programId']);
+        $service->import(collect([$rows[0]]), $period, $program, 1);
+        try {
+            $service->import(collect([[...$rows[0], 'Nama Kelas' => 'B']]), $period, $program, 1);
+            $this->fail('The imported course already exists in another class.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('sudah ada di KRS pada kelas berbeda', $exception->errors()['import'][0]);
+            $this->assertDatabaseCount('krs_items', 1);
+        }
+    }
+
     public function test_schedule_generator_uses_reference_slots_independent_of_credits_and_duration_inputs(): void
     {
         $data = $this->academicData();
@@ -1763,6 +1833,38 @@ class KrsWorkflowTest extends TestCase
             ->assertSessionHasNoErrors();
         $this->assertNull($grade->fresh()->nilai_indeks);
         $this->assertNull($grade->fresh()->nilai_angka);
+    }
+
+    private function crossClassKrsImportData(): array
+    {
+        $data = $this->academicData();
+        DB::table('kelas')->where('id', $data['classId'])->update(['name' => 'PAI I A']);
+        $data['master']->update(['code' => 'PAI.01']);
+        PenawaranMataKuliah::create($this->offeringAttributes($data));
+        $classAttributes = (array) DB::table('kelas')->where('id', $data['classId'])->first();
+        unset($classAttributes['id']);
+        $otherClass = DB::table('kelas')->insertGetId([
+            ...$classAttributes, 'name' => 'PAI I B', 'code' => 'PAI-I-B', 'capacity' => 1,
+        ]);
+        $secondMaster = MasterMataKuliah::create([
+            'program_studi' => 'PAI', 'semester' => 1, 'code' => 'PAI.02', 'name' => 'Bahasa Inggris', 'sks' => 3,
+        ]);
+        $secondOffering = PenawaranMataKuliah::create([
+            ...$this->offeringAttributes($data), 'master_mata_kuliah_id' => $secondMaster->id,
+            'kelas_id' => $otherClass, 'kapasitas' => 1,
+        ]);
+        $base = [
+            'NIM' => $data['student']->mhs_nim, 'Nama' => $data['student']->mhs_name,
+            'Semester' => '20261', 'Kode Mata Kuliah' => 'PAI.01',
+            'Nama Mata Kuliah' => 'Pengantar Studi Islam', 'Nama Kelas' => 'A',
+            'Kode Prodi' => 'PAI', 'Nama Prodi' => 'Pendidikan Agama Islam',
+            'Nilai Huruf' => '', 'Nilai Indeks' => '', 'Nilai Angka' => '',
+        ];
+        $rows = collect([$base, [
+            ...$base, 'Kode Mata Kuliah' => 'PAI.02', 'Nama Mata Kuliah' => 'Bahasa Inggris', 'Nama Kelas' => 'B',
+        ]]);
+
+        return [$data, $rows, $secondOffering, $otherClass];
     }
 
     private function academicData(): array
