@@ -2,24 +2,14 @@
 
 namespace App\Http\Controllers\Admin\Pages\Publikasi;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-// SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\File;
-use Auth;
-use Hash;
-use Str;
-use Storage;
-// SECTION ADDONS EXTERNAL
 use Alert;
 use App\Helper\roleTrait;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-// SECTION MODELS
-use App\Models\User;
+use App\Http\Controllers\Controller;
 use App\Models\docsResource;
 use App\Models\Settings\webSettings;
-
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class DocumentController extends Controller
 {
@@ -29,10 +19,11 @@ class DocumentController extends Controller
     {
         $data['prefix'] = $this->setPrefix();
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['docs'] = docsResource::orderBy('created_at', 'desc')->get();
+        $data['docs'] = docsResource::with('author')->orderBy('created_at', 'desc')->get();
 
         return view('user.pages.publikasi.document-index', $data);
     }
+
     public function create()
     {
         $data['prefix'] = $this->setPrefix();
@@ -47,8 +38,20 @@ class DocumentController extends Controller
         $request->validate([
             'cover' => 'required|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'name' => 'required|string|max:255',
-            'link' => 'nullable|max:255|url',
-            'path' => 'nullable|mimes:pdf|max:8192',
+            'source_type' => 'required|in:file,link',
+            'link' => 'nullable|required_if:source_type,link|max:255|url',
+            'path' => 'nullable|required_if:source_type,file|mimes:pdf|max:8192',
+        ], [
+            'cover.required' => 'Sampul dokumen wajib dipilih.',
+            'cover.mimes' => 'Sampul harus berformat JPEG, PNG, JPG, GIF, atau SVG.',
+            'cover.max' => 'Ukuran sampul maksimal 2 MB.',
+            'name.required' => 'Nama dokumen wajib diisi.',
+            'source_type.required' => 'Sumber dokumen wajib dipilih.',
+            'link.required_if' => 'Tautan dokumen wajib diisi.',
+            'link.url' => 'Tautan dokumen harus berupa URL yang valid.',
+            'path.required_if' => 'File PDF wajib dipilih.',
+            'path.mimes' => 'Dokumen harus berupa file PDF.',
+            'path.max' => 'Ukuran dokumen maksimal 8 MB.',
         ]);
 
         $docs = new DocsResource;
@@ -59,53 +62,39 @@ class DocumentController extends Controller
 
         if ($request->hasFile('cover')) {
             $file = $request->file('cover');
-            $fileName = 'images/document/' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $destinationPath = storage_path('app/public/images/document/');
-            $file->move($destinationPath, $fileName);
-
-            // Hapus file lama jika sudah ada
-            if (!empty($docs->cover) && $docs->cover != 'gallery_image.png') {
-                File::delete($destinationPath . '/' . $docs->cover);
-            }
-
-            $docs->cover = $fileName;
+            $fileName = uniqid().'.'.$file->getClientOriginalExtension();
+            $docs->cover = $file->storeAs('images/document', $fileName, 'public');
         }
         if ($request->hasFile('path')) {
             $file = $request->file('path');
-            $fileName = 'document/' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $destinationPath = storage_path('app/public/document/');
-            $file->move($destinationPath, $fileName);
-
-            // Hapus file lama jika sudah ada
-            if (!empty($docs->path) && $docs->path != 'docs-demo.pdf') {
-                File::delete($destinationPath . '/' . $docs->path);
-            }
-
-            $docs->path = $fileName;
+            $fileName = uniqid().'.'.$file->getClientOriginalExtension();
+            $docs->path = $file->storeAs('document', $fileName, 'public');
         }
 
         $docs->save();
 
         Alert::success('Success', 'Data berhasil ditambahkan');
-        return back();
+
+        return redirect()->route($this->setPrefix().'document-index');
     }
 
     public function destroy(Request $request, $code)
     {
-        $docs = docsResource::where('code', $code)->first();
+        $docs = docsResource::where('code', $code)->firstOrFail();
 
         // Hapus dokumen (path)
         if ($docs->cover) {
-            File::delete('/app/public/'.$docs->cover); // hapus gambar lama
+            Storage::disk('public')->delete($docs->cover);
         }
         if ($docs->path) {
-            File::delete('/app/public/'.$docs->path); // hapus gambar lama
+            Storage::disk('public')->delete($docs->path);
         }
         // Hapus entri dari database
         $docs->delete();
 
         // Tampilkan pesan sukses
         Alert::success('Success', 'Data berhasil dihapus');
+
         return back();
     }
 }

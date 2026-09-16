@@ -2,36 +2,31 @@
 
 namespace App\Http\Controllers\Core;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-// SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\File;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Response;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\DB;
-use Auth;
-use Str;
-use Illuminate\Support\Facades\Log;
-use Symfony\Component\Process\Process;
-use Symfony\Component\Process\Exception\ProcessFailedException;
-use CzProject\GitPhp\GitRepository;
-use CzProject\GitPhp\Git;
-// SECTION ADDONS EXTERNAL
-use GuzzleHttp\Client;
 use Alert;
 use App\Helper\roleTrait;
-// SECTION AUTH
+// SECTION ADDONS SYSTEM
+use App\Http\Controllers\Controller;
 use App\Models\Settings\webSettings;
+use Auth;
+use CzProject\GitPhp\Git;
+use GuzzleHttp\Client;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Storage;
+use Intervention\Image\Drivers\Gd\Driver;
+// SECTION ADDONS EXTERNAL
+use Intervention\Image\ImageManager;
+use Str;
+use Symfony\Component\Process\Exception\ProcessFailedException;
+// SECTION AUTH
+use Symfony\Component\Process\Process;
 
 class WebSettingController extends Controller
 {
     use roleTrait;
-
 
     public function index()
     {
@@ -39,7 +34,7 @@ class WebSettingController extends Controller
         $data['web'] = webSettings::where('id', 1)->first();
 
         // Fetch branches from GitHub
-        $client = new Client();
+        $client = new Client;
         $owner = env('GITHUB_OWNER', 'rc4dayyan');
         $repo = env('GITHUB_REPO', 'siakad');
         $url = "https://api.github.com/repos/$owner/$repo/branches";
@@ -60,7 +55,6 @@ class WebSettingController extends Controller
         return view('user.admin.system.settings-index', $data);
     }
 
-
     public function updateCheck()
     {
         $output = Artisan::call('update:check');
@@ -75,7 +69,7 @@ class WebSettingController extends Controller
 
         // Run the Laravel command with the branch as an argument
         $exitCode = Artisan::call('update:latest', [
-            '--branch' => $branch
+            '--branch' => $branch,
         ]);
 
         $output = Artisan::output();
@@ -83,7 +77,7 @@ class WebSettingController extends Controller
         if ($exitCode === 0) {
             return response()->json(['message' => 'Successfully updated to the latest version.', 'status' => 'success']);
         } else {
-            return response()->json(['message' => 'Failed to update. Error: ' . $output, 'status' => 'error']);
+            return response()->json(['message' => 'Failed to update. Error: '.$output, 'status' => 'error']);
         }
     }
 
@@ -213,41 +207,59 @@ class WebSettingController extends Controller
 
     public function update(Request $request)
     {
-        $request->validate([
-            'school_apps' => 'required|string',
-            'school_name' => 'required|string',
-            'school_head' => 'required|string',
-            'school_link' => 'required|url',
-            'school_desc' => 'required',
-            'school_email' => 'required',
-            'school_phone' => 'required|string',
-            // 'social_ig' => 'required',
-            // 'social_fb' => 'required',
-            // 'social_tw' => 'required',
-            // 'social_in' => 'required',
-        ]);
+        $request->validate(
+            [
+                'school_apps' => 'required|string',
+                'school_name' => 'required|string',
+                'school_head' => 'required|string',
+                'school_link' => 'required|url',
+                'school_desc' => 'required',
+                'school_email' => 'required',
+                'school_phone' => 'required|string',
+                'school_logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+                'school_head_photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+                // 'social_ig' => 'required',
+                // 'social_fb' => 'required',
+                // 'social_tw' => 'required',
+                // 'social_in' => 'required',
+            ],
+            [
+                'school_head_photo.image' => 'Foto pimpinan harus berupa gambar.',
+                'school_head_photo.mimes' => 'Foto pimpinan harus berformat JPG, JPEG, PNG, atau WebP.',
+                'school_head_photo.max' => 'Ukuran foto pimpinan maksimal 2 MB.',
+            ]
+        );
         $web = webSettings::where('id', 1)->first();
+        $oldHeadPhoto = null;
 
         if ($request->hasFile('school_logo')) {
             $image = $request->file('school_logo');
-            $name = 'logo-' . uniqid() . '.' . $image->getClientOriginalExtension();
+            $name = 'logo-'.uniqid().'.'.$image->getClientOriginalExtension();
             $destinationPath = storage_path('app/public/images/website');
 
             // Membuat direktori jika belum ada
-            if (!File::exists($destinationPath)) {
+            if (! File::exists($destinationPath)) {
                 File::makeDirectory($destinationPath, 0755, true, true);
             }
 
             // Mengompres gambar dan menyimpannya
-            $manager = new ImageManager(new Driver());
+            $manager = new ImageManager(new Driver);
             $image = $manager->read($image->getRealPath());
 
-            $image->save($destinationPath . '/' . $name);
+            $image->save($destinationPath.'/'.$name);
 
             // Menyimpan nama file gambar ke database
-            $web->school_logo = "website/" . $name;
+            $web->school_logo = 'website/'.$name;
         }
 
+        if ($request->hasFile('school_head_photo')) {
+            $oldHeadPhoto = $web->school_head_photo;
+            $photo = $request->file('school_head_photo');
+            $name = 'pimpinan-'.uniqid().'.'.$photo->extension();
+            $path = $photo->storeAs('images/website', $name, 'public');
+
+            $web->school_head_photo = Str::after($path, 'images/');
+        }
 
         $web->school_apps = $request->school_apps;
         $web->school_name = $request->school_name;
@@ -262,17 +274,22 @@ class WebSettingController extends Controller
         // $web->social_fb = $request->social_fb;
         $web->save();
 
+        if ($oldHeadPhoto && Str::startsWith($oldHeadPhoto, 'website/pimpinan-')) {
+            Storage::disk('public')->delete('images/'.$oldHeadPhoto);
+        }
+
         Alert::success('Success', 'Data berhasil diupdate.');
+
         return back();
     }
 
     public function databaseExport()
     {
-        $filename = 'backup-' . now()->format('Y-m-d_H-i-s') . '.sql';
+        $filename = 'backup-'.now()->format('Y-m-d_H-i-s').'.sql';
         $path = storage_path("app/$filename");
 
         // Jalankan perintah mysqldump untuk membuat backup database
-        $command = "mysqldump --user=" . env('DB_USERNAME') . " --password=" . env('DB_PASSWORD') . " --host=" . env('DB_HOST') . " " . env('DB_DATABASE') . " > $path";
+        $command = 'mysqldump --user='.env('DB_USERNAME').' --password='.env('DB_PASSWORD').' --host='.env('DB_HOST').' '.env('DB_DATABASE')." > $path";
         exec($command);
 
         // Pastikan file ada
@@ -291,7 +308,7 @@ class WebSettingController extends Controller
 
         $file = $request->file('sqldata');
         $path = $file->getRealPath();
-        $command = "mysql --user=" . env('DB_USERNAME') . " --password=" . env('DB_PASSWORD') . " --host=" . env('DB_HOST') . " " . env('DB_DATABASE') . " < $path";
+        $command = 'mysql --user='.env('DB_USERNAME').' --password='.env('DB_PASSWORD').' --host='.env('DB_HOST').' '.env('DB_DATABASE')." < $path";
 
         exec($command, $output, $return_var);
 

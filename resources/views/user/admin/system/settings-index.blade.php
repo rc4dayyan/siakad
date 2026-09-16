@@ -29,11 +29,25 @@
                         <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
                     </div>
                     <div class="card-body">
-                        <a href="#"><img src="{{ asset('storage/images/'.$web->school_logo) }}" class="card-img-top" alt="Logo Kampus"></a>
+                        <img src="{{ asset('storage/images/'.$web->school_logo) }}" id="school-logo-preview" class="card-img-top" alt="Logo Kampus">
                         <hr>
                         <div class="form-group">
                             <label for="school_logo">Logo Kampus</label>
                             <input type="file" name="school_logo" id="school_logo" class="form-control" accept="image/*">
+                            @error('school_logo')
+                                <small class="text-danger">{{ $message }}</small>
+                            @enderror
+                        </div>
+                        <hr>
+                        <img src="{{ asset('storage/images/'.($web->school_head_photo ?: 'default/default-profile.jpg')) }}" id="school-head-photo-preview" class="card-img-top" alt="Foto {{ $web->school_head }}">
+                        <hr>
+                        <div class="form-group">
+                            <label for="school_head_photo">Foto Pimpinan</label>
+                            <input type="file" name="school_head_photo" id="school_head_photo" class="form-control" accept="image/jpeg,image/png,image/webp">
+                            <small class="text-muted">Format JPG, PNG, atau WebP. Maksimal 2 MB.</small>
+                            @error('school_head_photo')
+                                <small class="text-danger d-block">{{ $message }}</small>
+                            @enderror
                         </div>
                     </div>
                 </div>
@@ -203,7 +217,16 @@
         document.getElementById("school_logo").onchange = function(event) {
             var reader = new FileReader();
             reader.onload = function() {
-                var output = document.querySelector('.card-img-top');
+                var output = document.getElementById('school-logo-preview');
+                output.src = reader.result;
+            };
+            reader.readAsDataURL(event.target.files[0]);
+        };
+
+        document.getElementById("school_head_photo").onchange = function(event) {
+            var reader = new FileReader();
+            reader.onload = function() {
+                var output = document.getElementById('school-head-photo-preview');
                 output.src = reader.result;
             };
             reader.readAsDataURL(event.target.files[0]);

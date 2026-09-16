@@ -242,7 +242,7 @@
             <div class="container">
                 <div class="home-leader__card">
                     <div class="home-leader__portrait">
-                        <img src="{{ asset('storage/images/default/default-profile.jpg') }}" alt="{{ $web->school_head }}">
+                        <img src="{{ asset('storage/images/'.($web->school_head_photo ?: 'default/default-profile.jpg')) }}" alt="Foto {{ $web->school_head }}">
                         <div class="home-leader__portrait-mark"><i class="fa-solid fa-quote-left"></i></div>
                     </div>
                     <div class="home-leader__content">
