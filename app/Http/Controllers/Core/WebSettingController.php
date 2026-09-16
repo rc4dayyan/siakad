@@ -212,6 +212,7 @@ class WebSettingController extends Controller
                 'school_apps' => 'required|string',
                 'school_name' => 'required|string',
                 'school_head' => 'required|string',
+                'school_tagline' => 'required|string|max:255',
                 'school_link' => 'required|url',
                 'school_desc' => 'required',
                 'school_email' => 'required',
@@ -264,6 +265,7 @@ class WebSettingController extends Controller
         $web->school_apps = $request->school_apps;
         $web->school_name = $request->school_name;
         $web->school_head = $request->school_head;
+        $web->school_tagline = $request->school_tagline;
         $web->school_link = $request->school_link;
         $web->school_desc = $request->school_desc;
         $web->school_email = $request->school_email;

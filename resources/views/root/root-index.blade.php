@@ -247,11 +247,13 @@
                     </div>
                     <div class="home-leader__content">
                         <span class="home-kicker">Sambutan pimpinan</span>
-                        <h2>Menumbuhkan ilmu, karakter, dan kontribusi nyata.</h2>
-                        <div class="home-leader__quote">{!! Str::limit(strip_tags($web->school_desc), 420) !!}</div>
+                        <h2>{{ $web->school_tagline }}</h2>
+                        <div class="home-leader__quote">
+                            {!! $web->school_desc !!}
+                        </div>
                         <div class="home-leader__identity">
                             <strong>{{ $web->school_head }}</strong>
-                            <span>Rektor · {!! $web->school_name !!}</span>
+                            <span>Ketua · {!! $web->school_name !!}</span>
                         </div>
                     </div>
                 </div>

@@ -81,6 +81,13 @@
                             @enderror
                         </div>
                         <div class="form-group col-lg-12 col-12">
+                            <label for="school_tagline">Kata Tag Line</label>
+                            <input type="text" name="school_tagline" id="school_tagline" class="form-control" value="{{ old('school_tagline', $web->school_tagline) }}" maxlength="255" placeholder="Inputkan kata tag line...">
+                            @error('school_tagline')
+                                <small class="text-danger">{{ $message }}</small>
+                            @enderror
+                        </div>
+                        <div class="form-group col-lg-12 col-12">
                             <label for="school_desc">Kata Sambutan</label>
                             <textarea name="school_desc" id="dark" class="form-control" cols="30" rows="10" placeholder="Inputkan pesan sambutan...">{{ $web->school_desc }}</textarea>
                             @error('school_desc')

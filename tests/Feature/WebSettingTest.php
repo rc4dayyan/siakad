@@ -44,6 +44,7 @@ class WebSettingTest extends TestCase
             $table->string('school_name');
             $table->string('school_head');
             $table->string('school_head_photo')->nullable();
+            $table->string('school_tagline');
             $table->string('school_logo')->default('website/site-logo.png');
             $table->string('school_link');
             $table->longText('school_desc');
@@ -67,12 +68,14 @@ class WebSettingTest extends TestCase
 
         $response = $this->actingAs($administrator)->patch(route('web-admin.system.setting-update'), [
             ...$this->validData($web),
+            'school_tagline' => 'Tagline kampus yang baru.',
             'school_head_photo' => UploadedFile::fake()->image('pimpinan-baru.jpg', 600, 800),
         ]);
 
         $response->assertRedirect();
 
         $photo = $web->fresh()->school_head_photo;
+        $this->assertSame('Tagline kampus yang baru.', $web->fresh()->school_tagline);
         $this->assertStringStartsWith('website/pimpinan-', $photo);
         Storage::disk('public')->assertExists('images/'.$photo);
         Storage::disk('public')->assertMissing('images/website/pimpinan-lama.jpg');
@@ -117,6 +120,7 @@ class WebSettingTest extends TestCase
             'school_apps' => 'SIAKAD',
             'school_name' => 'Kampus Uji',
             'school_head' => 'Ketua Uji',
+            'school_tagline' => 'Menumbuhkan ilmu dan karakter.',
             'school_link' => 'https://kampus.example.test',
             'school_desc' => 'Sambutan pimpinan kampus.',
             'school_email' => 'info@example.test',
@@ -134,6 +138,7 @@ class WebSettingTest extends TestCase
             'school_apps' => $web->school_apps,
             'school_name' => $web->school_name,
             'school_head' => $web->school_head,
+            'school_tagline' => $web->school_tagline,
             'school_link' => $web->school_link,
             'school_desc' => $web->school_desc,
             'school_email' => $web->school_email,
