@@ -2,14 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Admin\Pages\WorkersController;
 use App\Models\Dosen;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Rap2hpoutre\FastExcel\FastExcel;
 use Tests\TestCase;
 
 class DosenOpenFeederImportTest extends TestCase
@@ -29,6 +32,7 @@ class DosenOpenFeederImportTest extends TestCase
             $table->tinyInteger('type')->default(0);
             $table->string('code')->unique();
             $table->string('name');
+            $table->string('gend')->nullable();
             $table->string('user')->unique();
             $table->string('phone')->unique();
             $table->string('email')->unique();
@@ -56,6 +60,22 @@ class DosenOpenFeederImportTest extends TestCase
             $table->timestamp('token_created_at')->nullable();
             $table->timestamps();
         });
+
+        (require database_path('migrations/2024_06_26_050556_create_web_settings_table.php'))->up();
+        DB::table('web_settings')->insert([
+            'id' => 1,
+            'school_apps' => 'SIAKAD',
+            'school_name' => 'Kampus Pengujian',
+            'school_head' => 'Ketua',
+            'school_link' => 'https://example.test',
+            'school_desc' => 'Deskripsi kampus',
+            'school_email' => 'kampus@example.test',
+            'school_phone' => '081200000000',
+            'social_fb' => '-',
+            'social_ig' => '-',
+            'social_in' => '-',
+            'social_tw' => '-',
+        ]);
     }
 
     public function test_it_imports_each_nidn_once_and_uses_it_for_initial_credentials(): void
@@ -100,6 +120,139 @@ class DosenOpenFeederImportTest extends TestCase
         $response->assertRedirect(route('web-admin.workers.lecture-index'))
             ->assertSessionHasErrors('import');
         $this->assertDatabaseCount('dosens', 0);
+    }
+
+    public function test_web_administrator_can_export_lecturers_in_the_import_format(): void
+    {
+        Dosen::create([
+            'dsn_stat' => 1,
+            'dsn_nidn' => '2008017601',
+            'dsn_name' => 'Nida Nurjunaedah',
+            'dsn_code' => 'DOSEN001',
+            'dsn_user' => '2008017601',
+            'password' => Hash::make('password'),
+            'dsn_mail' => 'dosen@example.test',
+            'dsn_phone' => '081234567891',
+        ]);
+
+        $response = $this
+            ->actingAs($this->webAdministrator())
+            ->get(route('web-admin.workers.lecture-export'));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $this->assertStringContainsString('data-dosen-', (string) $response->headers->get('content-disposition'));
+
+        $path = sys_get_temp_dir().'/data-dosen-export-'.uniqid().'.xlsx';
+        file_put_contents($path, $response->streamedContent());
+
+        try {
+            $rows = (new FastExcel)->import($path);
+        } finally {
+            @unlink($path);
+        }
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(['NIDN', 'Nama Dosen'], array_keys($rows->first()));
+        $this->assertSame('2008017601', (string) $rows->first()['NIDN']);
+        $this->assertSame('Nida Nurjunaedah', $rows->first()['Nama Dosen']);
+    }
+
+    public function test_web_administrator_can_filter_the_lecturer_list(): void
+    {
+        $this->lecturer('2008017601', 'Dosen Aktif Laki-laki', 'L', 1);
+        $matching = $this->lecturer('2102119602', 'Dosen Aktif Perempuan', 'P', 1);
+        $this->lecturer('2203129703', 'Dosen Nonaktif Perempuan', 'P', 0);
+
+        $this->actingAs($this->webAdministrator());
+        $view = app(WorkersController::class)->indexLecture(Request::create(
+            route('web-admin.workers.lecture-index'),
+            'GET',
+            ['search' => 'Aktif Perempuan', 'status' => '1', 'gender' => 'P'],
+        ));
+        $data = $view->getData();
+
+        $this->assertSame('user.admin.pages.workers-lecture-index', $view->name());
+        $this->assertSame([$matching->id], $data['dosen']->modelKeys());
+        $this->assertSame(3, $data['lectureSummary']['total']);
+        $this->assertSame(2, $data['lectureSummary']['active']);
+        $this->assertTrue($data['hasLectureFilters']);
+    }
+
+    public function test_invalid_lecturer_filter_is_rejected(): void
+    {
+        $response = $this
+            ->actingAs($this->webAdministrator())
+            ->get(route('web-admin.workers.lecture-export', ['gender' => 'X']));
+
+        $response->assertRedirect();
+        $response->assertSessionHasErrors('gender');
+    }
+
+    public function test_web_administrator_can_filter_the_admin_list(): void
+    {
+        $this->actingAs($this->webAdministrator());
+        $matching = $this->worker(0, 'Administrator Perempuan', 'P', 1, 'admin-perempuan');
+        $this->worker(0, 'Administrator Nonaktif', 'L', 0, 'admin-nonaktif');
+
+        $view = app(WorkersController::class)->indexAdmin(Request::create(
+            route('web-admin.workers.admin-index'),
+            'GET',
+            ['search' => 'Perempuan', 'status' => '1', 'gender' => 'P'],
+        ));
+        $data = $view->getData();
+
+        $this->assertSame([$matching->id], $data['admin']->modelKeys());
+        $this->assertSame(3, $data['workerSummary']['total']);
+        $this->assertTrue($data['hasWorkerFilters']);
+    }
+
+    public function test_web_administrator_can_filter_the_staff_list_by_role(): void
+    {
+        $this->actingAs($this->webAdministrator());
+        $matching = $this->worker(3, 'Staff Akademik Perempuan', 'P', 1, 'staff-akademik');
+        $this->worker(2, 'Staff Officer Perempuan', 'P', 1, 'staff-officer');
+
+        $view = app(WorkersController::class)->indexWorkers(Request::create(
+            route('web-admin.workers.staff-index'),
+            'GET',
+            ['search' => 'Perempuan', 'status' => '1', 'gender' => 'P', 'role' => '3'],
+        ));
+        $data = $view->getData();
+
+        $this->assertSame([$matching->id], $data['admin']->modelKeys());
+        $this->assertSame(2, $data['workerSummary']['total']);
+        $this->assertTrue($data['hasWorkerFilters']);
+    }
+
+    private function lecturer(string $nidn, string $name, string $gender, int $status): Dosen
+    {
+        return Dosen::create([
+            'dsn_stat' => $status,
+            'dsn_nidn' => $nidn,
+            'dsn_name' => $name,
+            'dsn_code' => 'D'.$nidn,
+            'dsn_gend' => $gender,
+            'dsn_user' => $nidn,
+            'password' => Hash::make('password'),
+            'dsn_mail' => $nidn.'@example.test',
+            'dsn_phone' => '08'.$nidn,
+        ]);
+    }
+
+    private function worker(int $type, string $name, string $gender, int $status, string $username): User
+    {
+        return User::create([
+            'type' => $type,
+            'code' => strtoupper($username),
+            'name' => $name,
+            'gend' => $gender,
+            'user' => $username,
+            'phone' => '08'.str_pad((string) User::query()->count(), 10, '0', STR_PAD_LEFT),
+            'email' => $username.'@example.test',
+            'password' => 'password',
+            'status' => $status,
+        ]);
     }
 
     private function webAdministrator(): User

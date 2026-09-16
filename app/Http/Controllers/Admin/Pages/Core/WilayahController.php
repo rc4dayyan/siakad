@@ -21,8 +21,14 @@ class WilayahController extends Controller
 
     public function index(Request $request)
     {
-        $search = trim($request->string('q')->value());
-        $province = trim($request->string('provinsi')->value());
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'provinsi' => ['nullable', 'string', 'max:255'],
+            'kabupaten' => ['nullable', 'string', 'max:255'],
+        ]);
+        $search = trim((string) ($filters['q'] ?? ''));
+        $province = trim((string) ($filters['provinsi'] ?? ''));
+        $regency = trim((string) ($filters['kabupaten'] ?? ''));
 
         $wilayahs = Wilayah::query()
             ->when($search !== '', function ($query) use ($search) {
@@ -34,6 +40,7 @@ class WilayahController extends Controller
                 });
             })
             ->when($province !== '', fn ($query) => $query->where('provinsi', $province))
+            ->when($regency !== '', fn ($query) => $query->where('kabupaten', $regency))
             ->orderBy('provinsi')
             ->orderBy('kabupaten')
             ->orderBy('kecamatan')
@@ -52,6 +59,20 @@ class WilayahController extends Controller
                 ->pluck('provinsi'),
             'search' => $search,
             'selectedProvince' => $province,
+            'regencies' => Wilayah::query()
+                ->whereNotNull('kabupaten')
+                ->where('kabupaten', '!=', '')
+                ->when($province !== '', fn ($query) => $query->where('provinsi', $province))
+                ->distinct()
+                ->orderBy('kabupaten')
+                ->pluck('kabupaten'),
+            'selectedRegency' => $regency,
+            'hasRegionFilters' => $search !== '' || $province !== '' || $regency !== '',
+            'regionSummary' => [
+                'total' => Wilayah::query()->count(),
+                'provinces' => Wilayah::query()->whereNotNull('provinsi')->where('provinsi', '!=', '')->distinct()->count('provinsi'),
+                'regencies' => Wilayah::query()->whereNotNull('kabupaten')->where('kabupaten', '!=', '')->distinct()->count('kabupaten'),
+            ],
         ]);
     }
 

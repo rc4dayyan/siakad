@@ -6,6 +6,51 @@
 @section('urlmenu', '#')
 @section('subdesc', 'Kelola referensi kecamatan, kabupaten/kota, dan provinsi untuk integrasi OpenFeeder')
 
+@section('custom-css')
+<style>
+    .region-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .region-summary__item { display: flex; align-items: center; gap: 14px; min-height: 92px; padding: 18px; border: 1px solid #e8ecef; border-radius: 14px; background: #fff; box-shadow: 0 5px 18px rgba(37, 50, 55, .05); }
+    .region-summary__icon { display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; flex: 0 0 46px; border-radius: 12px; font-size: 18px; }
+    .region-summary__icon--district { background: #eef2ff; color: #435ebe; }
+    .region-summary__icon--regency { background: #fff7e6; color: #d88700; }
+    .region-summary__icon--province { background: #eaf8f2; color: #198754; }
+    .region-summary__label { display: block; margin-bottom: 2px; color: #7b8794; font-size: 12px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+    .region-summary__value { margin: 0; color: #263238; font-size: 24px; font-weight: 700; line-height: 1.2; }
+    .region-filter { margin-bottom: 20px; padding: 20px; border: 1px solid #dfe7e4; border-radius: 14px; background: linear-gradient(135deg, #f5faf8 0%, #fff 72%); }
+    .region-filter__header { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+    .region-filter__title { margin: 0 0 3px; color: #263d36; font-size: 15px; font-weight: 700; }
+    .region-filter__description { margin: 0; color: #71837d; font-size: 12px; }
+    .region-filter__result { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 999px; background: #e8f5f0; color: #176b55; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .region-filter .form-label { margin-bottom: 6px; color: #46534f; font-size: 12px; font-weight: 700; }
+    .region-filter .form-control, .region-filter .form-select { min-height: 42px; border-color: #dce4e1; border-radius: 9px; }
+    .region-filter .input-group-text { border-color: #dce4e1; border-radius: 9px 0 0 9px; background: #fff; color: #87938f; }
+    .region-filter__buttons { display: flex; gap: 8px; }
+    .region-filter__buttons .btn { min-height: 42px; border-radius: 9px; white-space: nowrap; }
+    .region-card { overflow: hidden; border: 0; border-radius: 14px; box-shadow: 0 7px 24px rgba(37, 50, 55, .07); }
+    .region-card .card-header { padding: 20px 22px; border-bottom: 1px solid #edf0f2; background: #fff; }
+    .region-card .card-body { padding: 8px 22px 22px; }
+    .region-table th { padding-top: 15px; padding-bottom: 15px; color: #66727d; font-size: 11px; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; white-space: nowrap; }
+    .region-table td { padding-top: 14px; padding-bottom: 14px; vertical-align: middle; }
+    .region-name { display: block; color: #263238; font-weight: 700; }
+    .region-code { display: inline-flex; padding: 6px 9px; border-radius: 8px; background: #eef2ff; color: #435ebe; font-family: monospace; font-weight: 700; }
+    .region-action-dropdown .dropdown-toggle { min-width: 88px; border-radius: 9px; font-weight: 600; }
+    .region-action-dropdown .dropdown-menu { min-width: 170px; padding: 7px; border: 1px solid #e6ece9; border-radius: 10px; box-shadow: 0 10px 28px rgba(38, 61, 54, .14); }
+    .region-action-dropdown .dropdown-item { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border: 0; border-radius: 7px; background: transparent; font-size: 13px; }
+    .region-action-dropdown .dropdown-item:hover { background: #f4f7f6; }
+    .region-action-dropdown .dropdown-item i { width: 16px; text-align: center; }
+    @media (max-width: 767.98px) {
+        .region-summary { grid-template-columns: 1fr; gap: 10px; }
+        .region-summary__item { min-height: 76px; padding: 14px; }
+        .region-filter__header { align-items: flex-start; flex-direction: column; }
+        .region-filter__buttons, .region-filter__buttons .btn { width: 100%; }
+        .region-card .card-header { align-items: flex-start !important; flex-direction: column; }
+        .region-card .card-header > div:last-child { display: flex; width: 100%; gap: 8px; }
+        .region-card .card-header > div:last-child .btn { flex: 1; }
+        .region-card .card-body { padding-right: 14px; padding-left: 14px; }
+    }
+</style>
+@endsection
+
 @section('content')
 <section class="section">
     @if ($errors->any())
@@ -19,11 +64,39 @@
         </div>
     @endif
 
-    <div class="card">
+    <div class="region-summary" aria-label="Ringkasan data wilayah">
+        <div class="region-summary__item"><span class="region-summary__icon region-summary__icon--district"><i class="fas fa-map-marker-alt"></i></span><div><span class="region-summary__label">Total Kecamatan</span><p class="region-summary__value">{{ number_format($regionSummary['total'], 0, ',', '.') }}</p></div></div>
+        <div class="region-summary__item"><span class="region-summary__icon region-summary__icon--regency"><i class="fas fa-city"></i></span><div><span class="region-summary__label">Kabupaten/Kota</span><p class="region-summary__value">{{ number_format($regionSummary['regencies'], 0, ',', '.') }}</p></div></div>
+        <div class="region-summary__item"><span class="region-summary__icon region-summary__icon--province"><i class="fas fa-map"></i></span><div><span class="region-summary__label">Provinsi</span><p class="region-summary__value">{{ number_format($regionSummary['provinces'], 0, ',', '.') }}</p></div></div>
+    </div>
+
+    <div class="region-filter">
+        <div class="region-filter__header">
+            <div><h6 class="region-filter__title"><i class="fas fa-sliders-h text-primary me-2"></i>Filter Data Wilayah</h6><p class="region-filter__description">Cari kode atau nama wilayah, lalu persempit berdasarkan tingkat administratif.</p></div>
+            <span class="region-filter__result"><i class="fas fa-list-ul"></i>{{ number_format($wilayahs->total(), 0, ',', '.') }} data ditemukan</span>
+        </div>
+        <form method="GET" action="{{ route($prefix.'master.wilayah-index') }}" class="row g-3 align-items-end">
+            <div class="col-xl-4 col-md-6">
+                <label for="wilayah-search" class="form-label">Cari wilayah</label>
+                <div class="input-group"><span class="input-group-text"><i class="fas fa-search"></i></span><input type="search" class="form-control" id="wilayah-search" name="q" value="{{ $search }}" placeholder="Kode, kecamatan, kabupaten, atau provinsi"></div>
+            </div>
+            <div class="col-xl-2 col-md-3 col-6">
+                <label for="wilayah-province" class="form-label">Provinsi</label>
+                <select class="form-select" id="wilayah-province" name="provinsi"><option value="">Semua provinsi</option>@foreach ($provinces as $province)<option value="{{ $province }}" @selected($selectedProvince === $province)>{{ $province }}</option>@endforeach</select>
+            </div>
+            <div class="col-xl-3 col-md-3 col-6">
+                <label for="wilayah-regency" class="form-label">Kabupaten/Kota</label>
+                <select class="form-select" id="wilayah-regency" name="kabupaten"><option value="">Semua kabupaten/kota</option>@foreach ($regencies as $regency)<option value="{{ $regency }}" @selected($selectedRegency === $regency)>{{ $regency }}</option>@endforeach</select>
+            </div>
+            <div class="col-xl-3 col-12"><div class="region-filter__buttons">@if ($hasRegionFilters)<a href="{{ route($prefix.'master.wilayah-index') }}" class="btn btn-outline-secondary" title="Reset filter"><i class="fas fa-rotate-left"></i></a>@endif<button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-filter me-1"></i> Terapkan</button></div></div>
+        </form>
+    </div>
+
+    <div class="card region-card">
         <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h5 class="card-title mb-1">@yield('submenu')</h5>
-                <small class="text-muted">{{ number_format($wilayahs->total(), 0, ',', '.') }} data ditemukan</small>
+                <small class="text-muted">Referensi alamat untuk data akademik dan integrasi OpenFeeder.</small>
             </div>
             <div>
                 <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#createWilayah" title="Tambah wilayah">
@@ -35,28 +108,8 @@
             </div>
         </div>
         <div class="card-body">
-            <form method="GET" action="{{ route($prefix.'master.wilayah-index') }}" class="row g-2 mb-4">
-                <div class="col-lg-5">
-                    <label for="wilayah-search" class="visually-hidden">Cari wilayah</label>
-                    <input type="search" class="form-control" id="wilayah-search" name="q" value="{{ $search }}" placeholder="Cari kode, kecamatan, kabupaten, atau provinsi">
-                </div>
-                <div class="col-lg-4">
-                    <label for="wilayah-province" class="visually-hidden">Filter provinsi</label>
-                    <select class="form-select" id="wilayah-province" name="provinsi">
-                        <option value="">Semua provinsi</option>
-                        @foreach ($provinces as $province)
-                            <option value="{{ $province }}" @selected($selectedProvince === $province)>{{ $province }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-lg-3 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Cari</button>
-                    <a href="{{ route($prefix.'master.wilayah-index') }}" class="btn btn-outline-secondary">Reset</a>
-                </div>
-            </form>
-
             <div class="table-responsive">
-                <table class="table table-striped align-middle">
+                <table class="table table-hover region-table align-middle mb-0">
                     <thead>
                         <tr>
                             <th class="text-center">#</th>
@@ -64,26 +117,26 @@
                             <th>Kecamatan</th>
                             <th>Kabupaten/Kota</th>
                             <th>Provinsi</th>
-                            <th class="text-center">Aksi</th>
+                            <th class="text-end">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($wilayahs as $item)
                             <tr>
                                 <td class="text-center">{{ $wilayahs->firstItem() + $loop->index }}</td>
-                                <td><span class="badge bg-light-primary text-primary">{{ $item->code }}</span></td>
-                                <td>{{ $item->kecamatan }}</td>
+                                <td><span class="region-code">{{ $item->code }}</span></td>
+                                <td><span class="region-name">{{ $item->kecamatan }}</span></td>
                                 <td>{{ $item->kabupaten ?: '-' }}</td>
                                 <td>{{ $item->provinsi ?: '-' }}</td>
-                                <td class="text-center text-nowrap">
-                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editWilayah{{ $item->id }}" title="Ubah">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <form class="d-inline" action="{{ route($prefix.'master.wilayah-destroy', $item) }}" method="POST" onsubmit="return confirm('Hapus data wilayah ini?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus"><i class="fas fa-trash"></i></button>
-                                    </form>
+                                <td class="text-end">
+                                    <div class="dropdown region-action-dropdown d-inline-block">
+                                        <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" id="region-action-{{ $item->id }}" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-cog me-1"></i> Aksi</button>
+                                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="region-action-{{ $item->id }}">
+                                            <li><button type="button" class="dropdown-item text-primary" data-bs-toggle="modal" data-bs-target="#editWilayah{{ $item->id }}"><i class="fas fa-pen"></i><span>Edit Data</span></button></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><form action="{{ route($prefix.'master.wilayah-destroy', $item) }}" method="POST" onsubmit="return confirm('Hapus data wilayah ini?')">@csrf @method('DELETE')<button type="submit" class="dropdown-item text-danger"><i class="fas fa-trash"></i><span>Hapus Data</span></button></form></li>
+                                        </ul>
+                                    </div>
                                 </td>
                             </tr>
                         @empty

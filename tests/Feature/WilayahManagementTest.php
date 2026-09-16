@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Admin\Pages\Core\WilayahController;
 use App\Models\User;
 use App\Models\Wilayah;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -40,6 +42,8 @@ class WilayahManagementTest extends TestCase
         });
 
         (require database_path('migrations/2026_08_16_000002_create_wilayahs_table.php'))->up();
+        Schema::create('web_settings', fn (Blueprint $table) => $table->id());
+        DB::table('web_settings')->insert(['id' => 1]);
     }
 
     public function test_web_administrator_can_create_update_and_delete_wilayah(): void
@@ -171,6 +175,25 @@ class WilayahManagementTest extends TestCase
                 unlink($path);
             }
         }
+    }
+
+    public function test_web_administrator_can_filter_regions_by_province_and_regency(): void
+    {
+        $this->actingAs($this->webAdministrator());
+        $matching = Wilayah::create(['code' => '020509', 'kecamatan' => 'Kec. Caringin', 'kabupaten' => 'Kab. Bogor', 'provinsi' => 'Prov. Jawa Barat']);
+        Wilayah::create(['code' => '016202', 'kecamatan' => 'Kec. Kebon Jeruk', 'kabupaten' => 'Kota Jakarta Barat', 'provinsi' => 'Prov. D.K.I. Jakarta']);
+
+        $view = app(WilayahController::class)->index(Request::create(
+            route('web-admin.master.wilayah-index'),
+            'GET',
+            ['q' => 'Caringin', 'provinsi' => 'Prov. Jawa Barat', 'kabupaten' => 'Kab. Bogor'],
+        ));
+        $data = $view->getData();
+
+        $this->assertSame([$matching->id], $data['wilayahs']->getCollection()->modelKeys());
+        $this->assertSame(2, $data['regionSummary']['total']);
+        $this->assertSame(2, $data['regionSummary']['provinces']);
+        $this->assertTrue($data['hasRegionFilters']);
     }
 
     private function webAdministrator(): User

@@ -204,6 +204,8 @@
 
         if (!event.target.closest('.dropdown')) closeDropdowns();
 
+        if (event.target.closest('.dropdown-item')) closeDropdowns();
+
         var modalTrigger = event.target.closest('[data-bs-toggle="modal"]');
         if (modalTrigger) {
             event.preventDefault();

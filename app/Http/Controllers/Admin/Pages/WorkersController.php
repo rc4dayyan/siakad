@@ -19,6 +19,7 @@ use App\Services\Academic\AcademicPeriodContext;
 use App\Services\Imports\DosenOpenFeederImportService;
 use App\Services\Imports\MahasiswaOpenFeederImportService;
 use Hash;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -34,11 +35,16 @@ class WorkersController extends Controller
     use roleTrait;
 
     // KHUSUS KELOLA DATA ROLE ADMIN
-    public function indexAdmin()
+    public function indexAdmin(Request $request)
     {
+        $filters = $this->validateWorkerFilters($request);
+
         $data['prefix'] = $this->setPrefix();
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['admin'] = User::where('type', 0)->get();
+        $data['admin'] = $this->filteredWorkerQuery([0], $filters)->orderBy('name')->get();
+        $data['workerSummary'] = $this->workerSummary([0]);
+        $data['filters'] = $filters;
+        $data['hasWorkerFilters'] = collect($filters)->contains(fn ($value): bool => filled($value));
 
         return view('user.admin.pages.workers-admin-index', $data);
 
@@ -207,12 +213,16 @@ class WorkersController extends Controller
     }
 
     // KHUSUS KELOLA DATA ROLE WORKER
-    public function indexWorkers()
+    public function indexWorkers(Request $request)
     {
+        $filters = $this->validateWorkerFilters($request, true);
+
         $data['prefix'] = $this->setPrefix();
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['admin'] = User::whereIn('type', [1, 2, 3, 4, 5])->get();
-        // dd($data['admin']->count());
+        $data['admin'] = $this->filteredWorkerQuery([1, 2, 3, 4, 5], $filters)->orderBy('name')->get();
+        $data['workerSummary'] = $this->workerSummary([1, 2, 3, 4, 5]);
+        $data['filters'] = $filters;
+        $data['hasWorkerFilters'] = collect($filters)->contains(fn ($value): bool => filled($value));
 
         return view('user.admin.pages.workers-staff-index', $data);
 
@@ -380,15 +390,110 @@ class WorkersController extends Controller
         return back();
     }
 
-    // KHUSUS KELOLA DATA ROLE DOSEN
-    public function indexLecture()
+    private function validateWorkerFilters(Request $request, bool $withRole = false): array
     {
+        $rules = [
+            'search' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', Rule::in(['0', '1'])],
+            'gender' => ['nullable', Rule::in(['L', 'P'])],
+        ];
+
+        if ($withRole) {
+            $rules['role'] = ['nullable', Rule::in(['1', '2', '3', '4', '5'])];
+        }
+
+        return $request->validate($rules);
+    }
+
+    private function filteredWorkerQuery(array $types, array $filters): Builder
+    {
+        return User::query()
+            ->whereIn('type', $types)
+            ->when($filters['search'] ?? null, function (Builder $query, string $search): void {
+                $query->where(function (Builder $query) use ($search): void {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('user', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%");
+                });
+            })
+            ->when(filled($filters['status'] ?? null), fn (Builder $query): Builder => $query->where('status', $filters['status']))
+            ->when($filters['gender'] ?? null, fn (Builder $query, string $gender): Builder => $query->where('gend', $gender))
+            ->when($filters['role'] ?? null, fn (Builder $query, string $role): Builder => $query->where('type', $role));
+    }
+
+    private function workerSummary(array $types): array
+    {
+        $total = User::query()->whereIn('type', $types)->count();
+        $active = User::query()->whereIn('type', $types)->where('status', 1)->count();
+
+        return compact('total', 'active') + ['inactive' => $total - $active];
+    }
+
+    // KHUSUS KELOLA DATA ROLE DOSEN
+    public function indexLecture(Request $request)
+    {
+        $filters = $this->validateLectureFilters($request);
+        $total = Dosen::query()->count();
+        $active = Dosen::query()->where('dsn_stat', 1)->count();
+
         $data['prefix'] = $this->setPrefix();
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['dosen'] = Dosen::all();
+        $data['dosen'] = $this->filteredLectureQuery($filters)->orderBy('dsn_name')->get();
+        $data['lectureSummary'] = [
+            'total' => $total,
+            'active' => $active,
+            'inactive' => $total - $active,
+        ];
+        $data['filters'] = $filters;
+        $data['hasLectureFilters'] = collect($filters)->contains(fn ($value): bool => filled($value));
 
         return view('user.admin.pages.workers-lecture-index', $data);
 
+    }
+
+    public function exportLecture(Request $request)
+    {
+        $lecturers = $this->filteredLectureQuery($this->validateLectureFilters($request))
+            ->orderBy('dsn_nidn')
+            ->get();
+
+        $response = (new FastExcel($lecturers))->download(
+            'data-dosen-'.now()->format('YmdHis').'.xlsx',
+            fn (Dosen $lecturer): array => [
+                'NIDN' => $lecturer->dsn_nidn,
+                'Nama Dosen' => $lecturer->dsn_name,
+            ]
+        );
+
+        $response->headers->set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        return $response;
+    }
+
+    private function validateLectureFilters(Request $request): array
+    {
+        return $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', Rule::in(['0', '1'])],
+            'gender' => ['nullable', Rule::in(['L', 'P'])],
+        ]);
+    }
+
+    private function filteredLectureQuery(array $filters): Builder
+    {
+        return Dosen::query()
+            ->when($filters['search'] ?? null, function (Builder $query, string $search): void {
+                $query->where(function (Builder $query) use ($search): void {
+                    $query->where('dsn_name', 'like', "%{$search}%")
+                        ->orWhere('dsn_nidn', 'like', "%{$search}%")
+                        ->orWhere('dsn_user', 'like', "%{$search}%")
+                        ->orWhere('dsn_mail', 'like', "%{$search}%")
+                        ->orWhere('dsn_phone', 'like', "%{$search}%");
+                });
+            })
+            ->when(filled($filters['status'] ?? null), fn (Builder $query): Builder => $query->where('dsn_stat', $filters['status']))
+            ->when($filters['gender'] ?? null, fn (Builder $query, string $gender): Builder => $query->where('dsn_gend', $gender));
     }
 
     public function createLecture()
