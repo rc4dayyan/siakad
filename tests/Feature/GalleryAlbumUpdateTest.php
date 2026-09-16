@@ -4,11 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\GalleryAlbum;
 use App\Models\User;
+use App\Services\Academic\AcademicPeriodContext;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class GalleryAlbumUpdateTest extends TestCase
@@ -49,7 +52,56 @@ class GalleryAlbumUpdateTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('web_settings', function (Blueprint $table): void {
+            $table->id();
+            $table->string('school_apps');
+            $table->string('school_name');
+            $table->string('school_logo');
+            $table->timestamps();
+        });
+
+        DB::table('web_settings')->insert([
+            'id' => 1,
+            'school_apps' => 'SIAKAD',
+            'school_name' => 'Kampus Uji',
+            'school_logo' => 'website/site-logo.png',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Schema::create('notifications', function (Blueprint $table): void {
+            $table->id();
+            $table->timestamps();
+        });
+
+        Schema::create('ticket_supports', function (Blueprint $table): void {
+            $table->id();
+            $table->timestamps();
+        });
+
         Storage::fake('public');
+    }
+
+    public function test_index_displays_album_information_and_management_actions(): void
+    {
+        $this->mock(AcademicPeriodContext::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('availableFor')->once()->andReturn(new Collection);
+            $mock->shouldReceive('current')->once()->andReturnNull();
+            $mock->shouldReceive('active')->once()->andReturnNull();
+        });
+
+        $user = $this->webAdministrator();
+        $album = $this->album($user);
+
+        $response = $this->actingAs($user)->get(route('web-admin.publish.album-index'));
+
+        $response
+            ->assertOk()
+            ->assertSee($album->name)
+            ->assertSee('2 foto')
+            ->assertSee($user->name)
+            ->assertSee(route('web-admin.publish.album-show', $album->slug))
+            ->assertSee(route('web-admin.publish.album-edit', $album->slug));
     }
 
     public function test_update_can_remove_an_existing_photo_and_add_multiple_new_photos(): void

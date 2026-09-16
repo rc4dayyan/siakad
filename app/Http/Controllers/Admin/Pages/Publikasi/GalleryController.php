@@ -25,7 +25,7 @@ class GalleryController extends Controller
     {
         $data['prefix'] = $this->setPrefix();
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['album'] = GalleryAlbum::latest()->paginate(24);
+        $data['album'] = GalleryAlbum::with('author')->latest()->paginate(24);
 
         return view('user.pages.publikasi.gallery-index', $data);
     }
@@ -35,7 +35,11 @@ class GalleryController extends Controller
         $data['prefix'] = $this->setPrefix();
         $data['web'] = webSettings::where('id', 1)->first();
         $search = $request->input('search');
-        $album = GalleryAlbum::where('name', 'like', "%$search%")->paginate(24);
+        $album = GalleryAlbum::with('author')
+            ->where('name', 'like', "%$search%")
+            ->latest()
+            ->paginate(24)
+            ->withQueryString();
 
         return view('user.pages.publikasi.gallery-index', ['album' => $album], $data);
     }

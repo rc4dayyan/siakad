@@ -219,7 +219,7 @@
                                 <div><small>Informasi penting</small><h2>Pengumuman</h2></div>
                             </div>
                             <div class="home-announcements__list">
-                                @forelse ($notify->take(5) as $item)
+                                @forelse ($notify->take(3) as $item)
                                     <button type="button" data-bs-toggle="modal" data-bs-target="#announcement{{ $item->code }}">
                                         <time>{{ \Carbon\Carbon::parse($item->created_at)->translatedFormat('d M Y') }}</time>
                                         <strong>{{ $item->name }}</strong>
