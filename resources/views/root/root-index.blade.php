@@ -42,10 +42,10 @@
                                 <strong>{{ $fakultas->count() }}</strong>
                                 <span>Fakultas</span>
                             </div>
-                            <div>
+                            <!-- <div>
                                 <strong>{{ $proku->count() }}</strong>
                                 <span>Program Kuliah</span>
-                            </div>
+                            </div> -->
                             <div>
                                 <strong>{{ $posts->total() }}</strong>
                                 <span>Informasi Terkini</span>
@@ -139,7 +139,7 @@
                         </div>
                     @endforelse
 
-                    <div class="col-md-6 col-lg-4">
+                    <!-- <div class="col-md-6 col-lg-4">
                         <article class="home-program-card home-program-card--accent">
                             <div class="home-program-card__number"><i class="fa-solid fa-compass"></i></div>
                             <span class="home-icon home-icon--accent"><i class="fa-solid fa-calendar-check"></i></span>
@@ -156,7 +156,7 @@
                                 @endforelse
                             </div>
                         </article>
-                    </div>
+                    </div> -->
                 </div>
             </div>
         </section>

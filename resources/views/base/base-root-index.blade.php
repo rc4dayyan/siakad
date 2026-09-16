@@ -158,9 +158,8 @@
                                                     </li>
                                                 </ul>
                                             </li>
-                                            <li class="submenu-item has-sub">
+                                            <!-- <li class="submenu-item has-sub">
                                                 <a href="#" class='submenu-link'>Program Kuliah</a>
-                                                <!-- 3 Level Submenu -->
                                                 <ul class="subsubmenu">
                                                     @foreach ($proku as $item)
 
@@ -169,7 +168,7 @@
                                                         </li>
                                                     @endforeach
                                                 </ul>
-                                            </li>
+                                            </li> -->
                                             <li class="submenu-item">
                                                 <a href="{{ route('root.gallery-index') }}" class='submenu-link'>Album Foto</a>
                                             </li>
