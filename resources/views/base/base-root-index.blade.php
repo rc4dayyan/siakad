@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="{{ asset('dist') }}/assets/compiled/css/iconly.css">
     <link rel="stylesheet" href="{{ asset('dist') }}/assets/custom/css/news-section.css">
     <link rel="stylesheet" href="{{ asset('dist') }}/custom/banner.css">
-    <link rel="stylesheet" href="{{ asset('dist') }}/custom/home.css">
+    <link rel="stylesheet" href="{{ asset('dist/custom/home.css') }}?v={{ filemtime(public_path('dist/custom/home.css')) }}">
     {{-- PLUGIN FONT AWESOME --}}
     <link rel="stylesheet" href="{{ asset('vendor') }}/fontawesome/css/all.min.css" rel="stylesheet">
     @yield('custom-css')

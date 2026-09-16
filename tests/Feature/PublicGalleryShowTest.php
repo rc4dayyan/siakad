@@ -80,6 +80,7 @@ class PublicGalleryShowTest extends TestCase
             ->assertOk()
             ->assertSee($album->name)
             ->assertSee('2 foto')
+            ->assertSee('dist/custom/home.css?v=', false)
             ->assertSee('galleryPrevious')
             ->assertSee('galleryNext')
             ->assertSee($related->name)

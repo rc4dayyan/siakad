@@ -18,11 +18,40 @@ class NotifyController extends Controller
 {
     use roleTrait;
 
-    public function index()
+    public function index(Request $request)
     {
+        $filters = $request->validate([
+            'search' => 'nullable|string|max:100',
+            'target' => 'nullable|integer|in:0,1,2,3',
+            'type' => 'nullable|string|max:255',
+            'status' => 'nullable|in:read,unread',
+        ]);
+
         $data['prefix'] = $this->setPrefix();
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['notify'] = Notification::query()->with('author')->latest()->get();
+        $data['categories'] = Notification::query()
+            ->whereNotNull('type')
+            ->where('type', '!=', '')
+            ->distinct()
+            ->orderBy('type')
+            ->pluck('type');
+        $data['totalNotifications'] = Notification::query()->count();
+        $data['unreadNotifications'] = Notification::query()->where('read', false)->count();
+        $data['notify'] = Notification::query()
+            ->with('author')
+            ->when($filters['search'] ?? null, function ($query, $search): void {
+                $query->where(function ($notification) use ($search): void {
+                    $notification->where('name', 'like', "%{$search}%")
+                        ->orWhere('desc', 'like', "%{$search}%")
+                        ->orWhere('type', 'like', "%{$search}%");
+                });
+            })
+            ->when(array_key_exists('target', $filters) && $filters['target'] !== null, fn ($query) => $query->where('send_to', $filters['target']))
+            ->when($filters['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('read', $status === 'read'))
+            ->latest()
+            ->paginate(15)
+            ->withQueryString();
 
         return view('user.admin.system.notify-index', $data);
     }
@@ -32,7 +61,7 @@ class NotifyController extends Controller
         $notify = new Notification;
 
         $request->validate([
-            'send_to' => 'required|integer',
+            'send_to' => 'required|integer|in:0,1,2,3',
             'dept_id' => 'nullable|integer',
             'user_id' => 'nullable|integer',
             'faku_id' => 'nullable|integer',
@@ -41,8 +70,8 @@ class NotifyController extends Controller
             'class_id' => 'nullable|integer',
             'student_id' => 'nullable|integer',
             'lecture_id' => 'nullable|integer',
-            'name' => 'required|string',
-            'type' => 'required|string',
+            'name' => 'required|string|max:255',
+            'type' => 'required|string|max:255',
             'desc' => 'required|string',
         ]);
 
@@ -74,12 +103,14 @@ class NotifyController extends Controller
         $notify = Notification::where('code', $code)->firstOrFail();
 
         $request->validate([
-            'name' => 'required|string',
-            'type' => 'required|string',
+            'send_to' => 'required|integer|in:0,1,2,3',
+            'name' => 'required|string|max:255',
+            'type' => 'required|string|max:255',
             'desc' => 'required|string',
         ]);
 
         $notify->auth_id = Auth::user()->id;
+        $notify->send_to = $request->send_to;
         $notify->name = $request->name;
         $notify->type = $request->type;
         // $notify->code = Str::random(7);

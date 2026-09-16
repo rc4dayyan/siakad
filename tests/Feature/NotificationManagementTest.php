@@ -64,6 +64,76 @@ class NotificationManagementTest extends TestCase
         $response->assertSee('Pengguna tidak tersedia');
     }
 
+    public function test_notification_page_filters_by_search_target_category_and_status(): void
+    {
+        $administrator = $this->webAdministrator();
+        Notification::create([
+            'auth_id' => $administrator->id,
+            'send_to' => 3,
+            'name' => 'Jadwal Pengisian KRS',
+            'slug' => 'jadwal-pengisian-krs',
+            'type' => 'Akademik',
+            'desc' => 'Pengisian KRS dibuka untuk mahasiswa.',
+            'code' => 'NTF-KRS',
+            'read' => false,
+        ]);
+        Notification::create([
+            'auth_id' => $administrator->id,
+            'send_to' => 2,
+            'name' => 'Rapat Dosen',
+            'slug' => 'rapat-dosen',
+            'type' => 'Kegiatan',
+            'desc' => 'Rapat koordinasi dosen.',
+            'code' => 'NTF-RAPAT',
+            'read' => true,
+        ]);
+
+        $response = $this->actingAs($administrator)->get(route('web-admin.system.notify-index', [
+            'search' => 'KRS',
+            'target' => 3,
+            'type' => 'Akademik',
+            'status' => 'unread',
+        ]));
+
+        $response
+            ->assertOk()
+            ->assertSee('Jadwal Pengisian KRS')
+            ->assertSee('4 filter aktif')
+            ->assertSee('updateNotifyNTF-KRS')
+            ->assertDontSee('updateNotifyNTF-RAPAT');
+    }
+
+    public function test_notification_target_can_be_updated(): void
+    {
+        $administrator = $this->webAdministrator();
+        $notification = Notification::create([
+            'auth_id' => $administrator->id,
+            'send_to' => 0,
+            'name' => 'Informasi Kampus',
+            'slug' => 'informasi-kampus',
+            'type' => 'Informasi',
+            'desc' => 'Informasi awal.',
+            'code' => 'NTF-UPDATE',
+        ]);
+
+        $response = $this->actingAs($administrator)->patch(
+            route('web-admin.system.notify-update', $notification->code),
+            [
+                'send_to' => 2,
+                'name' => 'Informasi Khusus Dosen',
+                'type' => 'Akademik',
+                'desc' => 'Informasi yang telah diperbarui.',
+            ],
+        );
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('notifications', [
+            'id' => $notification->id,
+            'send_to' => 2,
+            'name' => 'Informasi Khusus Dosen',
+        ]);
+    }
+
     private function webAdministrator(): User
     {
         return User::create([
