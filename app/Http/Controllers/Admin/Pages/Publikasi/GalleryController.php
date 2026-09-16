@@ -2,30 +2,24 @@
 
 namespace App\Http\Controllers\Admin\Pages\Publikasi;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-// SECTION ADDONS SYSTEM
-use Illuminate\Support\Facades\File;
-use Auth;
-use Hash;
-use Str;
-use Storage;
-// SECTION ADDONS EXTERNAL
 use Alert;
 use App\Helper\roleTrait;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-// SECTION MODELS
-use App\Models\User;
+// SECTION ADDONS SYSTEM
+use App\Http\Controllers\Controller;
 use App\Models\GalleryAlbum;
-use App\Models\GalleryPhotos;
 use App\Models\Settings\webSettings;
+// SECTION ADDONS EXTERNAL
+use Auth;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+// SECTION MODELS
+use Storage;
+use Str;
+use Throwable;
 
 class GalleryController extends Controller
 {
     use roleTrait;
-
-
 
     public function index()
     {
@@ -43,7 +37,7 @@ class GalleryController extends Controller
         $search = $request->input('search');
         $album = GalleryAlbum::where('name', 'like', "%$search%")->paginate(24);
 
-        return view('user.pages.publikasi.gallery-index',['album' => $album], $data);
+        return view('user.pages.publikasi.gallery-index', ['album' => $album], $data);
     }
 
     public function create()
@@ -53,6 +47,7 @@ class GalleryController extends Controller
 
         return view('user.pages.publikasi.gallery-create', $data);
     }
+
     public function show($slug)
     {
         $data['prefix'] = $this->setPrefix();
@@ -61,6 +56,7 @@ class GalleryController extends Controller
 
         return view('user.pages.publikasi.gallery-show', $data);
     }
+
     public function edit($slug)
     {
         $data['prefix'] = $this->setPrefix();
@@ -70,33 +66,26 @@ class GalleryController extends Controller
         return view('user.pages.publikasi.gallery-edit', $data);
     }
 
-
     public function store(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
             'desc' => 'required|string',
             'cover' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_1' => 'required|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_2' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_3' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_4' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_5' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_6' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_7' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_8' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_9' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_10' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_11' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_12' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_13' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_14' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_15' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_16' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_17' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_18' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_19' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'file_20' => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'photos' => 'required|array|min:1|max:20',
+            'photos.*' => 'required|file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        ], [
+            'name.required' => 'Nama album wajib diisi.',
+            'desc.required' => 'Deskripsi album wajib diisi.',
+            'cover.required' => 'Sampul album wajib dipilih.',
+            'cover.image' => 'Sampul album harus berupa gambar.',
+            'cover.mimes' => 'Format sampul harus JPG, JPEG, PNG, GIF, atau SVG.',
+            'cover.max' => 'Ukuran sampul maksimal 2 MB.',
+            'photos.required' => 'Pilih minimal satu foto untuk album.',
+            'photos.array' => 'Daftar foto album tidak valid.',
+            'photos.max' => 'Maksimal 20 foto dalam satu album.',
+            'photos.*.mimes' => 'Setiap foto harus berformat JPG, JPEG, PNG, GIF, atau SVG.',
+            'photos.*.max' => 'Ukuran setiap foto maksimal 2 MB.',
         ]);
 
         $coverPath = $request->file('cover')->store('images/gallery', 'public');
@@ -107,89 +96,107 @@ class GalleryController extends Controller
         $album->slug = Str::slug($request->name);
         $album->desc = $request->desc;
         $album->cover = $coverPath;
-        for ($i = 1; $i <= 20; $i++) {
-            $image_name = 'file_'.$i;
-            if ($request->hasFile($image_name)) {
-
-                $image = $request->file($image_name);
-                $name = 'images/gallery/'.uniqid().('file_'.$i).'.'.$image->getClientOriginalExtension();
-                $destinationPath = storage_path('app/public/images/gallery/');
-                $image->move($destinationPath, $name);
-                if ($album->$image_name != 'gallery_image.png') {
-                    File::delete($destinationPath.'/'.$album->$image_name); // hapus gambar lama
-                }
-
-                $album->$image_name = $name;
-            }
+        foreach ($request->file('photos') as $index => $image) {
+            $imageName = 'file_'.($index + 1);
+            $album->{$imageName} = $image->store('images/gallery', 'public');
         }
-        $album->save(); // Pastikan album disimpan terlebih dahulu
-
-
+        $album->save();
 
         Alert::success('Success', 'Data berhasil ditambahkan');
-        return back();
+
+        return redirect()->route($this->setPrefix().'publish.album-show', $album->slug);
     }
+
     public function update(Request $request, $slug)
     {
         $prefix = $this->setPrefix();
-        $request->validate([
+        $album = GalleryAlbum::where('slug', $slug)->firstOrFail();
+
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'desc' => 'required|string',
             'cover' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'photos' => 'nullable|array|max:20',
+            'photos.*' => 'required|file|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'remove_photos' => 'nullable|array',
+            'remove_photos.*' => 'integer|between:1,20|distinct',
+        ], [
+            'name.required' => 'Nama album wajib diisi.',
+            'desc.required' => 'Deskripsi album wajib diisi.',
+            'cover.image' => 'Sampul album harus berupa gambar.',
+            'cover.mimes' => 'Format sampul harus JPG, JPEG, PNG, GIF, atau SVG.',
+            'cover.max' => 'Ukuran sampul maksimal 2 MB.',
+            'photos.max' => 'Maksimal 20 foto baru dapat dipilih.',
+            'photos.*.mimes' => 'Setiap foto harus berformat JPG, JPEG, PNG, GIF, atau SVG.',
+            'photos.*.max' => 'Ukuran setiap foto maksimal 2 MB.',
+            'remove_photos.*.between' => 'Pilihan foto yang akan dihapus tidak valid.',
         ]);
 
-        $album = GalleryAlbum::where('slug', $slug)->firstOrFail();
+        $removedSlots = collect($validated['remove_photos'] ?? [])->map(fn ($slot) => (int) $slot);
+        $currentPhotos = collect(range(1, 20))
+            ->mapWithKeys(fn ($slot) => [$slot => $album->{'file_'.$slot}])
+            ->filter();
+        $retainedPhotos = $currentPhotos->reject(fn ($path, $slot) => $removedSlots->contains($slot))->values();
+        $newPhotos = $request->file('photos', []);
 
-        // Handle cover image upload if provided
-        if ($request->hasFile('cover')) {
-            $request->validate([
-                'cover' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        if ($retainedPhotos->count() + count($newPhotos) > 20) {
+            throw ValidationException::withMessages([
+                'photos' => 'Jumlah foto lama dan foto baru tidak boleh melebihi 20 foto.',
             ]);
-
-            $coverPath = $request->file('cover')->store('images/gallery/', 'public');
-
-            // Delete old cover if exists
-            if ($album->cover && $album->cover != 'gallery_image.png') {
-                Storage::disk('public')->delete($album->cover);
-            }
-
-            $album->cover = $coverPath;
         }
 
-        // Update other album details
-        $album->author_id = Auth::user()->id;
-        $album->name = $request->name;
-        $album->slug = Str::slug($request->name);
-        $album->desc = $request->desc;
-
-        // Handle file uploads (file_1 to file_20)
-        for ($i = 1; $i <= 20; $i++) {
-            $image_name = 'file_'.$i;
-
-            if ($request->hasFile($image_name)) {
-                $request->validate([
-                    $image_name => 'nullable|mimes:jpeg,png,jpg,gif,svg|max:2048',
-                ]);
-
-                $image = $request->file($image_name);
-                $name = 'images/gallery/' . uniqid().'_' . $image_name . '.' . $image->getClientOriginalExtension();
-                $destinationPath = storage_path('app/public/images/gallery/');
-                $image->move($destinationPath, $name);
-
-                // Delete old file if exists and is not default
-                if ($album->$image_name && $album->$image_name != 'gallery_image.png' && $album->$image_name != 'images/gallery/album-a.jpg' && $album->$image_name != 'images/gallery/album-b.jpg' && $album->$image_name != 'images/gallery/album-c.jpg') {
-                    Storage::disk('public')->delete($album->$image_name);
-                }
-
-                $album->$image_name = $name;
-            }
+        if ($retainedPhotos->isEmpty() && count($newPhotos) === 0) {
+            throw ValidationException::withMessages([
+                'photos' => 'Album harus memiliki minimal satu foto.',
+            ]);
         }
 
-        $album->save();
+        $uploadedPaths = [];
+        $oldCover = $album->cover;
+
+        try {
+            if ($request->hasFile('cover')) {
+                $album->cover = $request->file('cover')->store('images/gallery', 'public');
+                $uploadedPaths[] = $album->cover;
+            }
+
+            foreach ($newPhotos as $photo) {
+                $path = $photo->store('images/gallery', 'public');
+                $uploadedPaths[] = $path;
+                $retainedPhotos->push($path);
+            }
+
+            $album->author_id = Auth::user()->id;
+            $album->name = $validated['name'];
+            $album->slug = Str::slug($validated['name']);
+            $album->desc = $validated['desc'];
+
+            foreach (range(1, 20) as $slot) {
+                $album->{'file_'.$slot} = $retainedPhotos->get($slot - 1);
+            }
+
+            $album->save();
+        } catch (Throwable $exception) {
+            Storage::disk('public')->delete($uploadedPaths);
+
+            throw $exception;
+        }
+
+        $protectedImages = [
+            'gallery_image.png',
+            'images/gallery/album-a.jpg',
+            'images/gallery/album-b.jpg',
+            'images/gallery/album-c.jpg',
+        ];
+        $deletedPhotos = $currentPhotos->diff($retainedPhotos)->reject(fn ($path) => in_array($path, $protectedImages, true));
+        Storage::disk('public')->delete($deletedPhotos->all());
+
+        if ($request->hasFile('cover') && $oldCover && ! in_array($oldCover, $protectedImages, true)) {
+            Storage::disk('public')->delete($oldCover);
+        }
 
         Alert::success('Success', 'Data berhasil diupdate');
+
         return redirect()->route($prefix.'publish.album-edit', $album->slug);
     }
-
-
 }
