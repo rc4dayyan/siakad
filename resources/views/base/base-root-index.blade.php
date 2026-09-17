@@ -33,21 +33,45 @@
     <script src="{{ asset('dist') }}/assets/static/js/initTheme.js"></script>
     <div id="app">
         <div id="main" class="layout-horizontal">
-            <header class="mb-5">
+            <header class="public-header">
+                <div class="public-header__utility">
+                    <div class="container">
+                        <p>
+                            <i class="fa-solid fa-building-columns" aria-hidden="true"></i>
+                            <span>Sistem Informasi Akademik Terpadu</span>
+                        </p>
+                        <div class="public-header__utility-links" aria-label="Tautan cepat">
+                            @if ($web->school_email)
+                                <a href="mailto:{{ $web->school_email }}">
+                                    <i class="fa-regular fa-envelope" aria-hidden="true"></i>
+                                    {{ $web->school_email }}
+                                </a>
+                            @endif
+                            <a href="{{ route('root.gallery-index') }}">Galeri</a>
+                            <a href="{{ route('root.home-download') }}">Dokumen</a>
+                            <a href="{{ route('root.home-advice') }}">Kontak</a>
+                        </div>
+                    </div>
+                </div>
                 <div class="header-top">
                     <div class="container">
                         <div class="logo">
-                            <a href="{{ route('root.home-index') }}" style="font-size: 24px"><img
-                                    src="{{ asset('storage/images/' . $web->school_logo) }}" alt="Logo Website"
-                                    style="max-width: 100px; max-height: 100px"> {{ $web->school_name }}</a>
+                            <a href="{{ route('root.home-index') }}" aria-label="Beranda {{ strip_tags($web->school_name) }}">
+                                <span class="public-brand__mark">
+                                    <img src="{{ asset('storage/images/' . $web->school_logo) }}"
+                                        alt="Logo {{ strip_tags($web->school_name) }}">
+                                </span>
+                                <span class="public-brand__copy">
+                                    <strong>{{ strip_tags($web->school_name) }}</strong>
+                                    <small>Portal Informasi Akademik</small>
+                                </span>
+                            </a>
                         </div>
                         <div class="header-top-right">
-
                             <div class="dropdown">
                                 <a href="#" id="topbarUserDropdown"
-                                    class="user-dropdown d-flex align-items-center dropend dropdown-toggle "
+                                    class="user-dropdown d-flex align-items-center dropdown-toggle"
                                     data-bs-toggle="dropdown" aria-expanded="false">
-
                                     @if (Auth::guard('dosen')->check())
                                     <div class="avatar avatar-md2">
                                         <img src="{{ asset('storage/images/' . Auth::guard('dosen')->user()->dsn_image) }}"
@@ -80,9 +104,11 @@
                                         <p class="user-dropdown-status text-sm text-muted">{{ Auth::user()->type }}</p>
                                     </div>
                                     @else
-                                    <div class="text">
-                                        <h6 class="user-dropdown-name">Login</h6>
-                                    </div>
+                                    <span class="public-login__icon"><i class="fa-regular fa-user" aria-hidden="true"></i></span>
+                                    <span class="public-login__copy">
+                                        <small>Akses akun</small>
+                                        <strong>Masuk Portal</strong>
+                                    </span>
                                     @endif
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end shadow-lg"
@@ -114,126 +140,84 @@
                                 </ul>
                             </div>
 
-                            <!-- Burger button responsive -->
-                            <a href="#" class="burger-btn d-block d-xl-none">
-                                <i class="bi bi-justify fs-3"></i>
-                            </a>
+                            <button type="button" class="burger-btn d-flex d-xl-none" aria-controls="publicNavigation"
+                                aria-expanded="false" aria-label="Buka menu navigasi">
+                                <span></span><span></span><span></span>
+                            </button>
                         </div>
                     </div>
                 </div>
-                <nav class="main-navbar">
+                <nav class="main-navbar" id="publicNavigation" aria-label="Navigasi utama">
                     <div class="container">
                         <ul>
-
-
-
-                            <li class="menu-item">
+                            <li class="menu-item {{ request()->routeIs('root.home-index') ? 'active' : '' }}">
                                 <a href="{{ route('root.home-index') }}" class='menu-link'>
-                                    <span><i class="fa-solid fa-home"></i> Home</span>
+                                    <span><i class="fa-solid fa-house" aria-hidden="true"></i> Beranda</span>
                                 </a>
                             </li>
 
-                            <li class="menu-item  has-sub">
-                                <a href="#" class='menu-link'>
-                                    <span><i class="fa-solid fa-globe"></i> Tentang Kami</span>
+                            <li class="menu-item has-sub {{ request()->routeIs('root.gallery-*') ? 'active' : '' }}">
+                                <a href="#" class='menu-link' aria-haspopup="true" aria-expanded="false">
+                                    <span><i class="fa-regular fa-compass" aria-hidden="true"></i> Tentang Kampus</span>
                                 </a>
                                 <div class="submenu">
-                                    <!-- Wrap to submenu-group-wrapper if you want 3-level submenu. Otherwise remove it. -->
                                     <div class="submenu-group-wrapper">
-
-
                                         <ul class="submenu-group">
-                                            <li class="submenu-item has-sub">
-                                                <a href="#" class='submenu-link'>Profile</a>
-                                                <!-- 3 Level Submenu -->
-                                                <ul class="subsubmenu">
-                                                    <li class="subsubmenu-item ">
-                                                        <a href="#" class="subsubmenu-link">Sejarah</a>
-                                                    </li>
-                                                    <li class="subsubmenu-item ">
-                                                        <a href="#" class="subsubmenu-link">Struktur Organisasi</a>
-                                                    </li>
-                                                    <li class="subsubmenu-item ">
-                                                        <a href="#" class="subsubmenu-link">Visi & Misi</a>
-                                                    </li>
-                                                </ul>
-                                            </li>
-                                            <!-- <li class="submenu-item has-sub">
-                                                <a href="#" class='submenu-link'>Program Kuliah</a>
-                                                <ul class="subsubmenu">
-                                                    @foreach ($proku as $item)
-
-                                                        <li class="subsubmenu-item ">
-                                                            <a href="#" class="subsubmenu-link">{{ $item->name }}</a>
-                                                        </li>
-                                                    @endforeach
-                                                </ul>
-                                            </li> -->
-                                            <li class="submenu-item">
-                                                <a href="{{ route('root.gallery-index') }}" class='submenu-link'>Album Foto</a>
+                                            <li class="submenu-item {{ request()->routeIs('root.gallery-*') ? 'active' : '' }}">
+                                                <a href="{{ route('root.gallery-index') }}" class='submenu-link'>
+                                                    <span class="submenu-link__icon"><i class="fa-regular fa-images" aria-hidden="true"></i></span>
+                                                    <span><strong>Galeri Kampus</strong><small>Dokumentasi kegiatan dan suasana kampus</small></span>
+                                                </a>
                                             </li>
                                         </ul>
                                     </div>
                                 </div>
                             </li>
-                            <li class="menu-item  has-sub">
-                                <a href="#" class='menu-link'>
-                                    <span><i class="fa-solid fa-graduation-cap"></i> Fakultas</span>
+                            <li class="menu-item has-sub {{ request()->routeIs('root.home-prodi', 'root.home-proku') ? 'active' : '' }}">
+                                <a href="#" class='menu-link' aria-haspopup="true" aria-expanded="false">
+                                    <span><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i> Akademik</span>
                                 </a>
                                 <div class="submenu">
-                                    <!-- Wrap to submenu-group-wrapper if you want 3-level submenu. Otherwise remove it. -->
                                     <div class="submenu-group-wrapper">
-
-
                                         <ul class="submenu-group">
                                             @foreach ($fakultas as $faku)
-                                            <li class="submenu-item  has-sub">
-                                                <a href="#" class='submenu-link'>{{ $faku->name }}</a>
-
-
-                                                <!-- 3 Level Submenu -->
+                                            <li class="submenu-item has-sub">
+                                                <a href="#" class='submenu-link'>
+                                                    <span class="submenu-link__icon"><i class="fa-solid fa-book-open" aria-hidden="true"></i></span>
+                                                    <span><strong>{{ $faku->name }}</strong><small>Lihat program studi</small></span>
+                                                </a>
                                                 <ul class="subsubmenu">
-
                                                     @php
                                                     $pstudi = \App\Models\ProgramStudi::where('faku_id',
                                                     $faku->id)->get();
                                                     @endphp
                                                     @foreach ($pstudi as $item)
-                                                    <li class="subsubmenu-item ">
+                                                    <li class="subsubmenu-item">
                                                         <a href="{{ route('root.home-prodi', $item->slug) }}" class="subsubmenu-link">{{ $item->level . ' - ' . $item->name }}</a>
                                                     </li>
                                                     @endforeach
-
-
                                                 </ul>
-
                                             </li>
                                             @endforeach
-
                                         </ul>
-
-
                                     </div>
                                 </div>
                             </li>
 
-                            <li class="menu-item">
+                            <li class="menu-item {{ request()->routeIs('root.home-download') ? 'active' : '' }}">
                                 <a href="{{ route('root.home-download') }}" class='menu-link'>
-                                    <span><i class="fa-solid fa-file-pdf"></i> Document</span>
+                                    <span><i class="fa-regular fa-file-lines" aria-hidden="true"></i> Dokumen</span>
                                 </a>
                             </li>
 
-                            <li class="menu-item">
+                            <li class="menu-item {{ request()->routeIs('root.home-advice') ? 'active' : '' }}">
                                 <a href="{{ route('root.home-advice') }}" class='menu-link'>
-                                    <span><i class="fa-solid fa-envelope-open-text"></i> Kontak Kami</span>
+                                    <span><i class="fa-regular fa-message" aria-hidden="true"></i> Kontak</span>
                                 </a>
                             </li>
-
-
                         </ul>
                     </div>
                 </nav>
-
             </header>
             <div class="content-wrapper container">
                 @include('sweetalert::alert')
@@ -243,15 +227,11 @@
             </div>
 
 
-            <footer>
-                <div class="container">
-                    @include('base.panel.base-panel-footer')
-                </div>
-            </footer>
+            @include('base.partials.public-footer')
         </div>
     </div>
     <script src="{{ asset('dist') }}/assets/static/js/components/dark.js"></script>
-    <script src="{{ asset('dist') }}/assets/static/js/pages/horizontal-layout.js"></script>
+    <script src="{{ asset('dist/custom/public-header.js') }}?v={{ filemtime(public_path('dist/custom/public-header.js')) }}"></script>
     <script src="{{ asset('dist') }}/assets/extensions/perfect-scrollbar/perfect-scrollbar.min.js"></script>
 
     <script src="{{ asset('dist') }}/assets/compiled/js/app.js"></script>

@@ -81,6 +81,8 @@ class PublicGalleryShowTest extends TestCase
             ->assertSee($album->name)
             ->assertSee('2 foto')
             ->assertSee('dist/custom/home.css?v=', false)
+            ->assertSee('class="public-footer"', false)
+            ->assertSee('Portal Akademik')
             ->assertSee('galleryPrevious')
             ->assertSee('galleryNext')
             ->assertSee($related->name)
