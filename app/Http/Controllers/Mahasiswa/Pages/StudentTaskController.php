@@ -23,17 +23,67 @@ use Str;
 
 class StudentTaskController extends Controller
 {
-    public function index(AcademicPeriodContext $periodContext, StudentAcademicContext $studentContext)
-    {
+    public function index(
+        Request $request,
+        AcademicPeriodContext $periodContext,
+        StudentAcademicContext $studentContext
+    ) {
         $user = Auth::guard('mahasiswa')->user();
         $period = $periodContext->published();
         $classId = $studentContext->classIdFor($user, $period);
+        $filters = [
+            'q' => trim((string) $request->query('q')),
+            'status' => in_array($request->query('status'), ['aktif', 'segera', 'terlambat', 'dikumpulkan'], true)
+                ? $request->query('status')
+                : null,
+        ];
         $data['web'] = webSettings::where('id', 1)->first();
-        $data['stask'] = StudentTask::query()
+        $tasks = StudentTask::query()
             ->forAcademicPeriod($period)
             ->when($classId, fn ($query) => $query->whereHas('jadkul', fn ($schedule) => $schedule->where('kelas_id', $classId)))
             ->when(! $classId, fn ($query) => $query->whereRaw('1 = 0'))
+            ->with(['dosen', 'jadkul.matkul'])
             ->get();
+        $submittedTaskIds = studentScore::query()
+            ->where('student_id', $user->id)
+            ->whereIn('stask_id', $tasks->modelKeys())
+            ->pluck('stask_id')
+            ->flip();
+
+        $tasks->each(function (studentTask $task) use ($submittedTaskIds): void {
+            $deadline = Carbon::parse($task->exp_date.' '.$task->exp_time);
+            $status = match (true) {
+                $submittedTaskIds->has($task->id) => 'dikumpulkan',
+                $deadline->isPast() => 'terlambat',
+                now()->diffInHours($deadline, false) <= 72 => 'segera',
+                default => 'aktif',
+            };
+
+            $task->setAttribute('deadline_at', $deadline);
+            $task->setAttribute('student_status', $status);
+        });
+
+        $data['taskSummary'] = [
+            'total' => $tasks->count(),
+            'aktif' => $tasks->whereIn('student_status', ['aktif', 'segera'])->count(),
+            'terlambat' => $tasks->where('student_status', 'terlambat')->count(),
+            'dikumpulkan' => $tasks->where('student_status', 'dikumpulkan')->count(),
+        ];
+        $data['stask'] = $tasks
+            ->when($filters['q'], function ($items, $search) {
+                $needle = mb_strtolower($search);
+
+                return $items->filter(fn (studentTask $task) => str_contains(mb_strtolower(implode(' ', [
+                    $task->title,
+                    $task->dosen?->dsn_name,
+                    $task->jadkul?->matkul?->name,
+                ])), $needle));
+            })
+            ->when($filters['status'], fn ($items, $status) => $items->where('student_status', $status))
+            ->sortBy('deadline_at')
+            ->values();
+        $data['filters'] = $filters;
+        $data['period'] = $period;
 
         return view('mahasiswa.pages.stask-index', $data);
     }

@@ -20,6 +20,7 @@ use App\Services\Academic\AcademicPeriodContext;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Rap2hpoutre\FastExcel\FastExcel;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExportController extends Controller
 {
@@ -27,7 +28,7 @@ class ExportController extends Controller
     {
         $users = User::all();
 
-        (new FastExcel($users))->export('export-users-'.uniqid().'.csv', function ($user) {
+        return $this->asExcel((new FastExcel($users))->download('export-users-'.uniqid().'.xlsx', function (User $user) {
             return [
                 'Username' => $user->user,
                 'Email' => $user->email,
@@ -40,10 +41,7 @@ class ExportController extends Controller
                 'TypeUser' => $user->raw_type,
                 'Status' => $user->status,
             ];
-        });
-
-        return (new FastExcel($users))->download('export-users-'.uniqid().'.csv');
-
+        }));
     }
 
     public function exportStudent(Request $request, AcademicPeriodContext $context)
@@ -84,7 +82,7 @@ class ExportController extends Controller
             ->whereIn('kecamatan', $districtNames)
             ->get();
 
-        return (new FastExcel($registrations))->download('export-mahasiswa-openfeeder-'.$period->code.'-'.now()->format('YmdHis').'.xlsx', function ($registration) use ($regions) {
+        return $this->asExcel((new FastExcel($registrations))->download('export-mahasiswa-openfeeder-'.$period->code.'-'.now()->format('YmdHis').'.xlsx', function ($registration) use ($regions) {
             $student = $registration->mahasiswa;
             $studyProgram = $registration->kelas?->pstudi;
             $region = $regions->first(fn (Wilayah $item) => $this->sameRegion($student, $item));
@@ -149,7 +147,7 @@ class ExportController extends Controller
                 'Status Riwayat' => 1,
                 'Keterangan Riwayat' => null,
             ];
-        });
+        }));
     }
 
     private function openFeederSemester(?TahunAkademik $period, Mahasiswa $student): ?string
@@ -200,7 +198,7 @@ class ExportController extends Controller
             ->with(['taka', 'pstudi', 'proku', 'dosen'])
             ->get();
 
-        return (new FastExcel($kelas))->download('export-kelas-'.$period->code.'-'.uniqid().'.csv', function (Kelas $item) {
+        return $this->asExcel((new FastExcel($kelas))->download('export-kelas-'.$period->code.'-'.uniqid().'.xlsx', function (Kelas $item) {
             return [
                 'Kode Kelas' => $item->code,
                 'Nama Kelas' => $item->name,
@@ -210,7 +208,7 @@ class ExportController extends Controller
                 'Kode Program Kuliah' => $item->proku?->code,
                 'NIDN Wali Dosen' => $item->dosen?->dsn_nidn,
             ];
-        });
+        }));
     }
 
     public function exportMataKuliah(AcademicPeriodContext $context)
@@ -228,7 +226,7 @@ class ExportController extends Controller
                 'dosen3',
             ])->get();
 
-        return (new FastExcel($mataKuliah))->download('export-mata-kuliah-'.$period->code.'-'.uniqid().'.csv', function (MataKuliah $item) {
+        return $this->asExcel((new FastExcel($mataKuliah))->download('export-mata-kuliah-'.$period->code.'-'.uniqid().'.xlsx', function (MataKuliah $item) {
             return [
                 'Kode' => $item->code,
                 'Nama' => $item->name,
@@ -242,7 +240,7 @@ class ExportController extends Controller
                 'NIDN Dosen Kedua' => $item->dosen2?->dsn_nidn,
                 'NIDN Dosen Ketiga' => $item->dosen3?->dsn_nidn,
             ];
-        });
+        }));
     }
 
     public function exportJadwalKuliah(AcademicPeriodContext $context)
@@ -253,7 +251,7 @@ class ExportController extends Controller
             ->with(['matkul', 'kelas', 'dosen', 'ruang'])
             ->get();
 
-        return (new FastExcel($jadwalKuliah))->download('export-jadwal-kuliah-'.$period->code.'-'.uniqid().'.csv', function (JadwalKuliah $item) use ($period) {
+        return $this->asExcel((new FastExcel($jadwalKuliah))->download('export-jadwal-kuliah-'.$period->code.'-'.uniqid().'.xlsx', function (JadwalKuliah $item) use ($period) {
             return [
                 'Kode Tahun Akademik' => $period->code,
                 'Kode Jadwal' => $item->code,
@@ -269,26 +267,26 @@ class ExportController extends Controller
                 'Waktu Mulai' => $item->start,
                 'Waktu Selesai' => $item->ended,
             ];
-        });
+        }));
     }
 
     public function exportGedung()
     {
         $gedung = Gedung::all();
 
-        return (new FastExcel($gedung))->download('export-gedung-'.uniqid().'.csv', function (Gedung $item) {
+        return $this->asExcel((new FastExcel($gedung))->download('export-gedung-'.uniqid().'.xlsx', function (Gedung $item) {
             return [
                 'Kode Gedung' => $item->code,
                 'Nama Gedung' => $item->name,
             ];
-        });
+        }));
     }
 
     public function exportRuang()
     {
         $ruang = Ruang::with('gedung')->get();
 
-        return (new FastExcel($ruang))->download('export-ruang-'.uniqid().'.csv', function (Ruang $item) {
+        return $this->asExcel((new FastExcel($ruang))->download('export-ruang-'.uniqid().'.xlsx', function (Ruang $item) {
             return [
                 'Kode Ruang' => $item->code,
                 'Nama Ruang' => $item->name,
@@ -296,6 +294,16 @@ class ExportController extends Controller
                 'Tipe' => $item->raw_type,
                 'Lantai' => $item->floor,
             ];
-        });
+        }));
+    }
+
+    private function asExcel(StreamedResponse $response): StreamedResponse
+    {
+        $response->headers->set(
+            'Content-Type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        );
+
+        return $response;
     }
 }

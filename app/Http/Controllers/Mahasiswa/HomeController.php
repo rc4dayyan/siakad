@@ -36,6 +36,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
 use PDF;
@@ -344,39 +345,53 @@ class HomeController extends Controller
 
     public function saveDataKontak(Request $request)
     {
-
-        $request->validate([
-            'mhs_phone' => 'required|numeric|unique:users,phone,'.Auth::guard('mahasiswa')->user()->id,
-            'mhs_mail' => 'required|email|max:255|unique:users,email,'.Auth::guard('mahasiswa')->user()->id,
+        $user = Auth::guard('mahasiswa')->user();
+        $validated = $request->validate([
+            'mhs_phone' => ['required', 'numeric'],
+            'mhs_mail' => ['required', 'email', 'max:255', Rule::unique('mahasiswas', 'mhs_mail')->ignore($user->id)],
             'mhs_parent_father' => 'nullable|string|max:255',
             'mhs_parent_mother' => 'nullable|string|max:255',
             'mhs_parent_father_phone' => 'nullable|string|max:14',
             'mhs_parent_mother_phone' => 'nullable|string|max:14',
-            'mhs_parent_wali_name' => 'string|max:14',
-            'mhs_parent_wali_phone' => 'string|max:14',
+            'mhs_wali_name' => 'nullable|string|max:255',
+            'mhs_wali_phone' => 'nullable|string|max:14',
             'mhs_addr_domisili' => 'nullable|string|max:4192',
             'mhs_addr_kelurahan' => 'nullable|string|max:255',
             'mhs_addr_kecamatan' => 'nullable|string|max:255',
             'mhs_addr_kota' => 'nullable|string|max:255',
             'mhs_addr_provinsi' => 'nullable|string|max:255',
         ]);
-        $user = Auth::guard('mahasiswa')->user();
 
-        $user->mhs_phone = $request->mhs_phone;
-        $user->mhs_mail = $request->mhs_mail;
-        $user->mhs_parent_father = $request->mhs_parent_father;
-        $user->mhs_parent_father_phone = $request->mhs_parent_father_phone;
-        $user->mhs_parent_mother = $request->mhs_parent_mother;
-        $user->mhs_parent_mother_phone = $request->mhs_parent_mother_phone;
-        $user->mhs_wali_name = $request->mhs_wali_name;
-        $user->mhs_wali_phone = $request->mhs_wali_phone;
-        $user->mhs_addr_domisili = $request->mhs_addr_domisili;
-        $user->mhs_addr_kelurahan = $request->mhs_addr_kelurahan;
-        $user->mhs_addr_kecamatan = $request->mhs_addr_kecamatan;
-        $user->mhs_addr_kota = $request->mhs_addr_kota;
-        $user->mhs_addr_provinsi = $request->mhs_addr_provinsi;
+        DB::transaction(function () use ($user, $validated): void {
+            $lockedUser = $user->newQuery()->lockForUpdate()->findOrFail($user->id);
+            $newEmail = Str::lower(trim($validated['mhs_mail']));
+            $currentEmail = Str::lower(trim((string) $lockedUser->getRawOriginal('mhs_mail')));
 
-        $user->save();
+            if ($newEmail !== $currentEmail) {
+                if ($lockedUser->mhs_email_changed_at !== null) {
+                    throw ValidationException::withMessages([
+                        'mhs_mail' => 'Email akademik hanya dapat diubah satu kali. Silakan hubungi bagian akademik untuk perubahan berikutnya.',
+                    ]);
+                }
+
+                $lockedUser->mhs_mail = $newEmail;
+                $lockedUser->mhs_email_changed_at = now();
+            }
+
+            $lockedUser->mhs_phone = $validated['mhs_phone'];
+            $lockedUser->mhs_parent_father = $validated['mhs_parent_father'] ?? null;
+            $lockedUser->mhs_parent_father_phone = $validated['mhs_parent_father_phone'] ?? null;
+            $lockedUser->mhs_parent_mother = $validated['mhs_parent_mother'] ?? null;
+            $lockedUser->mhs_parent_mother_phone = $validated['mhs_parent_mother_phone'] ?? null;
+            $lockedUser->mhs_wali_name = $validated['mhs_wali_name'] ?? null;
+            $lockedUser->mhs_wali_phone = $validated['mhs_wali_phone'] ?? null;
+            $lockedUser->mhs_addr_domisili = $validated['mhs_addr_domisili'] ?? null;
+            $lockedUser->mhs_addr_kelurahan = $validated['mhs_addr_kelurahan'] ?? null;
+            $lockedUser->mhs_addr_kecamatan = $validated['mhs_addr_kecamatan'] ?? null;
+            $lockedUser->mhs_addr_kota = $validated['mhs_addr_kota'] ?? null;
+            $lockedUser->mhs_addr_provinsi = $validated['mhs_addr_provinsi'] ?? null;
+            $lockedUser->save();
+        });
 
         Alert::success('Success', 'Data berhasil diupdate');
 
@@ -397,7 +412,7 @@ class HomeController extends Controller
         if (! Hash::check($request->old_password, $user->password)) {
             Alert::error('Error', 'Password lama yang diberikan tidak cocok dengan catatan kami.');
 
-            return back();
+            return back()->withInput($request->only('profile_section'));
         }
 
         // Update the password
@@ -422,15 +437,52 @@ class HomeController extends Controller
 
     }
 
-    public function tagihanIndex(AcademicPeriodContext $context)
+    public function tagihanIndex(Request $request, AcademicPeriodContext $context)
     {
         $user = Auth::guard('mahasiswa')->user();
         $period = $context->published();
+        $filters = [
+            'q' => trim((string) $request->query('q')),
+            'status' => in_array($request->query('status'), ['lunas', 'pending', 'ditolak', 'belum_dibayar'], true)
+                ? $request->query('status')
+                : null,
+        ];
         $data['web'] = webSettings::where('id', 1)->first();
         $data['period'] = $period;
-        $data['tagihan'] = TagihanKuliah::query()->forAcademicPeriod($period)->forStudent($user)->latest()->get();
+        $tagihan = TagihanKuliah::query()->forAcademicPeriod($period)->forStudent($user)->latest()->get();
         $data['history'] = HistoryTagihan::query()->where('users_id', $user->id)->where('taka_id', $period?->id)->where('stat', 1)->latest()->get();
         $data['payments'] = HistoryTagihan::query()->where('users_id', $user->id)->where('taka_id', $period?->id)->latest()->get();
+        $tagihan->each(function (TagihanKuliah $bill) use ($data): void {
+            $payment = $data['payments']->firstWhere('tagihan_kuliah_id', $bill->id)
+                ?? $data['payments']->firstWhere('tagihan_code', $bill->code);
+            $status = match (true) {
+                $payment && ($payment->status === HistoryTagihan::STATUS_PAID || (int) $payment->stat === 1) => 'lunas',
+                $payment?->status === HistoryTagihan::STATUS_PENDING => 'pending',
+                $payment?->status === HistoryTagihan::STATUS_REJECTED => 'ditolak',
+                default => 'belum_dibayar',
+            };
+
+            $bill->setRelation('currentPayment', $payment);
+            $bill->setAttribute('student_status', $status);
+        });
+        $data['billingSummary'] = [
+            'total' => $tagihan->sum(fn (TagihanKuliah $bill) => (int) ($bill->nominal ?? $bill->price)),
+            'outstanding' => $tagihan->whereNotIn('student_status', ['lunas'])->sum(fn (TagihanKuliah $bill) => (int) ($bill->nominal ?? $bill->price)),
+            'paid' => $tagihan->where('student_status', 'lunas')->count(),
+            'pending' => $tagihan->where('student_status', 'pending')->count(),
+        ];
+        $data['tagihan'] = $tagihan
+            ->when($filters['q'], function ($items, $search) {
+                $needle = mb_strtolower($search);
+
+                return $items->filter(fn (TagihanKuliah $bill) => str_contains(
+                    mb_strtolower($bill->code.' '.$bill->name),
+                    $needle
+                ));
+            })
+            ->when($filters['status'], fn ($items, $status) => $items->where('student_status', $status))
+            ->values();
+        $data['filters'] = $filters;
 
         return view('mahasiswa.pages.mhs-tagihan-index', $data);
 

@@ -10,6 +10,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Rap2hpoutre\FastExcel\FastExcel;
 use Tests\TestCase;
 
 class KelasAcademicPeriodTest extends TestCase
@@ -246,10 +247,20 @@ class KelasAcademicPeriodTest extends TestCase
             ->get(route('academic.services.convert.export-kelas'));
 
         $response->assertOk();
+        $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         $this->assertStringContainsString($this->activePeriod->code, (string) $response->headers->get('content-disposition'));
-        $content = $response->streamedContent();
-        $this->assertStringContainsString('AKTIF-EXPORT', $content);
-        $this->assertStringNotContainsString('LAMA-EXPORT', $content);
+        $this->assertStringEndsWith('.xlsx', (string) $response->headers->get('content-disposition'));
+
+        $path = sys_get_temp_dir().'/kelas-export-'.uniqid().'.xlsx';
+        file_put_contents($path, $response->streamedContent());
+
+        try {
+            $rows = (new FastExcel)->import($path);
+        } finally {
+            @unlink($path);
+        }
+
+        $this->assertSame(['AKTIF-EXPORT'], $rows->pluck('Kode Kelas')->all());
     }
 
     public function test_exported_class_file_can_be_imported_again_by_web_admin(): void
@@ -298,7 +309,7 @@ class KelasAcademicPeriodTest extends TestCase
             ->from(route('web-admin.master.kelas-index'))
             ->post(route('web-admin.services.convert.import-kelas'), [
                 '_form' => 'import-kelas',
-                'import' => UploadedFile::fake()->createWithContent('export-kelas.csv', $content),
+                'import' => UploadedFile::fake()->createWithContent('export-kelas.xlsx', $content),
             ]);
 
         $import->assertRedirect(route('web-admin.master.kelas-index'));

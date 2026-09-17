@@ -42,7 +42,38 @@ class StudentNilaiController extends Controller
         $data['web'] = webSettings::where('id', 1)->first();
         $data['period'] = $period;
         $data['isTranscript'] = $isTranscript;
-        $data['nilai'] = $this->courseRows($user, $period, $isTranscript, $studentContext);
+        $filters = [
+            'q' => trim((string) $request->query('q')),
+            'status' => in_array($request->query('status'), ['sudah_dinilai', 'belum_dinilai'], true)
+                ? $request->query('status')
+                : null,
+            'nilai' => in_array(strtoupper((string) $request->query('nilai')), ['A', 'B', 'C', 'D', 'E'], true)
+                ? strtoupper((string) $request->query('nilai'))
+                : null,
+        ];
+        $courseRows = $this->courseRows($user, $period, $isTranscript, $studentContext);
+        $data['gradeSummary'] = [
+            'courses' => $courseRows->count(),
+            'credits' => $courseRows->sum('sks'),
+            'graded' => $courseRows->filter(fn (array $row) => filled($row['nilai']))->count(),
+            'ungraded' => $courseRows->filter(fn (array $row) => blank($row['nilai']))->count(),
+        ];
+        $data['nilai'] = $courseRows
+            ->when($filters['q'], function ($items, $search) {
+                $needle = mb_strtolower($search);
+
+                return $items->filter(fn (array $row) => str_contains(mb_strtolower(implode(' ', [
+                    $row['kode_mata_kuliah'],
+                    $row['mata_kuliah'],
+                    $row['dosen'],
+                    $row['kelas'],
+                ])), $needle));
+            })
+            ->when($filters['status'] === 'sudah_dinilai', fn ($items) => $items->filter(fn (array $row) => filled($row['nilai'])))
+            ->when($filters['status'] === 'belum_dinilai', fn ($items) => $items->filter(fn (array $row) => blank($row['nilai'])))
+            ->when($filters['nilai'], fn ($items, $grade) => $items->filter(fn (array $row) => strtoupper((string) $row['nilai']) === $grade))
+            ->values();
+        $data['filters'] = $filters;
         $data['hasilStudi'] = HasilStudi::query()
             ->where('student_id', $user->id)
             ->when(! $isTranscript, fn ($query) => $query->forAcademicPeriod($period))

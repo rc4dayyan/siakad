@@ -24,6 +24,13 @@ class Mahasiswa extends Authenticatable
         'remember_token',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'mhs_email_changed_at' => 'datetime',
+        ];
+    }
+
     public function getMhsStatAttribute($value)
     {
         $mhsstats = [
